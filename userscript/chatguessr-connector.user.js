@@ -1,9 +1,9 @@
 // ==UserScript==
-// @name         ChatGuessr YouTube - GeoGuessr Auto Connector, Overlay & Viewer Pins
+// @name         MabarBang YouTube - GeoGuessr Auto Connector, Overlay & Viewer Pins
 // @namespace    http://tampermonkey.net/
 // @version      2.3
-// @description  Otomatis mengirim data ronde GeoGuessr ke Railway, menampilkan Scoreboard Overlay & PIN tebakan penonton di peta GeoGuessr
-// @author       ChatGuessr
+// @description  Otomatis mengirim data ronde GeoGuessr ke Railway/Local, menampilkan Scoreboard Overlay & PIN tebakan penonton di peta GeoGuessr
+// @author       MabarBang
 // @match        *://*.geoguessr.com/*
 // @run-at       document-start
 // @grant        GM_setValue
@@ -15,23 +15,47 @@
 (function () {
   'use strict';
 
-  // Server default Railway
-  const DEFAULT_SERVER_URL = 'https://geochat-production-f099.up.railway.app';
-  let serverUrl = DEFAULT_SERVER_URL;
+  // Server URLs (Cloud Railway vs Local 5050)
+  const CLOUD_SERVER_URL = 'https://geochat-production-f099.up.railway.app';
+  const LOCAL_SERVER_URL = 'http://localhost:5050';
+
+  let serverUrl = LOCAL_SERVER_URL;
   try {
     const saved =
       typeof GM_getValue !== 'undefined'
         ? GM_getValue('cg_server_url')
         : localStorage.getItem('cg_server_url');
-    if (saved && !saved.includes('localhost')) {
-      serverUrl = saved;
-    } else {
-      if (typeof GM_setValue !== 'undefined') GM_setValue('cg_server_url', DEFAULT_SERVER_URL);
-      localStorage.setItem('cg_server_url', DEFAULT_SERVER_URL);
+    if (saved && saved.trim()) {
+      serverUrl = saved.trim();
     }
   } catch (_) {}
 
-  console.log('[ChatGuessr Connector] Started with Server:', serverUrl);
+  function getServerMode() {
+    if (serverUrl.includes('localhost') || serverUrl.includes('127.0.0.1')) {
+      return 'local';
+    }
+    if (serverUrl.includes('railway') || serverUrl === CLOUD_SERVER_URL) {
+      return 'cloud';
+    }
+    return 'custom';
+  }
+
+  function setServerUrl(newUrl, modeName) {
+    serverUrl = newUrl.trim();
+    if (typeof GM_setValue !== 'undefined') GM_setValue('cg_server_url', serverUrl);
+    try {
+      localStorage.setItem('cg_server_url', serverUrl);
+    } catch (_) {}
+    updateServerModeUI();
+    initSocket();
+    showToast({
+      username: 'MabarBang',
+      score: modeName ? `Server: ${modeName}` : serverUrl,
+      distance: 0
+    });
+  }
+
+  console.log('[MabarBang Connector] Started with Server:', serverUrl);
 
   const win = typeof unsafeWindow !== 'undefined' ? unsafeWindow : window;
 
@@ -255,17 +279,17 @@
       z-index: ${1000 - rank};
     `;
 
-    const borderColor =
-      rank === 1 ? '#f59e0b' : rank === 2 ? '#94a3b8' : rank === 3 ? '#d97706' : '#38bdf8';
+    const rankColor =
+      rank === 1 ? '#ffd166' : rank === 2 ? '#70d6ff' : rank === 3 ? '#ff9ebb' : '#ffffff';
 
     const avatarBox = document.createElement('div');
     avatarBox.style.cssText = `
-      width: 32px;
-      height: 32px;
+      width: 34px;
+      height: 34px;
       border-radius: 50%;
-      border: 3px solid ${borderColor};
-      box-shadow: 0 4px 12px rgba(0,0,0,0.5);
-      background: #0f172a;
+      border: 2.5px solid #000;
+      box-shadow: 2.5px 2.5px 0px #000;
+      background: #ffffff;
       overflow: hidden;
       display: flex;
       align-items: center;
@@ -280,7 +304,7 @@
     } else {
       const txt = document.createElement('span');
       txt.textContent = (p.username || '?')[0].toUpperCase();
-      txt.style.cssText = 'color: #fff; font-size: 13px; font-weight: 800;';
+      txt.style.cssText = 'color: #000; font-size: 13px; font-weight: 900;';
       avatarBox.appendChild(txt);
     }
 
@@ -288,34 +312,35 @@
     rankBadge.textContent = rank;
     rankBadge.style.cssText = `
       position: absolute;
-      top: -3px;
-      right: -3px;
-      background: ${rank === 1 ? '#f59e0b' : '#0f172a'};
-      color: #fff;
+      top: -4px;
+      right: -4px;
+      background: ${rankColor};
+      color: #000;
       font-size: 10px;
-      font-weight: 800;
-      width: 16px;
-      height: 16px;
+      font-weight: 900;
+      width: 18px;
+      height: 18px;
       border-radius: 50%;
       display: flex;
       align-items: center;
       justify-content: center;
-      border: 1px solid rgba(255,255,255,0.7);
+      border: 2px solid #000;
+      box-shadow: 1.5px 1.5px 0px #000;
     `;
 
     const nameTag = document.createElement('span');
     nameTag.textContent = p.username;
     nameTag.style.cssText = `
-      margin-top: 3px;
-      background: rgba(15, 23, 42, 0.9);
-      color: #fff;
+      margin-top: 4px;
+      background: #ffffff;
+      color: #000;
       font-size: 10px;
-      font-weight: 600;
-      padding: 1px 6px;
-      border-radius: 4px;
-      border: 1px solid rgba(255,255,255,0.2);
+      font-weight: 800;
+      padding: 2px 8px;
+      border-radius: 9999px;
+      border: 2px solid #000;
       white-space: nowrap;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+      box-shadow: 2px 2px 0px #000;
     `;
 
     el.appendChild(avatarBox);
@@ -637,30 +662,59 @@
         top: 20px;
         right: 20px;
         width: 330px;
-        background: rgba(15, 23, 42, 0.92);
-        backdrop-filter: blur(12px);
-        -webkit-backdrop-filter: blur(12px);
-        border: 1px solid rgba(255, 255, 255, 0.15);
-        border-radius: 16px;
-        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.65);
-        color: #fff;
+        background: #ffffff;
+        border: 3px solid #000000;
+        border-radius: 18px;
+        box-shadow: 6px 6px 0px #000000;
+        color: #000000;
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
         z-index: 999999;
         overflow: hidden;
         user-select: none;
-        transition: all 0.25s ease;
+        animation: cgWidgetPopIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+        transform-origin: top center;
+        touch-action: none;
+      }
+      #cg-native-widget.cg-dragging {
+        transition: none !important;
+        cursor: grabbing !important;
+        box-shadow: 10px 10px 0px #000000 !important;
+        transform: scale(1.02) !important;
+        opacity: 0.96;
+      }
+      #cg-native-widget.cg-dragging .cg-header {
+        cursor: grabbing !important;
+      }
+      @keyframes cgWidgetPopIn {
+        0% {
+          opacity: 0;
+          transform: scale(0.65) translateY(-32px) rotate(-4deg);
+        }
+        70% {
+          opacity: 1;
+          transform: scale(1.04) translateY(2px) rotate(1deg);
+        }
+        100% {
+          opacity: 1;
+          transform: scale(1) translateY(0) rotate(0deg);
+        }
       }
       #cg-native-widget.minimized .cg-content-body {
         display: none !important;
       }
       .cg-header {
         padding: 10px 14px;
-        background: linear-gradient(135deg, rgba(239, 68, 68, 0.3), rgba(56, 189, 248, 0.2));
-        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        background: #ffe082;
+        border-bottom: 2.5px solid #000000;
         display: flex;
         align-items: center;
         justify-content: space-between;
         cursor: grab;
+        user-select: none;
+        touch-action: none;
+      }
+      .cg-header:active {
+        cursor: grabbing;
       }
       .cg-header-left {
         display: flex;
@@ -668,28 +722,36 @@
         gap: 8px;
       }
       .cg-logo-icon {
-        width: 22px;
-        height: 22px;
-        background: #ef4444;
-        border-radius: 5px;
+        width: 24px;
+        height: 24px;
+        background: #ff5964;
+        border: 2px solid #000000;
+        border-radius: 6px;
         display: flex;
         align-items: center;
         justify-content: center;
         font-size: 11px;
-        font-weight: 800;
+        font-weight: 900;
+        color: #ffffff;
+        box-shadow: 2px 2px 0px #000000;
+        transform: rotate(-3deg);
       }
       .cg-title {
         font-size: 13px;
-        font-weight: 700;
+        font-weight: 800;
         letter-spacing: -0.2px;
+        color: #000000;
       }
       .cg-round-badge {
         font-size: 11px;
-        font-weight: 700;
-        background: rgba(255, 255, 255, 0.2);
-        padding: 2px 7px;
-        border-radius: 10px;
+        font-weight: 900;
+        background: #ffffff;
+        border: 1.5px solid #000000;
+        padding: 2px 8px;
+        border-radius: 999px;
         font-family: monospace;
+        color: #000000;
+        box-shadow: 1.5px 1.5px 0px #000000;
       }
       .cg-header-actions {
         display: flex;
@@ -697,71 +759,79 @@
         gap: 4px;
       }
       .cg-btn-icon {
-        background: transparent;
-        border: none;
-        color: #94a3b8;
-        font-size: 13px;
+        background: #ffffff;
+        border: 1.5px solid #000000;
+        color: #000000;
+        font-size: 12px;
         cursor: pointer;
         padding: 2px 6px;
-        border-radius: 4px;
+        border-radius: 6px;
+        box-shadow: 1.5px 1.5px 0px #000000;
+        font-weight: 800;
       }
       .cg-btn-icon:hover {
-        background: rgba(255, 255, 255, 0.15);
-        color: #fff;
+        background: #f1f5f9;
+        transform: translate(-1px, -1px);
       }
       .cg-status-row {
         padding: 6px 14px;
-        background: rgba(0, 0, 0, 0.35);
+        background: #c8f560;
+        border-bottom: 2px solid #000000;
         display: flex;
         justify-content: space-between;
         align-items: center;
         font-size: 11px;
-        font-weight: 600;
+        font-weight: 800;
+        color: #000000;
       }
       .cg-status-open {
-        color: #10b981;
+        color: #000000;
         display: flex;
         align-items: center;
         gap: 5px;
       }
       .cg-status-closed {
-        color: #94a3b8;
+        color: #64748b;
         display: flex;
         align-items: center;
         gap: 5px;
       }
       .cg-status-dot {
-        width: 6px;
-        height: 6px;
+        width: 8px;
+        height: 8px;
         border-radius: 50%;
-        background: currentColor;
+        border: 1.5px solid #000000;
+        background: #22c55e;
       }
       .cg-list {
         max-height: 280px;
         overflow-y: auto;
         padding: 4px 0;
+        background: #ffffff;
       }
       .cg-player-row {
         display: flex;
         align-items: center;
         justify-content: space-between;
         padding: 6px 14px;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+        border-bottom: 1px solid #f1f5f9;
         font-size: 12px;
+        color: #000000;
         cursor: pointer;
         transition: background 0.15s;
       }
       .cg-player-row:hover {
-        background: rgba(255, 255, 255, 0.08);
+        background: #fef08a;
       }
-      .cg-rank-gold { color: #f59e0b; font-weight: 800; }
-      .cg-rank-silver { color: #94a3b8; font-weight: 700; }
-      .cg-rank-bronze { color: #d97706; font-weight: 700; }
+      .cg-rank-gold { color: #b45309; font-weight: 900; }
+      .cg-rank-silver { color: #475569; font-weight: 800; }
+      .cg-rank-bronze { color: #9a3412; font-weight: 800; }
       .cg-empty-text {
         padding: 16px;
         text-align: center;
         font-size: 11px;
         color: #64748b;
+        font-weight: 700;
       }
       /* Toast notification */
       #cg-toast-box {
@@ -775,15 +845,17 @@
         pointer-events: none;
       }
       .cg-toast {
-        background: rgba(15, 23, 42, 0.95);
-        border: 1px solid rgba(56, 189, 248, 0.4);
+        background: #ffffff;
+        border: 2px solid #000000;
         padding: 8px 14px;
-        border-radius: 10px;
-        box-shadow: 0 4px 16px rgba(0,0,0,0.5);
+        border-radius: 12px;
+        box-shadow: 4px 4px 0px #000000;
+        color: #000000;
         display: flex;
         align-items: center;
         gap: 8px;
         font-size: 12px;
+        font-weight: 800;
         animation: cgFadeIn 0.3s ease;
       }
       @keyframes cgFadeIn {
@@ -800,10 +872,11 @@
       <div class="cg-header" id="cg-drag-handle">
         <div class="cg-header-left">
           <div class="cg-logo-icon">▶</div>
-          <span class="cg-title" id="cg-map-title">GeoGuessr Live</span>
+          <span class="cg-title" id="cg-map-title">MabarBang Live</span>
           <span class="cg-round-badge" id="cg-round-badge">R1 / 5</span>
         </div>
         <div class="cg-header-actions">
+          <button class="cg-btn-icon" id="cg-btn-server-mode" title="Ganti Server (Local / Cloud)" style="font-size: 11px; padding: 2px 7px;">⚡ Local</button>
           <button class="cg-btn-icon" id="cg-btn-pins" title="Toggle Tampilkan Pins di Peta">📌</button>
           <button class="cg-btn-icon" id="cg-btn-minimize" title="Minimize">_</button>
           <button class="cg-btn-icon" id="cg-btn-hide" title="Hide Overlay">✕</button>
@@ -855,11 +928,22 @@
       if (toggle) toggle.textContent = 'Show Overlay';
     };
 
+    const serverModeBtn = document.getElementById('cg-btn-server-mode');
+    if (serverModeBtn) {
+      serverModeBtn.onclick = (e) => {
+        e.stopPropagation();
+        openServerModal();
+      };
+    }
+
     // Bottom-Right Status Badge
     createBadgeUI();
 
     // Enable simple dragging
     enableDrag(widget, document.getElementById('cg-drag-handle'));
+
+    // Update Server Mode label in UI
+    updateServerModeUI();
 
     // Connect Socket.IO
     initSocket();
@@ -965,22 +1049,24 @@
     div.style.bottom = '16px';
     div.style.right = '16px';
     div.style.zIndex = '999999';
-    div.style.background = 'rgba(15, 23, 42, 0.9)';
-    div.style.border = '1px solid rgba(255, 255, 255, 0.2)';
-    div.style.borderRadius = '24px';
+    div.style.background = '#ffffff';
+    div.style.border = '2.5px solid #000000';
+    div.style.borderRadius = '9999px';
     div.style.padding = '6px 14px';
-    div.style.color = '#fff';
+    div.style.color = '#000000';
     div.style.fontSize = '12px';
+    div.style.fontWeight = '800';
     div.style.display = 'flex';
     div.style.alignItems = 'center';
     div.style.gap = '8px';
     div.style.cursor = 'pointer';
-    div.style.boxShadow = '0 4px 12px rgba(0,0,0,0.5)';
+    div.style.boxShadow = '4px 4px 0px #000000';
 
     div.innerHTML = `
-      <span id="cg-bridge-dot" style="width: 8px; height: 8px; border-radius: 50%; background: #94a3b8;"></span>
-      <span id="cg-bridge-text" style="font-weight: 600;">ChatGuessr</span>
-      <span id="cg-overlay-toggle" style="background: rgba(255,255,255,0.2); border-radius: 12px; padding: 2px 8px; margin-left: 4px; font-size: 11px;">Hide Overlay</span>
+      <span id="cg-bridge-dot" style="width: 8px; height: 8px; border-radius: 50%; border: 1.5px solid #000; background: #94a3b8;"></span>
+      <span id="cg-bridge-text" style="font-weight: 800; color: #000;">MabarBang</span>
+      <span id="cg-bridge-mode" style="background: #c8f560; border: 1.5px solid #000; border-radius: 999px; padding: 2px 8px; margin-left: 2px; font-size: 11px; font-weight: 800; color: #000; box-shadow: 1.5px 1.5px 0px #000;" title="Klik untuk pilih Server Local / Cloud">⚡ Local</span>
+      <span id="cg-overlay-toggle" style="background: #ffe082; border: 1.5px solid #000; border-radius: 999px; padding: 2px 8px; margin-left: 4px; font-size: 11px; font-weight: 800; color: #000; box-shadow: 1.5px 1.5px 0px #000;">Hide Overlay</span>
     `;
 
     div.onclick = (e) => {
@@ -989,6 +1075,9 @@
         if (!widget) return;
         if (widget.style.display === 'none') {
           widget.style.display = 'block';
+          widget.style.animation = 'none';
+          void widget.offsetWidth; // force browser reflow
+          widget.style.animation = 'cgWidgetPopIn 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) forwards';
           e.target.textContent = 'Hide Overlay';
         } else {
           widget.style.display = 'none';
@@ -997,17 +1086,196 @@
         return;
       }
 
-      const newUrl = prompt('Masukkan URL Server ChatGuessr Railway Anda:', serverUrl);
-      if (newUrl && newUrl.trim()) {
-        serverUrl = newUrl.trim();
-        if (typeof GM_setValue !== 'undefined') GM_setValue('cg_server_url', serverUrl);
-        localStorage.setItem('cg_server_url', serverUrl);
-        alert('Server URL disimpan: ' + serverUrl);
-        initSocket();
-      }
+      openServerModal();
     };
 
     document.body.appendChild(div);
+    updateServerModeUI();
+  }
+
+  function updateServerModeUI() {
+    const mode = getServerMode();
+    const btn = document.getElementById('cg-btn-server-mode');
+    const badgeMode = document.getElementById('cg-bridge-mode');
+
+    let label = '⚡ Local';
+    let bg = '#c8f560';
+
+    if (mode === 'cloud') {
+      label = '☁️ Cloud';
+      bg = '#ffe082';
+    } else if (mode === 'custom') {
+      label = '🌐 Custom';
+      bg = '#70d6ff';
+    }
+
+    if (btn) {
+      btn.textContent = label;
+      btn.title = `Server: ${serverUrl} (Klik untuk pilih Local/Cloud)`;
+    }
+    if (badgeMode) {
+      badgeMode.textContent = label;
+      badgeMode.style.background = bg;
+      badgeMode.title = `Server: ${serverUrl} (Klik untuk pilih Local/Cloud)`;
+    }
+  }
+
+  function openServerModal() {
+    let modal = document.getElementById('cg-server-modal');
+    if (!modal) {
+      modal = document.createElement('div');
+      modal.id = 'cg-server-modal';
+      modal.style.cssText = `
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.65);
+        backdrop-filter: blur(4px);
+        z-index: 10000000;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        animation: cgFadeIn 0.2s ease;
+      `;
+      modal.onclick = (e) => {
+        if (e.target === modal) modal.style.display = 'none';
+      };
+      document.body.appendChild(modal);
+    }
+
+    const currentMode = getServerMode();
+
+    modal.innerHTML = `
+      <div style="
+        background: #ffffff;
+        border: 3.5px solid #000;
+        border-radius: 24px;
+        box-shadow: 8px 8px 0px #000;
+        padding: 24px 26px;
+        max-width: 390px;
+        width: 90vw;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        color: #000;
+        animation: cgWidgetPopIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+      " onclick="event.stopPropagation()">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
+          <h3 style="font-size: 17px; font-weight: 900; margin: 0; display: flex; align-items: center; gap: 6px;">
+            <span>🌐</span> Pilih Server MabarBang
+          </h3>
+          <button id="cg-close-modal" style="
+            background: #ff5964;
+            color: #fff;
+            border: 2px solid #000;
+            border-radius: 50%;
+            width: 28px;
+            height: 28px;
+            cursor: pointer;
+            font-weight: 900;
+            box-shadow: 2px 2px 0px #000;
+          ">✕</button>
+        </div>
+
+        <p style="font-size: 12px; color: #475569; font-weight: 700; margin-bottom: 16px;">
+          Pilih server untuk menghubungkan tebakan viewer YouTube ke GeoGuessr:
+        </p>
+
+        <div style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 14px;">
+          <!-- Tombol Local Server -->
+          <button id="cg-btn-local" style="
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: ${currentMode === 'local' ? '#c8f560' : '#f8fafc'};
+            border: 2.5px solid #000;
+            border-radius: 14px;
+            padding: 12px 14px;
+            cursor: pointer;
+            box-shadow: ${currentMode === 'local' ? '4px 4px 0px #000' : '2px 2px 0px #000'};
+            text-align: left;
+            transition: all 0.15s ease;
+          ">
+            <div>
+              <div style="font-size: 14px; font-weight: 900; display: flex; align-items: center; gap: 6px;">
+                <span>💻</span> Local Server (PC Ini)
+                ${currentMode === 'local' ? '<span style="background: #000; color: #fff; font-size: 9px; padding: 2px 6px; border-radius: 99px;">AKTIF</span>' : ''}
+              </div>
+              <div style="font-size: 11px; color: #475569; font-weight: 700; margin-top: 2px;">
+                http://localhost:5050 (Standalone .exe)
+              </div>
+            </div>
+            <span style="font-size: 16px; font-weight: 900;">➔</span>
+          </button>
+
+          <!-- Tombol Cloud Server -->
+          <button id="cg-btn-cloud" style="
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: ${currentMode === 'cloud' ? '#ffe082' : '#f8fafc'};
+            border: 2.5px solid #000;
+            border-radius: 14px;
+            padding: 12px 14px;
+            cursor: pointer;
+            box-shadow: ${currentMode === 'cloud' ? '4px 4px 0px #000' : '2px 2px 0px #000'};
+            text-align: left;
+            transition: all 0.15s ease;
+          ">
+            <div>
+              <div style="font-size: 14px; font-weight: 900; display: flex; align-items: center; gap: 6px;">
+                <span>☁️</span> Cloud Server (Railway)
+                ${currentMode === 'cloud' ? '<span style="background: #000; color: #fff; font-size: 9px; padding: 2px 6px; border-radius: 99px;">AKTIF</span>' : ''}
+              </div>
+              <div style="font-size: 11px; color: #475569; font-weight: 700; margin-top: 2px;">
+                geochat-production-f099.up.railway.app
+              </div>
+            </div>
+            <span style="font-size: 16px; font-weight: 900;">➔</span>
+          </button>
+
+          <!-- Tombol Custom Server -->
+          <button id="cg-btn-custom" style="
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: ${currentMode === 'custom' ? '#70d6ff' : '#f8fafc'};
+            border: 2px solid #000;
+            border-radius: 12px;
+            padding: 10px 14px;
+            cursor: pointer;
+            box-shadow: ${currentMode === 'custom' ? '3px 3px 0px #000' : '2px 2px 0px #000'};
+            text-align: left;
+          ">
+            <div style="font-size: 12px; font-weight: 800;">
+              <span>⚙️</span> Custom URL Server...
+            </div>
+            <span style="font-size: 13px;">✎</span>
+          </button>
+        </div>
+      </div>
+    `;
+
+    modal.style.display = 'flex';
+
+    document.getElementById('cg-close-modal').onclick = () => {
+      modal.style.display = 'none';
+    };
+
+    document.getElementById('cg-btn-local').onclick = () => {
+      setServerUrl(LOCAL_SERVER_URL, 'Local (5050)');
+      modal.style.display = 'none';
+    };
+
+    document.getElementById('cg-btn-cloud').onclick = () => {
+      setServerUrl(CLOUD_SERVER_URL, 'Cloud (Railway)');
+      modal.style.display = 'none';
+    };
+
+    document.getElementById('cg-btn-custom').onclick = () => {
+      const customUrl = prompt('Masukkan URL Server Custom:', serverUrl);
+      if (customUrl && customUrl.trim()) {
+        setServerUrl(customUrl.trim(), 'Custom');
+      }
+      modal.style.display = 'none';
+    };
   }
 
   function updateBadgeStatus(connected) {
@@ -1015,40 +1283,108 @@
     const text = document.getElementById('cg-bridge-text');
     if (dot && text) {
       dot.style.background = connected ? '#10b981' : '#ef4444';
-      text.textContent = connected ? 'ChatGuessr: Connected' : 'ChatGuessr: Offline';
+      text.textContent = connected ? 'MabarBang: Connected' : 'MabarBang: Offline';
     }
   }
 
   function enableDrag(element, handle) {
-    let pos1 = 0,
-      pos2 = 0,
-      pos3 = 0,
-      pos4 = 0;
-    handle.onmousedown = dragMouseDown;
+    let startX = 0,
+      startY = 0;
+    let initialLeft = 0,
+      initialTop = 0;
+    let isDragging = false;
 
-    function dragMouseDown(e) {
+    // Restore saved position if available
+    try {
+      const savedPos = localStorage.getItem('cg_widget_pos');
+      if (savedPos) {
+        const { left, top } = JSON.parse(savedPos);
+        const maxL = Math.max(10, window.innerWidth - 340);
+        const maxT = Math.max(10, window.innerHeight - 100);
+        const clampL = Math.max(10, Math.min(left, maxL));
+        const clampT = Math.max(10, Math.min(top, maxT));
+        element.style.left = clampL + 'px';
+        element.style.top = clampT + 'px';
+        element.style.right = 'auto';
+      }
+    } catch (_) {}
+
+    // Double click header to reset to default top-right corner
+    handle.addEventListener('dblclick', (e) => {
       if (e.target.tagName === 'BUTTON') return;
-      e.preventDefault();
-      pos3 = e.clientX;
-      pos4 = e.clientY;
-      document.onmouseup = closeDragElement;
-      document.onmousemove = elementDrag;
-    }
+      element.style.top = '20px';
+      element.style.right = '20px';
+      element.style.left = 'auto';
+      try {
+        localStorage.removeItem('cg_widget_pos');
+      } catch (_) {}
+    });
 
-    function elementDrag(e) {
+    handle.addEventListener('pointerdown', onPointerDown);
+
+    function onPointerDown(e) {
+      if (e.target.tagName === 'BUTTON' || (e.button !== undefined && e.button !== 0)) return;
       e.preventDefault();
-      pos1 = pos3 - e.clientX;
-      pos2 = pos4 - e.clientY;
-      pos3 = e.clientX;
-      pos4 = e.clientY;
-      element.style.top = element.offsetTop - pos2 + 'px';
-      element.style.left = element.offsetLeft - pos1 + 'px';
+
+      const rect = element.getBoundingClientRect();
+      startX = e.clientX;
+      startY = e.clientY;
+      initialLeft = rect.left;
+      initialTop = rect.top;
+
+      isDragging = true;
+      element.classList.add('cg-dragging');
+      element.style.left = initialLeft + 'px';
+      element.style.top = initialTop + 'px';
       element.style.right = 'auto';
+
+      handle.setPointerCapture(e.pointerId);
+      handle.addEventListener('pointermove', onPointerMove);
+      handle.addEventListener('pointerup', onPointerUp);
+      handle.addEventListener('pointercancel', onPointerUp);
     }
 
-    function closeDragElement() {
-      document.onmouseup = null;
-      document.onmousemove = null;
+    function onPointerMove(e) {
+      if (!isDragging) return;
+      e.preventDefault();
+
+      const dx = e.clientX - startX;
+      const dy = e.clientY - startY;
+
+      let newLeft = initialLeft + dx;
+      let newTop = initialTop + dy;
+
+      const padding = 10;
+      const maxLeft = Math.max(padding, window.innerWidth - element.offsetWidth - padding);
+      const maxTop = Math.max(padding, window.innerHeight - element.offsetHeight - padding);
+
+      newLeft = Math.max(padding, Math.min(newLeft, maxLeft));
+      newTop = Math.max(padding, Math.min(newTop, maxTop));
+
+      element.style.left = newLeft + 'px';
+      element.style.top = newTop + 'px';
+    }
+
+    function onPointerUp(e) {
+      if (!isDragging) return;
+      isDragging = false;
+      element.classList.remove('cg-dragging');
+
+      handle.removeEventListener('pointermove', onPointerMove);
+      handle.removeEventListener('pointerup', onPointerUp);
+      handle.removeEventListener('pointercancel', onPointerUp);
+      try {
+        handle.releasePointerCapture(e.pointerId);
+      } catch (_) {}
+
+      // Save position for persistence across reloads / rounds
+      try {
+        const rect = element.getBoundingClientRect();
+        localStorage.setItem(
+          'cg_widget_pos',
+          JSON.stringify({ left: Math.round(rect.left), top: Math.round(rect.top) })
+        );
+      } catch (_) {}
     }
   }
 

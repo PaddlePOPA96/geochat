@@ -29984,13 +29984,6 @@ async function getStreakCode(location2) {
   if (!localIso) return;
   return streakCodes[localIso];
 }
-function parseCoordinates(coordinates) {
-  const regex = /^(?<lat>[-+]?(?:[1-8]?\d(?:\.\d+)?|90(?:\.0+)?)),\s*(?<lng>[-+]?(?:180(?:\.0+)?|(?:(?:1[0-7]\d)|(?:[1-9]?\d))(?:\.\d+)?))$/;
-  const m2 = regex.exec(coordinates);
-  if (m2 == null ? void 0 : m2.groups) {
-    return { lat: parseFloat(m2.groups.lat), lng: parseFloat(m2.groups.lng) };
-  }
-}
 function calculateScale(bounds) {
   return haversineDistance(bounds.min, bounds.max) / 7.458421;
 }
@@ -30426,6 +30419,22 @@ processStreamerGuess_fn = async function() {
   });
   this.streamerDidRandomPlonk = false;
 };
+axios.defaults.headers.common["User-Agent"] = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36";
+axios.defaults.headers.common["Accept-Language"] = "en-US,en;q=0.9";
+axios.defaults.headers.common["Accept"] = "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8";
+axios.defaults.headers.common["Cookie"] = "SOCS=CAESEwgDEgk2ODE3ODg0MjAaAmVuIAEaBgiA_LyaBg; CONSENT=YES+cb.20210328-17-p0.en+FX+100;";
+axios.interceptors.response.use((response) => {
+  if (typeof response.data === "string" && response.data.includes("INNERTUBE_API_KEY")) {
+    if (!response.data.match(/<link rel="canonical" href="https:\/\/www.youtube.com\/watch\?v=[^"]+">/)) {
+      const vMatch = response.data.match(/<link rel="canonical" href="https:\/\/www.youtube.com\/(?:live\/|watch\?v=)([^"]+)">/) || response.data.match(/["']externalVideoId["']:\s*["']([^"']+)["']/) || response.data.match(/["']videoId["']:\s*["']([^"']+)["']/) || response.data.match(/\/watch\?v=([a-zA-Z0-9_-]{11})/);
+      if (vMatch && vMatch[1]) {
+        response.data = `<link rel="canonical" href="https://www.youtube.com/watch?v=${vMatch[1]}">
+` + response.data;
+      }
+    }
+  }
+  return response;
+});
 function parseYouTubeInput(input) {
   input = input.trim();
   if (!input) return {};
@@ -30438,6 +30447,8 @@ function parseYouTubeInput(input) {
   }
   const channelMatch = input.match(/(?:channel\/)?(UC[a-zA-Z0-9_-]{22})/);
   if (channelMatch) return { channelId: channelMatch[1] };
+  const handleMatch = input.match(/@([a-zA-Z0-9_.-]+)/);
+  if (handleMatch) return { handle: "@" + handleMatch[1] };
   if (input.startsWith("UC")) {
     return { channelId: input };
   }
@@ -30451,11 +30462,15 @@ class YouTubeBackend extends require$$0$6.EventEmitter {
     __privateAdd(this, _closing, false);
     __publicField(this, "liveId");
     __publicField(this, "channelId");
+    __publicField(this, "handle");
     const parsed = parseYouTubeInput(options.streamInput);
     this.liveId = parsed.liveId;
     this.channelId = parsed.channelId;
+    this.handle = parsed.handle;
     if (this.channelId) {
       __privateSet(this, _liveChat, new youtubeChat.LiveChat({ channelId: this.channelId }));
+    } else if (this.handle) {
+      __privateSet(this, _liveChat, new youtubeChat.LiveChat({ handle: this.handle }));
     } else if (this.liveId) {
       __privateSet(this, _liveChat, new youtubeChat.LiveChat({ liveId: this.liveId }));
     }
@@ -30483,8 +30498,10 @@ class YouTubeBackend extends require$$0$6.EventEmitter {
       __privateSet(this, _connected, false);
       this.emit("disconnected", __privateGet(this, _closing), reason);
     });
+    let lastError = null;
     __privateGet(this, _liveChat).on("error", (err) => {
-      this.emit("error", err);
+      lastError = err instanceof Error ? err : new Error(String(err));
+      this.emit("error", lastError);
     });
     __privateGet(this, _liveChat).on("chat", (chatItem) => {
       var _a2, _b2;
@@ -30501,7 +30518,7 @@ class YouTubeBackend extends require$$0$6.EventEmitter {
           subscriber: chatItem.isMembership ? "1" : void 0
         }
       };
-      if (messageText.startsWith("!g")) {
+      if (/^!g(\s|$)/i.test(messageText)) {
         this.emit("guess", userstate, messageText);
       } else if (messageText.startsWith("!")) {
         this.emit("message", userstate, messageText);
@@ -30510,7 +30527,7 @@ class YouTubeBackend extends require$$0$6.EventEmitter {
     const ok = await __privateGet(this, _liveChat).start();
     if (!ok) {
       __privateSet(this, _connected, false);
-      throw new Error("Failed to start YouTube live chat fetcher");
+      throw lastError || new Error("Failed to start YouTube live chat fetcher");
     }
     return true;
   }
@@ -41279,6 +41296,456 @@ const saveSettings = (newSettings) => {
   Object.assign(settings, newSettings);
   store.set("settings", settings);
 };
+const COUNTRY_MAP = {
+  // Indonesia & Kota-kota
+  indonesia: { lat: -0.7893, lng: 113.9213 },
+  indo: { lat: -0.7893, lng: 113.9213 },
+  jakarta: { lat: -6.2088, lng: 106.8456 },
+  bandung: { lat: -6.9175, lng: 107.6191 },
+  surabaya: { lat: -7.2575, lng: 112.7521 },
+  semarang: { lat: -6.9667, lng: 110.4167 },
+  yogyakarta: { lat: -7.7956, lng: 110.3695 },
+  jogja: { lat: -7.7956, lng: 110.3695 },
+  solo: { lat: -7.5755, lng: 110.8243 },
+  surakarta: { lat: -7.5755, lng: 110.8243 },
+  malang: { lat: -7.9666, lng: 112.6326 },
+  medan: { lat: 3.5952, lng: 98.6722 },
+  palembang: { lat: -2.9761, lng: 104.7754 },
+  makassar: { lat: -5.1477, lng: 119.4327 },
+  bali: { lat: -8.4095, lng: 115.1889 },
+  denpasar: { lat: -8.6705, lng: 115.2126 },
+  aceh: { lat: 5.5483, lng: 95.3238 },
+  padang: { lat: -0.9471, lng: 100.4172 },
+  batam: { lat: 1.1301, lng: 104.0529 },
+  pekanbaru: { lat: 0.5071, lng: 101.4478 },
+  lampung: { lat: -5.45, lng: 105.2667 },
+  pontianak: { lat: -0.0263, lng: 109.3425 },
+  banjarmasin: { lat: -3.3194, lng: 114.5908 },
+  balikpapan: { lat: -1.2379, lng: 116.8529 },
+  samarinda: { lat: -0.5022, lng: 117.1536 },
+  manado: { lat: 1.4748, lng: 124.8421 },
+  ambon: { lat: -3.6547, lng: 128.1906 },
+  jayapura: { lat: -2.5337, lng: 140.7181 },
+  papua: { lat: -4.2699, lng: 138.0804 },
+  lombok: { lat: -8.5833, lng: 116.3333 },
+  // Rusia / Russia
+  rusia: { lat: 55.7558, lng: 37.6173 },
+  russia: { lat: 55.7558, lng: 37.6173 },
+  moskow: { lat: 55.7558, lng: 37.6173 },
+  moscow: { lat: 55.7558, lng: 37.6173 },
+  saintpetersburg: { lat: 59.9343, lng: 30.3351 },
+  // Inggris / United Kingdom
+  inggris: { lat: 51.5074, lng: -0.1278 },
+  england: { lat: 51.5074, lng: -0.1278 },
+  uk: { lat: 51.5074, lng: -0.1278 },
+  unitedkingdom: { lat: 51.5074, lng: -0.1278 },
+  britania: { lat: 51.5074, lng: -0.1278 },
+  britaniaraya: { lat: 51.5074, lng: -0.1278 },
+  greatbritain: { lat: 51.5074, lng: -0.1278 },
+  london: { lat: 51.5074, lng: -0.1278 },
+  skotlandia: { lat: 55.9533, lng: -3.1883 },
+  scotland: { lat: 55.9533, lng: -3.1883 },
+  wales: { lat: 51.4816, lng: -3.1791 },
+  irlandiautara: { lat: 54.5973, lng: -5.9301 },
+  northernireland: { lat: 54.5973, lng: -5.9301 },
+  // Jepang / Japan
+  jepang: { lat: 35.6762, lng: 139.6503 },
+  japan: { lat: 35.6762, lng: 139.6503 },
+  nihon: { lat: 35.6762, lng: 139.6503 },
+  nippon: { lat: 35.6762, lng: 139.6503 },
+  tokyo: { lat: 35.6762, lng: 139.6503 },
+  osaka: { lat: 34.6937, lng: 135.5023 },
+  kyoto: { lat: 35.0116, lng: 135.7681 },
+  hokkaido: { lat: 43.0642, lng: 141.3469 },
+  // Korea
+  korsel: { lat: 37.5665, lng: 126.978 },
+  koreaselatan: { lat: 37.5665, lng: 126.978 },
+  southkorea: { lat: 37.5665, lng: 126.978 },
+  korea: { lat: 37.5665, lng: 126.978 },
+  seoul: { lat: 37.5665, lng: 126.978 },
+  busan: { lat: 35.1796, lng: 129.0756 },
+  korut: { lat: 39.0392, lng: 125.7625 },
+  koreautara: { lat: 39.0392, lng: 125.7625 },
+  northkorea: { lat: 39.0392, lng: 125.7625 },
+  pyongyang: { lat: 39.0392, lng: 125.7625 },
+  // Amerika Serikat / USA
+  as: { lat: 38.8951, lng: -77.0364 },
+  usa: { lat: 38.8951, lng: -77.0364 },
+  us: { lat: 38.8951, lng: -77.0364 },
+  amerika: { lat: 38.8951, lng: -77.0364 },
+  amerikaserikat: { lat: 38.8951, lng: -77.0364 },
+  unitedstates: { lat: 38.8951, lng: -77.0364 },
+  newyork: { lat: 40.7128, lng: -74.006 },
+  losangeles: { lat: 34.0522, lng: -118.2437 },
+  california: { lat: 36.7783, lng: -119.4179 },
+  texas: { lat: 31.9686, lng: -99.9018 },
+  hawaii: { lat: 21.3069, lng: -157.8583 },
+  alaska: { lat: 64.2008, lng: -149.4937 },
+  // Jerman / Germany
+  jerman: { lat: 52.52, lng: 13.405 },
+  germany: { lat: 52.52, lng: 13.405 },
+  deutschland: { lat: 52.52, lng: 13.405 },
+  berlin: { lat: 52.52, lng: 13.405 },
+  munich: { lat: 48.1351, lng: 11.582 },
+  munchen: { lat: 48.1351, lng: 11.582 },
+  frankfurt: { lat: 50.1109, lng: 8.6821 },
+  // Prancis / France
+  prancis: { lat: 48.8566, lng: 2.3522 },
+  perancis: { lat: 48.8566, lng: 2.3522 },
+  france: { lat: 48.8566, lng: 2.3522 },
+  paris: { lat: 48.8566, lng: 2.3522 },
+  marseille: { lat: 43.2965, lng: 5.3698 },
+  lyon: { lat: 45.764, lng: 4.8357 },
+  // Belanda / Netherlands
+  belanda: { lat: 52.3676, lng: 4.9041 },
+  netherlands: { lat: 52.3676, lng: 4.9041 },
+  holland: { lat: 52.3676, lng: 4.9041 },
+  amsterdam: { lat: 52.3676, lng: 4.9041 },
+  rotterdam: { lat: 51.9244, lng: 4.4777 },
+  // Italia / Italy
+  italia: { lat: 41.9028, lng: 12.4964 },
+  italy: { lat: 41.9028, lng: 12.4964 },
+  roma: { lat: 41.9028, lng: 12.4964 },
+  rome: { lat: 41.9028, lng: 12.4964 },
+  milan: { lat: 45.4642, lng: 9.19 },
+  milano: { lat: 45.4642, lng: 9.19 },
+  venesia: { lat: 45.4408, lng: 12.3155 },
+  venice: { lat: 45.4408, lng: 12.3155 },
+  // Spanyol / Spain
+  spanyol: { lat: 40.4168, lng: -3.7038 },
+  spain: { lat: 40.4168, lng: -3.7038 },
+  espana: { lat: 40.4168, lng: -3.7038 },
+  madrid: { lat: 40.4168, lng: -3.7038 },
+  barcelona: { lat: 41.3879, lng: 2.1699 },
+  // Portugal
+  portugal: { lat: 38.7223, lng: -9.1393 },
+  lisbon: { lat: 38.7223, lng: -9.1393 },
+  lisboa: { lat: 38.7223, lng: -9.1393 },
+  porto: { lat: 41.1579, lng: -8.6291 },
+  // Kanada / Canada
+  kanada: { lat: 45.4215, lng: -75.6972 },
+  canada: { lat: 45.4215, lng: -75.6972 },
+  ottawa: { lat: 45.4215, lng: -75.6972 },
+  toronto: { lat: 43.6532, lng: -79.3832 },
+  vancouver: { lat: 49.2827, lng: -123.1207 },
+  montreal: { lat: 45.5017, lng: -73.5673 },
+  // Meksiko / Mexico
+  meksiko: { lat: 19.4326, lng: -99.1332 },
+  mexico: { lat: 19.4326, lng: -99.1332 },
+  mexicocity: { lat: 19.4326, lng: -99.1332 },
+  cancun: { lat: 21.1619, lng: -86.8515 },
+  // Brasil / Brazil
+  brasil: { lat: -15.7975, lng: -47.8919 },
+  brazil: { lat: -15.7975, lng: -47.8919 },
+  brasilia: { lat: -15.7975, lng: -47.8919 },
+  saopaulo: { lat: -23.5505, lng: -46.6333 },
+  riodejaneiro: { lat: -22.9068, lng: -43.1729 },
+  // Argentina & Amerika Selatan
+  argentina: { lat: -34.6037, lng: -58.3816 },
+  buenosaires: { lat: -34.6037, lng: -58.3816 },
+  chili: { lat: -33.4489, lng: -70.6693 },
+  chile: { lat: -33.4489, lng: -70.6693 },
+  santiago: { lat: -33.4489, lng: -70.6693 },
+  kolombia: { lat: 4.711, lng: -74.0721 },
+  colombia: { lat: 4.711, lng: -74.0721 },
+  bogota: { lat: 4.711, lng: -74.0721 },
+  peru: { lat: -12.0464, lng: -77.0428 },
+  lima: { lat: -12.0464, lng: -77.0428 },
+  uruguay: { lat: -34.9011, lng: -56.1645 },
+  montevideo: { lat: -34.9011, lng: -56.1645 },
+  paraguay: { lat: -25.2637, lng: -57.5759 },
+  asuncion: { lat: -25.2637, lng: -57.5759 },
+  bolivia: { lat: -16.5, lng: -68.15 },
+  lapaz: { lat: -16.5, lng: -68.15 },
+  ekuador: { lat: -0.1807, lng: -78.4678 },
+  ecuador: { lat: -0.1807, lng: -78.4678 },
+  quito: { lat: -0.1807, lng: -78.4678 },
+  venezuela: { lat: 10.4806, lng: -66.9036 },
+  caracas: { lat: 10.4806, lng: -66.9036 },
+  // Australia & Oceania
+  australia: { lat: -35.2809, lng: 149.13 },
+  canberra: { lat: -35.2809, lng: 149.13 },
+  sydney: { lat: -33.8688, lng: 151.2093 },
+  melbourne: { lat: -37.8136, lng: 144.9631 },
+  brisbane: { lat: -27.4698, lng: 153.0251 },
+  perth: { lat: -31.9505, lng: 115.8605 },
+  selandiabaru: { lat: -41.2865, lng: 174.7762 },
+  newzealand: { lat: -41.2865, lng: 174.7762 },
+  nz: { lat: -41.2865, lng: 174.7762 },
+  auckland: { lat: -36.8485, lng: 174.7633 },
+  wellington: { lat: -41.2865, lng: 174.7762 },
+  // Negara Eropa Nordik & Baltik
+  swedia: { lat: 59.3293, lng: 18.0686 },
+  sweden: { lat: 59.3293, lng: 18.0686 },
+  stockholm: { lat: 59.3293, lng: 18.0686 },
+  norwegia: { lat: 59.9139, lng: 10.7522 },
+  norway: { lat: 59.9139, lng: 10.7522 },
+  oslo: { lat: 59.9139, lng: 10.7522 },
+  finlandia: { lat: 60.1699, lng: 24.9384 },
+  finland: { lat: 60.1699, lng: 24.9384 },
+  helsinki: { lat: 60.1699, lng: 24.9384 },
+  denmark: { lat: 55.6761, lng: 12.5683 },
+  kopenhagen: { lat: 55.6761, lng: 12.5683 },
+  copenhagen: { lat: 55.6761, lng: 12.5683 },
+  islandia: { lat: 64.1466, lng: -21.9426 },
+  iceland: { lat: 64.1466, lng: -21.9426 },
+  reykjavik: { lat: 64.1466, lng: -21.9426 },
+  estonia: { lat: 59.437, lng: 24.7536 },
+  tallinn: { lat: 59.437, lng: 24.7536 },
+  latvia: { lat: 56.9496, lng: 24.1052 },
+  riga: { lat: 56.9496, lng: 24.1052 },
+  lithuania: { lat: 54.6872, lng: 25.2797 },
+  lituania: { lat: 54.6872, lng: 25.2797 },
+  vilnius: { lat: 54.6872, lng: 25.2797 },
+  // Eropa Tengah & Timur
+  polandia: { lat: 52.2297, lng: 21.0122 },
+  poland: { lat: 52.2297, lng: 21.0122 },
+  warsawa: { lat: 52.2297, lng: 21.0122 },
+  warsaw: { lat: 52.2297, lng: 21.0122 },
+  krakow: { lat: 50.0647, lng: 19.945 },
+  ukraina: { lat: 50.4501, lng: 30.5234 },
+  ukraine: { lat: 50.4501, lng: 30.5234 },
+  kyiv: { lat: 50.4501, lng: 30.5234 },
+  kiev: { lat: 50.4501, lng: 30.5234 },
+  ceko: { lat: 50.0755, lng: 14.4378 },
+  czech: { lat: 50.0755, lng: 14.4378 },
+  czechia: { lat: 50.0755, lng: 14.4378 },
+  czechrepublic: { lat: 50.0755, lng: 14.4378 },
+  praha: { lat: 50.0755, lng: 14.4378 },
+  prague: { lat: 50.0755, lng: 14.4378 },
+  slowakia: { lat: 48.1486, lng: 17.1077 },
+  slovakia: { lat: 48.1486, lng: 17.1077 },
+  bratislava: { lat: 48.1486, lng: 17.1077 },
+  austria: { lat: 48.2082, lng: 16.3738 },
+  wina: { lat: 48.2082, lng: 16.3738 },
+  vienna: { lat: 48.2082, lng: 16.3738 },
+  swiss: { lat: 46.948, lng: 7.4474 },
+  switzerland: { lat: 46.948, lng: 7.4474 },
+  bern: { lat: 46.948, lng: 7.4474 },
+  zurich: { lat: 47.3769, lng: 8.5417 },
+  geneva: { lat: 46.2044, lng: 6.1432 },
+  hungaria: { lat: 47.4979, lng: 19.0402 },
+  hungary: { lat: 47.4979, lng: 19.0402 },
+  budapest: { lat: 47.4979, lng: 19.0402 },
+  rumania: { lat: 44.4268, lng: 26.1025 },
+  romania: { lat: 44.4268, lng: 26.1025 },
+  bucharest: { lat: 44.4268, lng: 26.1025 },
+  bulgaria: { lat: 42.6977, lng: 23.3219 },
+  sofia: { lat: 42.6977, lng: 23.3219 },
+  // Eropa Selatan & Balkan
+  yunani: { lat: 37.9838, lng: 23.7275 },
+  greece: { lat: 37.9838, lng: 23.7275 },
+  athena: { lat: 37.9838, lng: 23.7275 },
+  athens: { lat: 37.9838, lng: 23.7275 },
+  turki: { lat: 39.9334, lng: 32.8597 },
+  turkey: { lat: 39.9334, lng: 32.8597 },
+  turkiye: { lat: 39.9334, lng: 32.8597 },
+  ankara: { lat: 39.9334, lng: 32.8597 },
+  istanbul: { lat: 41.0082, lng: 28.9784 },
+  kroasia: { lat: 45.815, lng: 15.9819 },
+  croatia: { lat: 45.815, lng: 15.9819 },
+  zagreb: { lat: 45.815, lng: 15.9819 },
+  slovenia: { lat: 46.0569, lng: 14.5058 },
+  ljubljana: { lat: 46.0569, lng: 14.5058 },
+  serbia: { lat: 44.7866, lng: 20.4489 },
+  belgrade: { lat: 44.7866, lng: 20.4489 },
+  bosnia: { lat: 43.8563, lng: 18.4131 },
+  bosniaherzegovina: { lat: 43.8563, lng: 18.4131 },
+  sarajevo: { lat: 43.8563, lng: 18.4131 },
+  montenegro: { lat: 42.4304, lng: 19.2594 },
+  albania: { lat: 41.3275, lng: 19.8187 },
+  tirana: { lat: 41.3275, lng: 19.8187 },
+  makedonia: { lat: 41.9973, lng: 21.428 },
+  macedonia: { lat: 41.9973, lng: 21.428 },
+  northmacedonia: { lat: 41.9973, lng: 21.428 },
+  belgia: { lat: 50.8503, lng: 4.3517 },
+  belgium: { lat: 50.8503, lng: 4.3517 },
+  brussels: { lat: 50.8503, lng: 4.3517 },
+  irlandia: { lat: 53.3498, lng: -6.2603 },
+  ireland: { lat: 53.3498, lng: -6.2603 },
+  dublin: { lat: 53.3498, lng: -6.2603 },
+  luksemburg: { lat: 49.6116, lng: 6.1319 },
+  luxembourg: { lat: 49.6116, lng: 6.1319 },
+  monako: { lat: 43.7384, lng: 7.4246 },
+  monaco: { lat: 43.7384, lng: 7.4246 },
+  andorra: { lat: 42.5063, lng: 1.5218 },
+  sanmarino: { lat: 43.9424, lng: 12.4578 },
+  malta: { lat: 35.8989, lng: 14.5146 },
+  siprus: { lat: 35.1856, lng: 33.3823 },
+  cyprus: { lat: 35.1856, lng: 33.3823 },
+  // Asia Tenggara
+  malaysia: { lat: 3.139, lng: 101.6869 },
+  kualalumpur: { lat: 3.139, lng: 101.6869 },
+  singapura: { lat: 1.3521, lng: 103.8198 },
+  singapore: { lat: 1.3521, lng: 103.8198 },
+  thailand: { lat: 13.7563, lng: 100.5018 },
+  bangkok: { lat: 13.7563, lng: 100.5018 },
+  muangthai: { lat: 13.7563, lng: 100.5018 },
+  filipina: { lat: 14.5995, lng: 120.9842 },
+  philippines: { lat: 14.5995, lng: 120.9842 },
+  manila: { lat: 14.5995, lng: 120.9842 },
+  vietnam: { lat: 21.0285, lng: 105.8542 },
+  hanoi: { lat: 21.0285, lng: 105.8542 },
+  hochiminh: { lat: 10.8231, lng: 106.6297 },
+  saigon: { lat: 10.8231, lng: 106.6297 },
+  kamboja: { lat: 11.5564, lng: 104.9282 },
+  cambodia: { lat: 11.5564, lng: 104.9282 },
+  laos: { lat: 17.9757, lng: 102.6331 },
+  myanmar: { lat: 16.8661, lng: 96.1951 },
+  burma: { lat: 16.8661, lng: 96.1951 },
+  brunei: { lat: 4.9031, lng: 114.9398 },
+  timorleste: { lat: -8.5569, lng: 125.5603 },
+  // Asia Timur, Selatan & Tengah
+  cina: { lat: 39.9042, lng: 116.4074 },
+  china: { lat: 39.9042, lng: 116.4074 },
+  tiongkok: { lat: 39.9042, lng: 116.4074 },
+  beijing: { lat: 39.9042, lng: 116.4074 },
+  shanghai: { lat: 31.2304, lng: 121.4737 },
+  taiwan: { lat: 25.033, lng: 121.5654 },
+  taipei: { lat: 25.033, lng: 121.5654 },
+  hongkong: { lat: 22.3193, lng: 114.1694 },
+  mongolia: { lat: 47.9212, lng: 106.9186 },
+  india: { lat: 28.6139, lng: 77.209 },
+  newdelhi: { lat: 28.6139, lng: 77.209 },
+  mumbai: { lat: 19.076, lng: 72.8777 },
+  pakistan: { lat: 33.6844, lng: 73.0479 },
+  bangladesh: { lat: 23.8103, lng: 90.4125 },
+  srilanka: { lat: 6.9271, lng: 79.8612 },
+  nepal: { lat: 27.7172, lng: 85.324 },
+  bhutan: { lat: 27.4728, lng: 89.6393 },
+  kazakhstan: { lat: 51.1694, lng: 71.4491 },
+  kazakstan: { lat: 51.1694, lng: 71.4491 },
+  almaty: { lat: 43.222, lng: 76.8512 },
+  uzbekistan: { lat: 41.2995, lng: 69.2401 },
+  tashkent: { lat: 41.2995, lng: 69.2401 },
+  kyrgyzstan: { lat: 42.8746, lng: 74.5698 },
+  kirgistan: { lat: 42.8746, lng: 74.5698 },
+  tajikistan: { lat: 38.5598, lng: 68.787 },
+  turkmenistan: { lat: 37.9601, lng: 58.3261 },
+  // Timur Tengah & Kaukasus
+  georgia: { lat: 41.7151, lng: 44.8271 },
+  tbilisi: { lat: 41.7151, lng: 44.8271 },
+  azerbaijan: { lat: 40.4093, lng: 49.8671 },
+  baku: { lat: 40.4093, lng: 49.8671 },
+  armenia: { lat: 40.1792, lng: 44.4991 },
+  yerevan: { lat: 40.1792, lng: 44.4991 },
+  uea: { lat: 24.4539, lng: 54.3773 },
+  uae: { lat: 24.4539, lng: 54.3773 },
+  uniemiratrab: { lat: 24.4539, lng: 54.3773 },
+  unitedarabemirates: { lat: 24.4539, lng: 54.3773 },
+  dubai: { lat: 25.2048, lng: 55.2708 },
+  abudhabi: { lat: 24.4539, lng: 54.3773 },
+  arabsaudi: { lat: 24.7136, lng: 46.6753 },
+  saudiarabia: { lat: 24.7136, lng: 46.6753 },
+  saudi: { lat: 24.7136, lng: 46.6753 },
+  riyadh: { lat: 24.7136, lng: 46.6753 },
+  qatar: { lat: 25.2854, lng: 51.531 },
+  doha: { lat: 25.2854, lng: 51.531 },
+  kuwait: { lat: 29.3759, lng: 47.9774 },
+  oman: { lat: 23.588, lng: 58.3829 },
+  yordania: { lat: 31.9454, lng: 35.9284 },
+  jordan: { lat: 31.9454, lng: 35.9284 },
+  israel: { lat: 31.7683, lng: 35.2137 },
+  telaviv: { lat: 32.0853, lng: 34.7818 },
+  palestina: { lat: 31.9038, lng: 35.2034 },
+  palestine: { lat: 31.9038, lng: 35.2034 },
+  lebanon: { lat: 33.8938, lng: 35.5018 },
+  beirut: { lat: 33.8938, lng: 35.5018 },
+  // Afrika
+  afrikaselatan: { lat: -33.9249, lng: 18.4241 },
+  southafrica: { lat: -33.9249, lng: 18.4241 },
+  capetown: { lat: -33.9249, lng: 18.4241 },
+  johannesburg: { lat: -26.2041, lng: 28.0473 },
+  mesir: { lat: 30.0444, lng: 31.2357 },
+  egypt: { lat: 30.0444, lng: 31.2357 },
+  kairo: { lat: 30.0444, lng: 31.2357 },
+  cairo: { lat: 30.0444, lng: 31.2357 },
+  maroko: { lat: 33.9716, lng: -6.8498 },
+  morocco: { lat: 33.9716, lng: -6.8498 },
+  rabat: { lat: 33.9716, lng: -6.8498 },
+  casablanca: { lat: 33.5731, lng: -7.5898 },
+  tunisia: { lat: 36.8065, lng: 10.1815 },
+  tunis: { lat: 36.8065, lng: 10.1815 },
+  aljazair: { lat: 36.7538, lng: 3.0588 },
+  algeria: { lat: 36.7538, lng: 3.0588 },
+  kenya: { lat: -1.2921, lng: 36.8219 },
+  nairobi: { lat: -1.2921, lng: 36.8219 },
+  uganda: { lat: 0.3476, lng: 32.5825 },
+  kampala: { lat: 0.3476, lng: 32.5825 },
+  nigeria: { lat: 9.0765, lng: 7.3986 },
+  lagos: { lat: 6.5244, lng: 3.3792 },
+  ghana: { lat: 5.6037, lng: -0.187 },
+  accra: { lat: 5.6037, lng: -0.187 },
+  senegal: { lat: 14.7167, lng: -17.4677 },
+  dakar: { lat: 14.7167, lng: -17.4677 },
+  madagaskar: { lat: -18.8792, lng: 47.5079 },
+  madagascar: { lat: -18.8792, lng: 47.5079 },
+  botswana: { lat: -24.6282, lng: 25.9231 },
+  eswatini: { lat: -26.4194, lng: 31.1804 },
+  swaziland: { lat: -26.4194, lng: 31.1804 },
+  lesotho: { lat: -29.3151, lng: 27.4869 },
+  // Amerika Tengah & Karibia
+  kostarika: { lat: 9.9281, lng: -84.0907 },
+  costarica: { lat: 9.9281, lng: -84.0907 },
+  panama: { lat: 8.9824, lng: -79.5199 },
+  guatemala: { lat: 14.6349, lng: -90.5069 },
+  republikdominika: { lat: 18.4861, lng: -69.9312 },
+  dominicanrepublic: { lat: 18.4861, lng: -69.9312 },
+  puertoriko: { lat: 18.4655, lng: -66.1057 },
+  puertorico: { lat: 18.4655, lng: -66.1057 },
+  curacao: { lat: 12.1696, lng: -68.99 },
+  bermuda: { lat: 32.3078, lng: -64.7505 },
+  greenland: { lat: 64.1814, lng: -51.6941 },
+  faroe: { lat: 62.0079, lng: -6.7909 },
+  faroeislands: { lat: 62.0079, lng: -6.7909 },
+  kepulauanfaroe: { lat: 62.0079, lng: -6.7909 },
+  guam: { lat: 13.4443, lng: 144.7937 }
+};
+function parseCoordinates(coordinates) {
+  const regex = /^(?<lat>[-+]?(?:[1-8]?\d(?:\.\d+)?|90(?:\.0+)?)),\s*(?<lng>[-+]?(?:180(?:\.0+)?|(?:(?:1[0-7]\d)|(?:[1-9]?\d))(?:\.\d+)?))$/;
+  const m2 = regex.exec(coordinates.trim());
+  if (m2 == null ? void 0 : m2.groups) {
+    return { lat: parseFloat(m2.groups.lat), lng: parseFloat(m2.groups.lng) };
+  }
+  return null;
+}
+const geocodeCache = /* @__PURE__ */ new Map();
+async function resolveLocation(query) {
+  const trimmed = query.trim();
+  if (!trimmed) return null;
+  const coords = parseCoordinates(trimmed);
+  if (coords) return coords;
+  const normalizedKey = trimmed.toLowerCase().replace(/[^a-z0-9]/g, "");
+  if (COUNTRY_MAP[normalizedKey]) {
+    return COUNTRY_MAP[normalizedKey];
+  }
+  const cacheKey = trimmed.toLowerCase();
+  if (geocodeCache.has(cacheKey)) {
+    return geocodeCache.get(cacheKey);
+  }
+  try {
+    const url2 = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(trimmed)}&format=json&limit=1`;
+    const res = await axios.get(url2, {
+      headers: {
+        "User-Agent": "ChatGuessr-YouTube-Bot/1.0 (https://chatguessr.com)",
+        "Accept-Language": "id,en;q=0.9"
+      },
+      timeout: 5e3
+    });
+    if (Array.isArray(res.data) && res.data.length > 0) {
+      const first = res.data[0];
+      const result = {
+        lat: parseFloat(first.lat),
+        lng: parseFloat(first.lon)
+      };
+      geocodeCache.set(cacheKey, result);
+      return result;
+    }
+  } catch (err) {
+    console.warn(`[Geocoding] Could not geocode "${trimmed}":`, (err == null ? void 0 : err.message) || err);
+  }
+  return null;
+}
 var removeAccents$2 = { exports: {} };
 var characterMap = {
   "À": "A",
@@ -43829,7 +44296,7 @@ handleGuess_fn = async function(userstate, message, isRandomPlonk = false) {
   if (!message.startsWith("!g") || !__privateGet(this, _game).guessesOpen) return;
   if (((_a2 = userstate.username) == null ? void 0 : _a2.toLowerCase()) === settings.channelName.toLowerCase()) return;
   if (__privateMethod(this, _GameHandler_instances, isUserBanned_fn).call(this, userstate.username)) return;
-  const location2 = parseCoordinates(message.replace(/^!g\s+/, ""));
+  const location2 = await resolveLocation(message.replace(/^!g\s+/, ""));
   if (!location2) return;
   try {
     const guess = await __privateGet(this, _game).handleUserGuess(userstate, location2, isRandomPlonk);

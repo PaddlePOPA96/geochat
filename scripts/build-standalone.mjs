@@ -31,13 +31,24 @@ execSync(
 )
 
 // Rename to clean user-friendly filenames
-if (fs.existsSync('bin/server-bundle-win-x64.exe')) {
-  fs.renameSync('bin/server-bundle-win-x64.exe', 'bin/ChatGuessr.exe')
+const winCandidates = ['bin/server-bundle-win.exe', 'bin/server-bundle-win-x64.exe']
+for (const f of winCandidates) {
+  if (fs.existsSync(f)) {
+    fs.copyFileSync(f, 'bin/MabarBang.exe')
+    fs.copyFileSync(f, 'bin/ChatGuessr.exe')
+    try { fs.unlinkSync(f) } catch (_) {}
+  }
 }
-if (fs.existsSync('bin/server-bundle-macos-x64')) {
-  fs.renameSync('bin/server-bundle-macos-x64', 'bin/ChatGuessr-macos')
+
+const macCandidates = ['bin/server-bundle-macos', 'bin/server-bundle-macos-x64']
+for (const f of macCandidates) {
+  if (fs.existsSync(f)) {
+    fs.copyFileSync(f, 'bin/MabarBang-macos')
+    fs.copyFileSync(f, 'bin/ChatGuessr-macos')
+    try { fs.unlinkSync(f) } catch (_) {}
+  }
 }
 
 console.log('✅ Build Complete!')
-console.log('📁 Windows Exe: bin/ChatGuessr.exe')
-console.log('📁 Mac Binary : bin/ChatGuessr-macos')
+console.log('📁 Windows Exe: bin/MabarBang.exe (dan bin/ChatGuessr.exe)')
+console.log('📁 Mac Binary : bin/MabarBang-macos')

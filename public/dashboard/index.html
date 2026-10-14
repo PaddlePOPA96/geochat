@@ -3,27 +3,27 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ChatGuessr Live Dashboard</title>
+  <title>MabarBang Live Dashboard</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800;900&family=JetBrains+Mono:wght@600;700;800&display=swap" rel="stylesheet">
   <script src="/socket.io/socket.io.js"></script>
   <style>
     :root {
-      --bg-base: #090d16;
-      --bg-card: rgba(22, 28, 45, 0.7);
-      --bg-card-hover: rgba(30, 38, 60, 0.85);
-      --border-card: rgba(255, 255, 255, 0.08);
-      --primary: #ff0033;
-      --primary-hover: #e6002e;
-      --accent-blue: #38bdf8;
-      --accent-green: #10b981;
-      --accent-yellow: #f59e0b;
-      --text-main: #f8fafc;
-      --text-muted: #94a3b8;
-      --radius-sm: 8px;
-      --radius-md: 14px;
-      --radius-lg: 20px;
+      --bg-page: #9b87f5;
+      --card-yellow: #ffe082;
+      --card-green: #c8f560;
+      --card-pink: #ffb3c6;
+      --card-blue: #70d6ff;
+      --card-white: #ffffff;
+      --black: #000000;
+      --border-thick: 3px solid #000000;
+      --border-med: 2.5px solid #000000;
+      --shadow-solid: 5px 5px 0px #000000;
+      --shadow-hover: 7px 7px 0px #000000;
+      --shadow-active: 2px 2px 0px #000000;
+      --radius-card: 22px;
+      --radius-pill: 9999px;
     }
 
     * {
@@ -33,90 +33,98 @@
     }
 
     body {
-      font-family: 'Outfit', sans-serif;
-      background-color: var(--bg-base);
-      color: var(--text-main);
-      min-height: 100vh;
+      font-family: 'Plus Jakarta Sans', -apple-system, sans-serif;
+      background-color: var(--bg-page);
       background-image: 
-        radial-gradient(circle at 15% 15%, rgba(255, 0, 51, 0.08) 0%, transparent 40%),
-        radial-gradient(circle at 85% 85%, rgba(56, 189, 248, 0.06) 0%, transparent 40%);
+        radial-gradient(#000000 1.2px, transparent 1.2px),
+        radial-gradient(#000000 1.2px, var(--bg-page) 1.2px);
+      background-size: 32px 32px;
+      background-position: 0 0, 16px 16px;
+      color: #000;
+      min-height: 100vh;
       padding: 24px;
     }
 
     .container {
-      max-width: 1200px;
+      max-width: 1140px;
       margin: 0 auto;
       display: flex;
       flex-direction: column;
-      gap: 24px;
+      gap: 20px;
     }
 
-    /* Header */
+    /* Top Navigation Header */
     header {
       display: flex;
       justify-content: space-between;
       align-items: center;
       padding: 16px 24px;
-      background: var(--bg-card);
-      border: 1px solid var(--border-card);
-      backdrop-filter: blur(16px);
-      border-radius: var(--radius-lg);
+      background: var(--card-white);
+      border: var(--border-thick);
+      border-radius: var(--radius-card);
+      box-shadow: var(--shadow-solid);
     }
 
     .brand {
       display: flex;
       align-items: center;
-      gap: 12px;
+      gap: 14px;
     }
 
     .brand-logo {
-      width: 40px;
-      height: 40px;
-      background: linear-gradient(135deg, #ff0033, #ff4d6d);
-      border-radius: 10px;
+      width: 44px;
+      height: 44px;
+      background: #ff5964;
+      border: var(--border-thick);
+      border-radius: 12px;
       display: flex;
       align-items: center;
       justify-content: center;
-      font-weight: 800;
+      font-weight: 900;
       font-size: 20px;
-      box-shadow: 0 4px 14px rgba(255, 0, 51, 0.35);
+      color: #fff;
+      box-shadow: 3px 3px 0px #000;
+      transform: rotate(-3deg);
     }
 
     .brand-title h1 {
-      font-size: 20px;
-      font-weight: 700;
-      letter-spacing: -0.5px;
+      font-size: 22px;
+      font-weight: 900;
+      letter-spacing: -0.6px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
     }
 
     .brand-title p {
-      font-size: 12px;
-      color: var(--text-muted);
+      font-size: 13px;
+      font-weight: 700;
+      color: #4b5563;
     }
 
     .header-actions {
       display: flex;
-      gap: 12px;
+      gap: 10px;
     }
 
-    /* Grid layout */
+    /* Grid Layout */
     .grid-2 {
       display: grid;
       grid-template-columns: 1fr 1fr;
       gap: 20px;
     }
 
-    @media (max-width: 900px) {
+    @media (max-width: 860px) {
       .grid-2 {
         grid-template-columns: 1fr;
       }
     }
 
-    /* Cards */
+    /* Neobrutalist Cards */
     .card {
-      background: var(--bg-card);
-      border: 1px solid var(--border-card);
-      backdrop-filter: blur(16px);
-      border-radius: var(--radius-lg);
+      border: var(--border-thick);
+      border-radius: var(--radius-card);
+      box-shadow: var(--shadow-solid);
       padding: 22px;
       display: flex;
       flex-direction: column;
@@ -124,59 +132,74 @@
       position: relative;
     }
 
-    .card-title {
-      font-size: 16px;
-      font-weight: 600;
+    .card-yellow { background: var(--card-yellow); }
+    .card-green { background: var(--card-green); }
+    .card-white { background: var(--card-white); }
+    .card-pink { background: var(--card-pink); }
+    .card-blue { background: var(--card-blue); }
+
+    .card-header {
       display: flex;
+      justify-content: space-between;
       align-items: center;
-      gap: 10px;
-      color: var(--text-main);
     }
 
-    /* Badges */
-    .badge {
+    .card-title {
+      font-size: 18px;
+      font-weight: 900;
+      letter-spacing: -0.4px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    /* Badges & Pills */
+    .badge-pill {
       display: inline-flex;
       align-items: center;
       gap: 6px;
-      padding: 4px 10px;
-      border-radius: 20px;
+      padding: 6px 14px;
+      border: var(--border-med);
+      border-radius: var(--radius-pill);
       font-size: 12px;
-      font-weight: 600;
+      font-weight: 800;
       text-transform: uppercase;
       letter-spacing: 0.5px;
+      box-shadow: 2px 2px 0px #000;
+    }
+
+    .badge-disconnected {
+      background: #e2e8f0;
+      color: #475569;
+    }
+
+    .badge-connecting {
+      background: #fde047;
+      color: #000;
+    }
+
+    .badge-connected {
+      background: #86efac;
+      color: #000;
+    }
+
+    .badge-error {
+      background: #fca5a5;
+      color: #991b1b;
     }
 
     .badge-dot {
       width: 8px;
       height: 8px;
       border-radius: 50%;
+      border: 1.5px solid #000;
     }
+    .badge-disconnected .badge-dot { background: #64748b; }
+    .badge-connecting .badge-dot { background: #ca8a04; }
+    .badge-connected .badge-dot { background: #16a34a; }
+    .badge-error .badge-dot { background: #dc2626; }
 
-    .badge-disconnected {
-      background: rgba(148, 163, 184, 0.15);
-      color: var(--text-muted);
-    }
-    .badge-disconnected .badge-dot { background: var(--text-muted); }
-
-    .badge-connecting {
-      background: rgba(245, 158, 11, 0.15);
-      color: var(--accent-yellow);
-    }
-    .badge-connecting .badge-dot { background: var(--accent-yellow); }
-
-    .badge-connected {
-      background: rgba(16, 185, 129, 0.15);
-      color: var(--accent-green);
-    }
-    .badge-connected .badge-dot { background: var(--accent-green); }
-
-    .badge-error {
-      background: rgba(239, 68, 68, 0.15);
-      color: #ef4444;
-    }
-    .badge-error .badge-dot { background: #ef4444; }
-
-    /* Inputs & Buttons */
+    /* Input & Buttons */
     .input-group {
       display: flex;
       gap: 10px;
@@ -185,74 +208,70 @@
     input[type="text"] {
       flex: 1;
       padding: 12px 16px;
-      background: rgba(0, 0, 0, 0.35);
-      border: 1px solid var(--border-card);
-      border-radius: var(--radius-md);
-      color: var(--text-main);
+      background: #ffffff;
+      border: var(--border-thick);
+      border-radius: 14px;
+      color: #000;
       font-family: inherit;
       font-size: 14px;
+      font-weight: 700;
       outline: none;
-      transition: border-color 0.2s;
+      box-shadow: 3px 3px 0px #000;
+      transition: all 0.15s;
     }
 
     input[type="text"]:focus {
-      border-color: var(--primary);
+      background: #fff;
+      transform: translate(-1px, -1px);
+      box-shadow: 5px 5px 0px #000;
     }
 
     .btn {
-      padding: 12px 20px;
-      border: none;
-      border-radius: var(--radius-md);
+      padding: 11px 18px;
+      border: var(--border-thick);
+      border-radius: 14px;
       font-family: inherit;
-      font-weight: 600;
-      font-size: 14px;
+      font-weight: 800;
+      font-size: 13px;
       cursor: pointer;
       display: inline-flex;
       align-items: center;
       gap: 8px;
-      transition: all 0.2s;
+      box-shadow: 3px 3px 0px #000;
+      transition: all 0.15s ease;
       text-decoration: none;
+      user-select: none;
     }
 
-    .btn-primary {
-      background: var(--primary);
-      color: white;
-      box-shadow: 0 4px 12px rgba(255, 0, 51, 0.3);
-    }
-    .btn-primary:hover {
-      background: var(--primary-hover);
-      transform: translateY(-1px);
+    .btn:hover {
+      transform: translate(-2px, -2px);
+      box-shadow: 5px 5px 0px #000;
     }
 
-    .btn-secondary {
-      background: rgba(255, 255, 255, 0.08);
-      color: var(--text-main);
-      border: 1px solid var(--border-card);
-    }
-    .btn-secondary:hover {
-      background: rgba(255, 255, 255, 0.12);
+    .btn:active {
+      transform: translate(2px, 2px);
+      box-shadow: 1px 1px 0px #000;
     }
 
-    .btn-danger {
-      background: rgba(239, 68, 68, 0.15);
-      color: #f87171;
-      border: 1px solid rgba(239, 68, 68, 0.3);
-    }
-    .btn-danger:hover {
-      background: rgba(239, 68, 68, 0.25);
-    }
+    .btn-red { background: #ff5964; color: #fff; }
+    .btn-yellow { background: #fde047; color: #000; }
+    .btn-green { background: #6ee7b7; color: #000; }
+    .btn-blue { background: #70d6ff; color: #000; }
+    .btn-white { background: #ffffff; color: #000; }
+    .btn-black { background: #000000; color: #fff; }
 
     .btn-sm {
-      padding: 6px 12px;
+      padding: 8px 14px;
       font-size: 12px;
-      border-radius: var(--radius-sm);
+      border-radius: var(--radius-pill);
+      box-shadow: 2px 2px 0px #000;
     }
 
-    /* Status Info Display */
+    /* Info Boxes */
     .info-list {
       display: flex;
       flex-direction: column;
-      gap: 10px;
+      gap: 8px;
     }
 
     .info-item {
@@ -260,216 +279,569 @@
       justify-content: space-between;
       align-items: center;
       padding: 10px 14px;
-      background: rgba(0, 0, 0, 0.25);
-      border-radius: var(--radius-sm);
-      font-size: 14px;
+      background: #ffffff;
+      border: var(--border-med);
+      border-radius: 12px;
+      box-shadow: 2px 2px 0px #000;
+      font-size: 13px;
+      font-weight: 800;
     }
 
     .info-label {
-      color: var(--text-muted);
+      color: #374151;
+      display: flex;
+      align-items: center;
+      gap: 6px;
     }
 
-    .info-value {
-      font-weight: 600;
+    .info-val {
       font-family: 'JetBrains Mono', monospace;
+      font-weight: 800;
+      font-size: 14px;
     }
 
-    /* Scoreboard Table */
-    .table-container {
-      overflow-x: auto;
+    /* Scoreboard Tabs & Table */
+    .tab-pills {
+      display: flex;
+      gap: 10px;
+    }
+
+    .table-wrapper {
+      border: var(--border-thick);
+      border-radius: 16px;
+      background: #ffffff;
+      box-shadow: var(--shadow-solid);
+      overflow: hidden;
       max-height: 480px;
-      border-radius: var(--radius-md);
-      background: rgba(0, 0, 0, 0.3);
-      border: 1px solid var(--border-card);
+      overflow-y: auto;
     }
 
     table {
       width: 100%;
       border-collapse: collapse;
       text-align: left;
-      font-size: 14px;
     }
 
     th {
       padding: 12px 16px;
-      background: rgba(255, 255, 255, 0.03);
-      color: var(--text-muted);
-      font-weight: 600;
+      background: #f1f5f9;
+      color: #000;
+      font-weight: 900;
+      font-size: 12px;
       text-transform: uppercase;
-      font-size: 11px;
-      letter-spacing: 0.6px;
-      border-bottom: 1px solid var(--border-card);
+      letter-spacing: 0.5px;
+      border-bottom: var(--border-thick);
       position: sticky;
       top: 0;
-      backdrop-filter: blur(10px);
+      z-index: 10;
     }
 
     td {
       padding: 12px 16px;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+      border-bottom: 2px solid #e2e8f0;
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    tr:last-child td {
+      border-bottom: none;
     }
 
     tr:hover td {
-      background: rgba(255, 255, 255, 0.02);
+      background: #fef08a;
     }
 
-    .user-cell {
+    .user-box {
       display: flex;
       align-items: center;
       gap: 10px;
     }
 
-    .avatar {
-      width: 28px;
-      height: 28px;
+    .avatar-circle {
+      width: 32px;
+      height: 32px;
       border-radius: 50%;
-      background: #334155;
+      border: 2px solid #000;
+      box-shadow: 2px 2px 0px #000;
       object-fit: cover;
+      background: #ffcf70;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 900;
+      font-size: 13px;
     }
 
-    .rank-badge {
+    .rank-pill {
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      width: 24px;
-      height: 24px;
+      width: 28px;
+      height: 28px;
       border-radius: 50%;
-      font-weight: 700;
-      font-size: 12px;
+      border: 2px solid #000;
+      box-shadow: 2px 2px 0px #000;
+      font-weight: 900;
+      font-size: 13px;
     }
 
-    .rank-1 { background: linear-gradient(135deg, #fbbf24, #d97706); color: #000; }
-    .rank-2 { background: linear-gradient(135deg, #cbd5e1, #94a3b8); color: #000; }
-    .rank-3 { background: linear-gradient(135deg, #d97706, #92400e); color: #fff; }
+    .rank-1 { background: #ffd166; color: #000; }
+    .rank-2 { background: #70d6ff; color: #000; }
+    .rank-3 { background: #ff9ebb; color: #000; }
+    .rank-other { background: #e2e8f0; color: #000; }
 
-    .score-pts {
+    .score-tag {
       font-family: 'JetBrains Mono', monospace;
-      font-weight: 700;
-      color: var(--accent-green);
+      font-weight: 900;
+      background: #bbf7d0;
+      border: 2px solid #000;
+      padding: 3px 8px;
+      border-radius: 8px;
+      box-shadow: 2px 2px 0px #000;
     }
 
-    .distance-km {
+    .dist-tag {
       font-family: 'JetBrains Mono', monospace;
-      color: var(--accent-blue);
+      font-weight: 800;
+      background: #e0f2fe;
+      border: 1.5px solid #000;
+      padding: 2px 6px;
+      border-radius: 6px;
+      color: #0369a1;
     }
 
     .empty-state {
       padding: 40px 20px;
       text-align: center;
-      color: var(--text-muted);
+      font-weight: 800;
+      color: #64748b;
+    }
+
+    /* Sticker badge */
+    .sticker-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      background: #ff5964;
+      color: #fff;
+      font-size: 11px;
+      font-weight: 900;
+      padding: 2px 8px;
+      border: 2px solid #000;
+      border-radius: var(--radius-pill);
+      box-shadow: 2px 2px 0px #000;
+      transform: rotate(2deg);
+    }
+
+    /* ==========================================================================
+       Solid Neobrutalism Intro Transition: MABAR BANG - kikobooo x arvana prod
+       ========================================================================== */
+    .intro-curtain {
+      position: fixed;
+      inset: 0;
+      z-index: 999999;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      pointer-events: all;
+    }
+
+    .curtain-slab {
+      position: absolute;
+      left: 0;
+      width: 100%;
+      height: 50.5%;
+      z-index: 1;
+      transition: transform 0.65s cubic-bezier(0.85, 0, 0.15, 1);
+    }
+
+    .curtain-top {
+      top: 0;
+      background: #ffe082;
+      border-bottom: 5px solid #000;
+      background-image: radial-gradient(#000000 1.5px, transparent 1.5px);
+      background-size: 24px 24px;
+      transform: translateY(0);
+    }
+
+    .curtain-bottom {
+      bottom: 0;
+      background: #c8f560;
+      border-top: 5px solid #000;
+      background-image: radial-gradient(#000000 1.5px, transparent 1.5px);
+      background-size: 24px 24px;
+      transform: translateY(0);
+    }
+
+    .intro-curtain.dismissed .curtain-top {
+      transform: translateY(-101%);
+    }
+
+    .intro-curtain.dismissed .curtain-bottom {
+      transform: translateY(101%);
+    }
+
+    .intro-card-wrap {
+      position: relative;
+      z-index: 10;
+      padding: 20px;
+      transition: transform 0.45s cubic-bezier(0.85, 0, 0.15, 1), opacity 0.35s ease;
+    }
+
+    .intro-curtain.dismissed .intro-card-wrap {
+      transform: scale(0.6) rotate(-3deg);
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .intro-card {
+      background: #ffffff;
+      border: 4px solid #000000;
+      border-radius: 32px;
+      box-shadow: 12px 12px 0px #000000;
+      padding: 42px 32px 32px;
+      max-width: 580px;
+      width: 90vw;
+      text-align: center;
+      position: relative;
+      animation: popIntro 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+    }
+
+    @keyframes popIntro {
+      0% {
+        transform: scale(0.6) rotate(-6deg);
+        opacity: 0;
+      }
+      70% {
+        transform: scale(1.04) rotate(1deg);
+      }
+      100% {
+        transform: scale(1) rotate(0deg);
+        opacity: 1;
+      }
+    }
+
+    .intro-sticker {
+      position: absolute;
+      font-size: 11px;
+      font-weight: 900;
+      border: 2.5px solid #000;
+      border-radius: var(--radius-pill);
+      padding: 4px 12px;
+      box-shadow: 3px 3px 0px #000;
+      letter-spacing: 0.5px;
+      z-index: 5;
+    }
+
+    .sticker-tl {
+      top: -14px;
+      left: 20px;
+      background: #70d6ff;
+      color: #000;
+      transform: rotate(-5deg);
+    }
+
+    .sticker-tr {
+      top: -14px;
+      right: 20px;
+      background: #c8f560;
+      color: #000;
+      transform: rotate(4deg);
+    }
+
+    .intro-starburst {
+      position: absolute;
+      top: -24px;
+      right: -16px;
+      font-size: 44px;
+      color: #ff5964;
+      line-height: 1;
+      text-shadow: 2px 2px 0px #000;
+      animation: spinStar 10s linear infinite;
+    }
+
+    @keyframes spinStar {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+
+    .intro-tag-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: #f1f5f9;
+      border: 2px solid #000;
+      padding: 4px 14px;
+      border-radius: var(--radius-pill);
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+      box-shadow: 2px 2px 0px #000;
+      margin-bottom: 12px;
+    }
+
+    .intro-title {
+      font-size: clamp(38px, 8vw, 64px);
+      font-weight: 900;
+      letter-spacing: -2px;
+      color: #000000;
+      line-height: 1.05;
+      margin: 8px 0 16px;
+      text-transform: uppercase;
+      transform: rotate(-1.5deg);
+      text-shadow: 3px 3px 0px #ffe082, 6px 6px 0px #000000;
+    }
+
+    .intro-collab-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      background: #ff5964;
+      color: #ffffff;
+      border: 3px solid #000000;
+      border-radius: var(--radius-pill);
+      padding: 10px 24px;
+      font-weight: 900;
+      font-size: 17px;
+      letter-spacing: 0.5px;
+      box-shadow: 4px 4px 0px #000000;
+      margin-bottom: 16px;
+      transform: rotate(1deg);
+    }
+
+    .collab-x {
+      color: #ffe082;
+      font-size: 14px;
+      font-weight: 900;
+    }
+
+    .intro-subtext {
+      font-size: 13px;
+      font-weight: 700;
+      color: #475569;
+      margin-bottom: 22px;
+    }
+
+    .intro-bar-outer {
+      width: 100%;
+      max-width: 280px;
+      height: 14px;
+      background: #f8fafc;
+      border: 2.5px solid #000000;
+      border-radius: var(--radius-pill);
+      margin: 0 auto 20px;
+      overflow: hidden;
+      box-shadow: 2px 2px 0px #000000;
+    }
+
+    .intro-bar-inner {
+      height: 100%;
+      width: 0%;
+      background: repeating-linear-gradient(45deg, #c8f560, #c8f560 10px, #bbf7d0 10px, #bbf7d0 20px);
+      border-right: 2.5px solid #000000;
+      animation: fillProgress 1.6s ease-in-out forwards;
+    }
+
+    @keyframes fillProgress {
+      0% { width: 0%; }
+      60% { width: 75%; }
+      100% { width: 100%; }
+    }
+
+    .intro-btn {
+      background: #000000;
+      color: #ffffff;
+      border: 3px solid #000000;
+      border-radius: var(--radius-pill);
+      padding: 12px 36px;
+      font-size: 16px;
+      font-weight: 900;
+      letter-spacing: 0.5px;
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      cursor: pointer;
+      box-shadow: 5px 5px 0px #ff5964;
+      transition: all 0.15s ease;
+    }
+
+    .intro-btn:hover {
+      transform: translate(-2px, -2px);
+      box-shadow: 7px 7px 0px #ff5964;
+      background: #18181b;
+    }
+
+    .intro-btn:active {
+      transform: translate(2px, 2px);
+      box-shadow: 1px 1px 0px #ff5964;
+    }
+
+    .intro-hint {
+      margin-top: 14px;
+      font-size: 11px;
+      font-weight: 700;
+      color: #94a3b8;
     }
   </style>
 </head>
 <body>
+  <!-- Solid Neobrutalism Intro Curtain & Transition -->
+  <div id="intro-curtain" class="intro-curtain" onclick="dismissIntro()">
+    <div class="curtain-slab curtain-top"></div>
+    <div class="curtain-slab curtain-bottom"></div>
+
+    <div class="intro-card-wrap">
+      <div class="intro-card" onclick="event.stopPropagation()">
+        <div class="intro-sticker sticker-tl">✦ MABARBANG ✦</div>
+        <div class="intro-sticker sticker-tr">★ 2026 EDITION ★</div>
+        <div class="intro-starburst">✹</div>
+
+        <div class="intro-tag-pill">
+          <span class="live-dot"></span> LIVE STREAMING ENGINE
+        </div>
+
+        <h1 class="intro-title">MABAR BANG</h1>
+
+        <div class="intro-collab-badge">
+          <span>⚡</span>
+          <span>kikobooo</span>
+          <span class="collab-x">✕</span>
+          <span>arvana prod</span>
+          <span>⚡</span>
+        </div>
+
+        <p class="intro-subtext">MabarBang • Interaktif YouTube Live Guessing Game</p>
+
+        <div class="intro-bar-outer">
+          <div class="intro-bar-inner"></div>
+        </div>
+
+        <button class="intro-btn" onclick="dismissIntro()">
+          <span>GASKEUN!</span>
+          <span>➔</span>
+        </button>
+
+        <div class="intro-hint">Klik di mana saja atau tekan Spasi untuk masuk</div>
+      </div>
+    </div>
+  </div>
+
   <div class="container">
     <!-- Header -->
     <header>
       <div class="brand">
-        <div class="brand-logo">▶</div>
+        <div class="brand-logo" onclick="replayIntro()" title="Klik untuk putar transisi MABAR BANG" style="cursor: pointer;">▶</div>
         <div class="brand-title">
-          <h1>ChatGuessr YouTube Live</h1>
-          <p>Real-Time Web Dashboard & Engine</p>
+          <h1>MabarBang <span class="sticker-tag">LIVE ✦</span></h1>
+          <p>MabarBang Streamer Dashboard</p>
         </div>
       </div>
       <div class="header-actions">
-        <button class="btn btn-secondary btn-sm" onclick="copyOverlayUrl()">📋 Copy OBS Overlay URL</button>
-        <button class="btn btn-secondary btn-sm" onclick="openUserscriptModal()">🧩 Userscript Setup</button>
+        <button class="btn btn-pink btn-sm" onclick="replayIntro()" title="Putar ulang transisi Mabar Bang">🎬 Intro Mabar</button>
+        <button class="btn btn-yellow btn-sm" onclick="copyOverlayUrl()">📋 Copy OBS Overlay URL</button>
+        <button class="btn btn-blue btn-sm" onclick="openUserscriptModal()">🧩 Userscript Setup</button>
       </div>
     </header>
 
     <!-- Controls Grid -->
     <div class="grid-2">
       <!-- YouTube Connect Card -->
-      <div class="card">
-        <div style="display: flex; justify-content: space-between; align-items: center;">
+      <div class="card card-yellow">
+        <div class="card-header">
           <div class="card-title">
-            <span style="color: #ff0033;">●</span> YouTube Live Stream
+            <span>📺</span> YouTube Live Stream
           </div>
-          <span id="ytBadge" class="badge badge-disconnected">
+          <span id="ytBadge" class="badge-pill badge-disconnected">
             <span class="badge-dot"></span> <span id="ytBadgeText">Disconnected</span>
           </span>
         </div>
 
-        <p style="font-size: 13px; color: var(--text-muted);">
-          Masukkan link live stream atau Video ID YouTube yang sedang tayang:
+        <p style="font-size: 13px; font-weight: 700; color: #1f2937;">
+          Masukkan link stream / popup chat / handle channel (@Arvanna26):
         </p>
 
         <div class="input-group">
-          <input type="text" id="streamInput" placeholder="https://www.youtube.com/@Arvanna26 atau link video live">
-          <button id="btnConnectYt" class="btn btn-primary" onclick="connectYouTube()">Connect</button>
-          <button id="btnDisconnectYt" class="btn btn-danger" onclick="disconnectYouTube()" style="display: none;">Disconnect</button>
+          <input type="text" id="streamInput" placeholder="@Arvanna26 atau https://www.youtube.com/watch?v=...">
+          <button id="btnConnectYt" class="btn btn-black" onclick="connectYouTube()">Connect</button>
+          <button id="btnDisconnectYt" class="btn btn-red" onclick="disconnectYouTube()" style="display: none;">Disconnect</button>
         </div>
 
         <div class="info-list">
           <div class="info-item">
-            <span class="info-label">Active Target:</span>
-            <span class="info-value" id="activeTarget">-</span>
+            <span class="info-label">🎯 Active Target:</span>
+            <span class="info-val" id="activeTarget">-</span>
           </div>
         </div>
 
-        <div id="ytErrorBox" style="display: none; margin-top: 12px; padding: 10px 14px; background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.4); border-radius: 8px; color: #f87171; font-size: 12px;">
-          <span style="font-weight: 700;">Gagal Connect:</span> <span id="ytErrorText"></span>
+        <div id="ytErrorBox" style="display: none; padding: 10px 14px; background: #fee2e2; border: 2.5px solid #000; border-radius: 12px; box-shadow: 2px 2px 0px #000; color: #991b1b; font-size: 12px; font-weight: 800;">
+          <span>⚠️ Gagal Connect:</span> <span id="ytErrorText"></span>
         </div>
       </div>
 
       <!-- GeoGuessr Game Status Card -->
-      <div class="card">
-        <div style="display: flex; justify-content: space-between; align-items: center;">
+      <div class="card card-green">
+        <div class="card-header">
           <div class="card-title">
-            <span style="color: #38bdf8;">●</span> GeoGuessr Game Status
+            <span>🌍</span> GeoGuessr Game Status
           </div>
-          <span id="guessBadge" class="badge badge-disconnected">
+          <span id="guessBadge" class="badge-pill badge-disconnected">
             <span class="badge-dot"></span> <span id="guessBadgeText">Guesses Closed</span>
           </span>
         </div>
 
         <div class="info-list">
           <div class="info-item">
-            <span class="info-label">Map Name:</span>
-            <span class="info-value" id="mapNameDisplay">Waiting for game...</span>
+            <span class="info-label">🗺️ Map:</span>
+            <span class="info-val" id="mapNameDisplay">Menunggu Game...</span>
           </div>
           <div class="info-item">
-            <span class="info-label">Round:</span>
-            <span class="info-value" id="roundDisplay">1</span>
+            <span class="info-label">📍 Ronde:</span>
+            <span class="info-val" id="roundDisplay">R1 / 5</span>
           </div>
           <div class="info-item">
-            <span class="info-label">Current Round Guesses:</span>
-            <span class="info-value" id="guessCountDisplay">0</span>
+            <span class="info-label">👥 Tebakan Ronde Ini:</span>
+            <span class="info-val" id="guessCountDisplay">0 Guesses</span>
           </div>
         </div>
 
         <div style="display: flex; gap: 10px; margin-top: auto;">
-          <button id="btnToggleGuesses" class="btn btn-secondary btn-sm" onclick="toggleGuesses()">Open Guesses</button>
-          <button class="btn btn-danger btn-sm" onclick="resetGame()">Reset Game</button>
+          <button id="btnToggleGuesses" class="btn btn-white btn-sm" onclick="toggleGuesses()">🔓 Open Guesses</button>
+          <button class="btn btn-red btn-sm" onclick="resetGame()">🔄 Reset Game</button>
         </div>
       </div>
     </div>
 
     <!-- Live Scoreboard -->
-    <div class="card">
-      <div style="display: flex; justify-content: space-between; align-items: center;">
+    <div class="card card-white">
+      <div class="card-header">
         <div class="card-title">
-          <span>🏆</span> Live Round Guesses & Leaderboard
+          <span>🏆</span> Papan Skor Live
         </div>
-        <div style="display: flex; gap: 8px;">
-          <button class="btn btn-sm btn-secondary active" id="tabRound" onclick="switchView('round')">Current Round</button>
-          <button class="btn btn-sm btn-secondary" id="tabGame" onclick="switchView('game')">Game Total</button>
+        <div class="tab-pills">
+          <button id="tabRound" class="btn btn-yellow btn-sm" onclick="switchView('round')">Ronde Ini</button>
+          <button id="tabGame" class="btn btn-white btn-sm" onclick="switchView('game')">Total Game</button>
         </div>
       </div>
 
-      <div class="table-container">
+      <div class="table-wrapper">
         <table>
           <thead>
             <tr>
-              <th style="width: 60px;">Rank</th>
-              <th>Player</th>
-              <th>Distance</th>
-              <th style="text-align: right;">Score</th>
+              <th style="width: 70px;">Rank</th>
+              <th>Pemain (Viewer)</th>
+              <th style="width: 140px;">Jarak</th>
+              <th style="width: 130px; text-align: right;">Skor</th>
             </tr>
           </thead>
           <tbody id="scoreboardBody">
             <tr>
-              <td colspan="4" class="empty-state">Belum ada tebakan masuk di ronde ini. Penonton bisa mengetik <code>!g lat, lng</code> di YouTube chat!</td>
+              <td colspan="4" class="empty-state">
+                Belum ada tebakan. Viewer bisa ketik <code>!g [nama negara/kota]</code> di YouTube chat!
+              </td>
             </tr>
           </tbody>
         </table>
@@ -482,27 +854,39 @@
     let currentState = null;
     let currentView = 'round'; // 'round' or 'game'
 
+    socket.on('connect', () => {
+      console.log('Connected to MabarBang server');
+      socket.emit('request-state');
+    });
+
     socket.on('state-update', (state) => {
       currentState = state;
       updateUI();
     });
 
     socket.on('guess-added', () => {
-      // Re-fetch or update state
+      socket.emit('request-state');
+    });
+
+    socket.on('round-started', () => {
+      socket.emit('request-state');
+    });
+
+    socket.on('round-finished', () => {
       socket.emit('request-state');
     });
 
     function updateUI() {
       if (!currentState) return;
 
-      // Update YouTube connection
+      // Update YouTube Status
       const ytBadge = document.getElementById('ytBadge');
       const ytBadgeText = document.getElementById('ytBadgeText');
       const btnConnectYt = document.getElementById('btnConnectYt');
       const btnDisconnectYt = document.getElementById('btnDisconnectYt');
       const activeTarget = document.getElementById('activeTarget');
 
-      ytBadge.className = 'badge badge-' + currentState.youtubeStatus;
+      ytBadge.className = 'badge-pill badge-' + currentState.youtubeStatus;
       ytBadgeText.textContent = currentState.youtubeStatus;
 
       const errorBox = document.getElementById('ytErrorBox');
@@ -525,22 +909,22 @@
       }
 
       // Update Game Status
-      document.getElementById('mapNameDisplay').textContent = currentState.mapName || 'Custom Game';
-      document.getElementById('roundDisplay').textContent = currentState.round;
-      document.getElementById('guessCountDisplay').textContent = (currentState.roundGuesses || []).length;
+      document.getElementById('mapNameDisplay').textContent = currentState.mapName || 'GeoGuessr Map';
+      document.getElementById('roundDisplay').textContent = `R${currentState.round} / 5`;
+      document.getElementById('guessCountDisplay').textContent = `${(currentState.roundGuesses || []).length} Guesses`;
 
       const guessBadge = document.getElementById('guessBadge');
       const guessBadgeText = document.getElementById('guessBadgeText');
       const btnToggleGuesses = document.getElementById('btnToggleGuesses');
 
       if (currentState.guessesOpen) {
-        guessBadge.className = 'badge badge-connected';
+        guessBadge.className = 'badge-pill badge-connected';
         guessBadgeText.textContent = 'Guesses Open';
-        btnToggleGuesses.textContent = 'Close Guesses';
+        btnToggleGuesses.textContent = '🔒 Close Guesses';
       } else {
-        guessBadge.className = 'badge badge-disconnected';
+        guessBadge.className = 'badge-pill badge-disconnected';
         guessBadgeText.textContent = 'Guesses Closed';
-        btnToggleGuesses.textContent = 'Open Guesses';
+        btnToggleGuesses.textContent = '🔓 Open Guesses';
       }
 
       renderScoreboard();
@@ -548,10 +932,8 @@
 
     function switchView(view) {
       currentView = view;
-      document.getElementById('tabRound').classList.toggle('btn-primary', view === 'round');
-      document.getElementById('tabRound').classList.toggle('btn-secondary', view !== 'round');
-      document.getElementById('tabGame').classList.toggle('btn-primary', view === 'game');
-      document.getElementById('tabGame').classList.toggle('btn-secondary', view !== 'game');
+      document.getElementById('tabRound').className = view === 'round' ? 'btn btn-yellow btn-sm' : 'btn btn-white btn-sm';
+      document.getElementById('tabGame').className = view === 'game' ? 'btn btn-yellow btn-sm' : 'btn btn-white btn-sm';
       renderScoreboard();
     }
 
@@ -562,19 +944,22 @@
       const list = currentView === 'round' ? (currentState.roundGuesses || []) : (currentState.leaderboard || []);
 
       if (list.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="4" class="empty-state">Belum ada tebakan. Penonton bisa mengetik <code>!g &lt;lat, lng&gt;</code> di chat YouTube!</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="4" class="empty-state">Belum ada tebakan. Viewer bisa ketik <code>!g [nama negara/kota]</code> di YouTube chat!</td></tr>`;
         return;
       }
 
       let html = '';
       list.forEach((item, index) => {
         const rank = index + 1;
-        let rankBadge = rank;
-        if (rank === 1) rankBadge = `<span class="rank-badge rank-1">1</span>`;
-        else if (rank === 2) rankBadge = `<span class="rank-badge rank-2">2</span>`;
-        else if (rank === 3) rankBadge = `<span class="rank-badge rank-3">3</span>`;
+        let rankClass = 'rank-other';
+        if (rank === 1) rankClass = 'rank-1';
+        else if (rank === 2) rankClass = 'rank-2';
+        else if (rank === 3) rankClass = 'rank-3';
 
-        const avatar = item.avatar ? `<img class="avatar" src="${item.avatar}" alt="" />` : `<div class="avatar" style="display:flex;align-items:center;justify-content:center;font-size:12px;">👤</div>`;
+        const rankBadge = `<span class="rank-pill ${rankClass}">${rank}</span>`;
+        const avatar = item.avatar 
+          ? `<img class="avatar-circle" src="${item.avatar}" alt="" />` 
+          : `<div class="avatar-circle">👤</div>`;
         const distance = currentView === 'round' ? `${item.distance} km` : `${Math.round(item.totalDistance)} km total`;
         const score = currentView === 'round' ? `${item.score.toLocaleString()} pts` : `${item.totalScore.toLocaleString()} pts`;
 
@@ -582,13 +967,13 @@
           <tr>
             <td>${rankBadge}</td>
             <td>
-              <div class="user-cell">
+              <div class="user-box">
                 ${avatar}
-                <strong>${escapeHtml(item.username)}</strong>
+                <strong style="font-size: 14px;">${escapeHtml(item.username)}</strong>
               </div>
             </td>
-            <td><span class="distance-km">${distance}</span></td>
-            <td style="text-align: right;"><span class="score-pts">${score}</span></td>
+            <td><span class="dist-tag">${distance}</span></td>
+            <td style="text-align: right;"><span class="score-tag">${score}</span></td>
           </tr>
         `;
       });
@@ -609,7 +994,6 @@
       });
     }
 
-    // Load saved stream input
     const savedTarget = localStorage.getItem('cg_last_yt_target');
     if (savedTarget) {
       document.getElementById('streamInput').value = savedTarget;
@@ -644,6 +1028,83 @@
     function escapeHtml(str) {
       if (!str) return '';
       return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    // =========================================================================
+    // Solid Neobrutalism Intro Transition Controller
+    // =========================================================================
+    let introDismissed = false;
+    let introTimer = null;
+
+    function dismissIntro() {
+      if (introDismissed) return;
+      introDismissed = true;
+      if (introTimer) clearTimeout(introTimer);
+
+      const curtain = document.getElementById('intro-curtain');
+      if (!curtain) return;
+
+      // Play snappy arcade pop sound via Web Audio API (optional)
+      try {
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        if (audioCtx.state === 'suspended') {
+          audioCtx.resume();
+        }
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(440, audioCtx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(880, audioCtx.currentTime + 0.12);
+        gain.gain.setValueAtTime(0.18, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.18);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.18);
+      } catch (e) {}
+
+      curtain.classList.add('dismissed');
+      setTimeout(() => {
+        curtain.style.display = 'none';
+        curtain.style.pointerEvents = 'none';
+      }, 700);
+    }
+
+    // Auto-dismiss after 1.8 seconds on initial load
+    introTimer = setTimeout(() => {
+      dismissIntro();
+    }, 1800);
+
+    // Keyboard shortcut to skip immediately (Space, Enter, Escape)
+    window.addEventListener('keydown', (e) => {
+      if ((e.code === 'Space' || e.code === 'Enter' || e.code === 'Escape') && !introDismissed) {
+        dismissIntro();
+      }
+    });
+
+    // Replay function to trigger on demand
+    function replayIntro() {
+      const curtain = document.getElementById('intro-curtain');
+      if (!curtain) return;
+      if (introTimer) clearTimeout(introTimer);
+      introDismissed = false;
+
+      curtain.style.display = 'flex';
+      curtain.style.pointerEvents = 'all';
+      void curtain.offsetWidth; // force browser reflow
+      curtain.classList.remove('dismissed');
+
+      // Re-trigger progress bar animation
+      const bar = curtain.querySelector('.intro-bar-inner');
+      if (bar) {
+        bar.style.animation = 'none';
+        void bar.offsetWidth;
+        bar.style.animation = 'fillProgress 1.6s ease-in-out forwards';
+      }
+
+      introTimer = setTimeout(() => {
+        dismissIntro();
+      }, 1900);
     }
   </script>
 </body>

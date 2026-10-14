@@ -482,20 +482,22 @@ io.on('connection', (socket) => {
   })
 })
 
-const PORT = process.env.PORT || 3000
-server.listen(PORT, () => {
-  console.log(`===============================================`)
-  console.log(`🚀 ChatGuessr Standalone Server running on port ${PORT}`)
-  console.log(`📱 Streamer Dashboard : http://localhost:${PORT}/dashboard`)
-  console.log(`📺 OBS Studio Overlay: http://localhost:${PORT}/overlay`)
-  console.log(`===============================================`)
-  console.log(`💡 Biarkan jendela ini tetap terbuka selama live stream berlangsung.`)
+const PORT = process.env.PORT || 5050
+if (process.env.NODE_ENV !== 'test') {
+  server.listen(PORT, () => {
+    console.log(`===============================================`)
+    console.log(`🚀 MabarBang Standalone Server running on port ${PORT}`)
+    console.log(`📱 Streamer Dashboard : http://localhost:${PORT}/dashboard`)
+    console.log(`📺 OBS Studio Overlay: http://localhost:${PORT}/overlay`)
+    console.log(`===============================================`)
+    console.log(`💡 Biarkan jendela ini tetap terbuka selama live stream berlangsung.`)
 
-  // Auto-open browser on desktop if not in test/CI
-  if (process.env.NODE_ENV !== 'test' && !process.env.CI) {
-    const startCmd = process.platform === 'win32' ? 'start' : (process.platform === 'darwin' ? 'open' : 'xdg-open')
-    try {
-      exec(`${startCmd} http://localhost:${PORT}/dashboard`)
-    } catch (_) {}
-  }
-})
+    // Auto-open browser on desktop if not in CI
+    if (!process.env.CI) {
+      const startCmd = process.platform === 'win32' ? 'start' : (process.platform === 'darwin' ? 'open' : 'xdg-open')
+      try {
+        exec(`${startCmd} http://localhost:${PORT}/dashboard`)
+      } catch (_) {}
+    }
+  })
+}
