@@ -23,6 +23,7 @@
     "publish": "electron-forge publish",
     "start": "tsx src/server/index.ts",
     "server": "tsx src/server/index.ts",
+    "build:exe": "node scripts/build-standalone.mjs",
     "test": "vitest run"
   },
   "devDependencies": {

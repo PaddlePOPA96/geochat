@@ -3,8 +3,11 @@ import http from 'http'
 import { Server as SocketIOServer } from 'socket.io'
 import cors from 'cors'
 import path from 'path'
+import fs from 'fs'
+import { exec } from 'child_process'
 import YouTubeBackend from '../main/utils/useYouTubeChat'
 import { resolveLocation, parseCoordinates } from '../shared/geocoding'
+import { embeddedDashboardHtml, embeddedOverlayHtml } from './embeddedTemplates'
 
 export { resolveLocation, parseCoordinates }
 
@@ -27,9 +30,16 @@ app.use((_req, res, next) => {
   next()
 })
 
-// Serve static frontend files
-const publicDir = path.resolve(__dirname, '../../public')
-app.use(express.static(publicDir))
+// Serve static frontend files (if directory exists on disk)
+const publicDir = fs.existsSync(path.resolve(__dirname, '../../public'))
+  ? path.resolve(__dirname, '../../public')
+  : (fs.existsSync(path.join(process.cwd(), 'public'))
+    ? path.join(process.cwd(), 'public')
+    : path.resolve(__dirname, 'public'))
+
+if (fs.existsSync(publicDir)) {
+  app.use(express.static(publicDir))
+}
 
 export function haversineDistance(
   mk1: { lat: number; lng: number },
@@ -440,12 +450,22 @@ app.post('/api/game/reset', (_req, res) => {
 })
 
 // Serve Dashboard & Overlay HTML routes
-app.get('/dashboard', (_req, res) => {
-  res.sendFile(path.join(publicDir, 'dashboard/index.html'))
+app.get(['/dashboard', '/dashboard/'], (_req, res) => {
+  const filePath = path.join(publicDir, 'dashboard/index.html')
+  if (fs.existsSync(filePath)) {
+    res.sendFile(filePath)
+  } else {
+    res.setHeader('Content-Type', 'text/html; charset=utf-8').send(embeddedDashboardHtml)
+  }
 })
 
 app.get(['/overlay', '/overlay/'], (_req, res) => {
-  res.sendFile(path.join(publicDir, 'overlay/index.html'))
+  const filePath = path.join(publicDir, 'overlay/index.html')
+  if (fs.existsSync(filePath)) {
+    res.sendFile(filePath)
+  } else {
+    res.setHeader('Content-Type', 'text/html; charset=utf-8').send(embeddedOverlayHtml)
+  }
 })
 
 app.get('/', (_req, res) => {
@@ -469,4 +489,13 @@ server.listen(PORT, () => {
   console.log(`📱 Streamer Dashboard : http://localhost:${PORT}/dashboard`)
   console.log(`📺 OBS Studio Overlay: http://localhost:${PORT}/overlay`)
   console.log(`===============================================`)
+  console.log(`💡 Biarkan jendela ini tetap terbuka selama live stream berlangsung.`)
+
+  // Auto-open browser on desktop if not in test/CI
+  if (process.env.NODE_ENV !== 'test' && !process.env.CI) {
+    const startCmd = process.platform === 'win32' ? 'start' : (process.platform === 'darwin' ? 'open' : 'xdg-open')
+    try {
+      exec(`${startCmd} http://localhost:${PORT}/dashboard`)
+    } catch (_) {}
+  }
 })

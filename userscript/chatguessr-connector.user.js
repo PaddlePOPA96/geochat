@@ -1,40 +1,42 @@
 // ==UserScript==
 // @name         ChatGuessr YouTube - GeoGuessr Auto Connector, Overlay & Viewer Pins
 // @namespace    http://tampermonkey.net/
-// @version      2.1
+// @version      2.3
 // @description  Otomatis mengirim data ronde GeoGuessr ke Railway, menampilkan Scoreboard Overlay & PIN tebakan penonton di peta GeoGuessr
 // @author       ChatGuessr
 // @match        *://*.geoguessr.com/*
 // @run-at       document-start
 // @grant        GM_setValue
 // @grant        GM_getValue
-// @grant        GM_xmlhttpRequest
 // @grant        unsafeWindow
-// @connect      *
 // @require      https://cdn.socket.io/4.7.5/socket.io.min.js
 // ==/UserScript==
 
 (function () {
   'use strict';
 
+  // Server default Railway
   const DEFAULT_SERVER_URL = 'https://geochat-production-f099.up.railway.app';
-  let serverUrl =
-    (typeof GM_getValue !== 'undefined'
-      ? GM_getValue('cg_server_url', DEFAULT_SERVER_URL)
-      : localStorage.getItem('cg_server_url')) || DEFAULT_SERVER_URL;
-
-  if (serverUrl.includes('localhost:3000')) {
-    serverUrl = DEFAULT_SERVER_URL;
-    if (typeof GM_setValue !== 'undefined') GM_setValue('cg_server_url', serverUrl);
-    localStorage.setItem('cg_server_url', serverUrl);
-  }
+  let serverUrl = DEFAULT_SERVER_URL;
+  try {
+    const saved =
+      typeof GM_getValue !== 'undefined'
+        ? GM_getValue('cg_server_url')
+        : localStorage.getItem('cg_server_url');
+    if (saved && !saved.includes('localhost')) {
+      serverUrl = saved;
+    } else {
+      if (typeof GM_setValue !== 'undefined') GM_setValue('cg_server_url', DEFAULT_SERVER_URL);
+      localStorage.setItem('cg_server_url', DEFAULT_SERVER_URL);
+    }
+  } catch (_) {}
 
   console.log('[ChatGuessr Connector] Started with Server:', serverUrl);
 
   const win = typeof unsafeWindow !== 'undefined' ? unsafeWindow : window;
 
   // ==========================================
-  // 1. GOOGLE MAPS HOOK (FOR VIEWER PINS)
+  // 1. GOOGLE MAPS HOOK & OVERLAYVIEW (FOR VIEWER PINS)
   // ==========================================
   let globalMap = null;
   let guessMarkers = [];
@@ -43,13 +45,77 @@
   let lastRoundResults = null;
   let lastRoundLocation = null;
   let showPinsEnabled = true;
+  let CustomMarkerOverlay = null;
+
+  function initOverlayViewClass() {
+    if (CustomMarkerOverlay || !win.google?.maps?.OverlayView) return CustomMarkerOverlay;
+
+    CustomMarkerOverlay = class extends win.google.maps.OverlayView {
+      constructor(latLng, content, map) {
+        super();
+        this.latLng =
+          latLng instanceof win.google.maps.LatLng
+            ? latLng
+            : new win.google.maps.LatLng(latLng.lat, latLng.lng);
+        this.content = content;
+        this.setMap(map);
+      }
+
+      onAdd() {
+        const panes = this.getPanes();
+        if (panes && panes.overlayMouseTarget) {
+          panes.overlayMouseTarget.appendChild(this.content);
+        }
+      }
+
+      draw() {
+        const projection = this.getProjection();
+        if (!projection || !this.content) return;
+        const point = projection.fromLatLngToDivPixel(this.latLng);
+        if (point) {
+          this.content.style.position = 'absolute';
+          this.content.style.left = `${Math.round(point.x)}px`;
+          this.content.style.top = `${Math.round(point.y)}px`;
+          this.content.style.transform = 'translate(-50%, -100%)';
+          this.content.style.pointerEvents = 'auto';
+        }
+      }
+
+      onRemove() {
+        if (this.content && this.content.parentNode) {
+          this.content.parentNode.removeChild(this.content);
+        }
+      }
+    };
+
+    return CustomMarkerOverlay;
+  }
+
+  function isResultScreenActive() {
+    return Boolean(
+      document.querySelector('[data-qa="close-round-result"]') ||
+      document.querySelector('[data-qa="play-again-button"]') ||
+      document.querySelector('[data-qa="round-result"]') ||
+      document.querySelector('[class*="round-result"]') ||
+      document.querySelector('[class*="result-layout"]')
+    );
+  }
 
   function onMapReady(map) {
     if (!map) return;
+    const isNewMap = map !== globalMap;
     globalMap = map;
-    console.log('[ChatGuessr] Map instance hooked:', map);
-    if (showPinsEnabled && lastRoundResults && lastRoundResults.length > 0 && guessMarkers.length === 0) {
-      drawViewerPins(lastRoundResults, lastRoundLocation);
+    console.log('[ChatGuessr] Map instance hooked:', map, 'isNewMap:', isNewMap);
+
+    if (
+      showPinsEnabled &&
+      lastRoundResults &&
+      lastRoundResults.length > 0 &&
+      (isNewMap || guessMarkers.length === 0)
+    ) {
+      setTimeout(() => {
+        drawViewerPins(lastRoundResults, lastRoundLocation);
+      }, 150);
     }
   }
 
@@ -78,23 +144,14 @@
 
   hookGoogleMaps();
 
-  async function drawViewerPins(results, targetLocation) {
-    if (!globalMap || !results || results.length === 0 || !showPinsEnabled) return;
+  function drawViewerPins(results, targetLocation) {
+    if (!globalMap || !results || results.length === 0 || !showPinsEnabled) {
+      return;
+    }
 
     clearViewerPins();
 
-    let AdvancedMarkerElement = null;
-    if (win.google && win.google.maps && win.google.maps.importLibrary) {
-      try {
-        const markerLib = await win.google.maps.importLibrary('marker');
-        AdvancedMarkerElement = markerLib?.AdvancedMarkerElement;
-      } catch (_) {}
-    }
-
-    if (!currentInfoWindow && win.google?.maps?.InfoWindow) {
-      currentInfoWindow = new win.google.maps.InfoWindow();
-    }
-
+    const OverlayClass = initOverlayViewClass();
     const lineSymbol = {
       path: 'M 0,-1 0,1',
       strokeOpacity: 1,
@@ -107,14 +164,16 @@
       const markerContent = createCustomMarkerElement(p, rank);
 
       let marker = null;
-      if (AdvancedMarkerElement) {
-        marker = new AdvancedMarkerElement({
-          map: globalMap,
-          position: p.position,
-          content: markerContent,
-          title: `${p.username} (${p.score} pts)`
-        });
-      } else if (win.google?.maps?.Marker) {
+      if (OverlayClass) {
+        try {
+          marker = new OverlayClass(p.position, markerContent, globalMap);
+        } catch (err) {
+          console.warn('[ChatGuessr] CustomMarkerOverlay failed, falling back:', err);
+        }
+      }
+
+      // Fallback
+      if (!marker && win.google?.maps?.Marker) {
         marker = new win.google.maps.Marker({
           map: globalMap,
           position: p.position,
@@ -144,18 +203,23 @@
 
       // Garis putus-putus ke jawaban benar
       if (targetLocation && typeof targetLocation.lat === 'number' && win.google?.maps?.Polyline) {
-        const line = new win.google.maps.Polyline({
-          path: [p.position, targetLocation],
-          map: globalMap,
-          strokeOpacity: 0,
-          icons: [{
-            icon: lineSymbol,
-            offset: '0',
-            repeat: '8px'
-          }],
-          geodesic: true
-        });
-        polylines.push(line);
+        try {
+          const line = new win.google.maps.Polyline({
+            path: [p.position, targetLocation],
+            map: globalMap,
+            strokeOpacity: 0,
+            icons: [
+              {
+                icon: lineSymbol,
+                offset: '0',
+                repeat: '8px'
+              }
+            ],
+            strokeColor: rank === 1 ? '#f59e0b' : '#38bdf8',
+            geodesic: true
+          });
+          polylines.push(line);
+        } catch (_) {}
       }
     });
 
@@ -164,7 +228,11 @@
 
   function clearViewerPins() {
     for (const marker of guessMarkers) {
-      if (marker.map !== undefined) marker.map = null;
+      if (marker.setMap) {
+        marker.setMap(null);
+      } else if (marker.map !== undefined) {
+        marker.map = null;
+      }
     }
     guessMarkers = [];
     for (const line of polylines) {
@@ -274,12 +342,19 @@
     const response = await originalFetch.apply(this, args);
     const url = typeof args[0] === 'string' ? args[0] : args[0]?.url || '';
 
-    if (url.includes('/api/v3/games/') || url.includes('/api/v3/challenges/') || url.includes('/api/v4/parties/')) {
+    if (
+      url.includes('/api/v3/games/') ||
+      url.includes('/api/v3/challenges/') ||
+      url.includes('/api/v4/parties/')
+    ) {
       try {
         const clone = response.clone();
-        clone.json().then((gameData) => {
-          handleGeoGuessrGameData(gameData);
-        }).catch(() => {});
+        clone
+          .json()
+          .then((gameData) => {
+            handleGeoGuessrGameData(gameData);
+          })
+          .catch(() => {});
       } catch (err) {
         console.error('[ChatGuessr] Error parsing fetch response:', err);
       }
@@ -293,7 +368,10 @@
     this.addEventListener('load', function () {
       try {
         const url = args[1] || '';
-        if (typeof url === 'string' && (url.includes('/api/v3/games/') || url.includes('/api/v3/challenges/'))) {
+        if (
+          typeof url === 'string' &&
+          (url.includes('/api/v3/games/') || url.includes('/api/v3/challenges/'))
+        ) {
           const gameData = JSON.parse(this.responseText);
           handleGeoGuessrGameData(gameData);
         }
@@ -333,96 +411,160 @@
 
   function fetchGameData(gameId) {
     const endpoint = `https://www.geoguessr.com/api/v3/games/${gameId}`;
-    if (typeof GM_xmlhttpRequest !== 'undefined') {
-      GM_xmlhttpRequest({
-        method: 'GET',
-        url: endpoint,
-        withCredentials: true,
-        onload: (res) => {
-          try {
-            const data = JSON.parse(res.responseText);
-            handleGeoGuessrGameData(data);
-          } catch (_) {}
-        }
-      });
-    } else {
-      win.fetch(endpoint, { credentials: 'include' })
-        .then((r) => r.json())
-        .then((data) => handleGeoGuessrGameData(data))
-        .catch(() => {});
-    }
+    (win.fetch || fetch)(endpoint, { credentials: 'include' })
+      .then((r) => r.json())
+      .then((data) => handleGeoGuessrGameData(data))
+      .catch(() => {});
   }
 
   setInterval(checkUrlForGame, 2000);
 
   // ==========================================
-  // 4. SEND GAME DATA TO RAILWAY SERVER
+  // 4. OBSERVING RESULT SCREEN & NEXT ROUND
   // ==========================================
+  function observeResultScreen() {
+    const observer = new MutationObserver(() => {
+      // 1. Hook "Play Next Round" button
+      const nextBtn = document.querySelector('[data-qa="close-round-result"]');
+      if (nextBtn && !nextBtn.__cg_attached) {
+        nextBtn.__cg_attached = true;
+        nextBtn.addEventListener('click', () => {
+          console.log('[ChatGuessr] Streamer clicked Next Round button!');
+          clearViewerPins();
+          lastRoundResults = null;
+          lastRoundLocation = null;
+          setTimeout(() => {
+            if (lastGameData) handleGeoGuessrGameData(lastGameData);
+          }, 350);
+        });
+      }
+
+      // 2. Hook "Play Again" button (Game end)
+      const playAgainBtn = document.querySelector('[data-qa="play-again-button"]');
+      if (playAgainBtn && !playAgainBtn.__cg_attached) {
+        playAgainBtn.__cg_attached = true;
+        playAgainBtn.addEventListener('click', () => {
+          console.log('[ChatGuessr] Streamer clicked Play Again button!');
+          clearViewerPins();
+          lastRoundResults = null;
+          lastRoundLocation = null;
+        });
+      }
+
+      // 3. If we are on result screen and results are available but pins not drawn:
+      if (
+        isResultScreenActive() &&
+        showPinsEnabled &&
+        lastRoundResults &&
+        lastRoundResults.length > 0 &&
+        guessMarkers.length === 0
+      ) {
+        drawViewerPins(lastRoundResults, lastRoundLocation);
+      }
+    });
+
+    observer.observe(document.documentElement, { childList: true, subtree: true });
+  }
+
+  observeResultScreen();
+
+  // ==========================================
+  // 5. SEND GAME DATA TO RAILWAY SERVER
+  // ==========================================
+  let lastGameData = null;
+  let lastHandledGuessesCount = 0;
+  let lastHandledRound = 0;
+  let lastHandledToken = '';
+
   function handleGeoGuessrGameData(data) {
     if (!data || !data.token || !data.rounds) return;
+    lastGameData = data;
 
     const token = data.token;
-    const roundNumber = data.round || data.rounds.length;
-    const currentRoundLocation = data.rounds[roundNumber - 1];
     const mapName = data.mapName || 'GeoGuessr';
     const bounds = data.bounds;
     const guessesCount = data.player?.guesses?.length || 0;
     const isGameFinished = data.state === 'finished';
 
-    const isRoundFinished = guessesCount === roundNumber;
+    // Reset when a new game token is loaded
+    if (token !== lastHandledToken) {
+      lastHandledToken = token;
+      lastHandledGuessesCount = 0;
+      lastHandledRound = 0;
+      clearViewerPins();
+      lastRoundResults = null;
+      lastRoundLocation = null;
+    }
 
-    const stateKey = `${token}_R${roundNumber}_G${guessesCount}_F${isGameFinished ? 1 : 0}`;
-    if (win.__lastCgStateKey === stateKey) {
+    // A. STREAMER JUST SUBMITTED A GUESS (Round Finished)
+    if (guessesCount > lastHandledGuessesCount) {
+      const finishedRound = guessesCount;
+      const finishedLocation = data.rounds[finishedRound - 1];
+      lastHandledGuessesCount = guessesCount;
+      lastHandledRound = finishedRound;
+
+      console.log(`[ChatGuessr] Round ${finishedRound} FINISHED! Forwarding results to server...`, {
+        token,
+        round: finishedRound,
+        location: finishedLocation,
+        gameFinished: isGameFinished
+      });
+
+      sendToServer({
+        token,
+        mapName,
+        round: finishedRound,
+        location: finishedLocation ? { lat: finishedLocation.lat, lng: finishedLocation.lng } : null,
+        bounds,
+        roundFinished: true,
+        gameFinished: isGameFinished
+      });
       return;
     }
-    win.__lastCgStateKey = stateKey;
 
-    console.log('[ChatGuessr] Forwarding Round to Server:', {
-      token,
-      round: roundNumber,
-      location: currentRoundLocation ? { lat: currentRoundLocation.lat, lng: currentRoundLocation.lng } : null,
-      isRoundFinished,
-      isGameFinished
-    });
+    // B. STREAMER IS CURRENTLY PLAYING IN PANORAMA (Round in Progress)
+    if (!isResultScreenActive() && !isGameFinished) {
+      const currentRound = guessesCount + 1;
+      const currentLoc = data.rounds[currentRound - 1];
 
-    const payload = {
-      token,
-      mapName,
-      round: roundNumber,
-      location: currentRoundLocation ? { lat: currentRoundLocation.lat, lng: currentRoundLocation.lng } : null,
-      bounds,
-      roundFinished: isRoundFinished,
-      gameFinished: isGameFinished
-    };
+      if (currentRound !== lastHandledRound && currentLoc) {
+        lastHandledRound = currentRound;
+        console.log(`[ChatGuessr] Round ${currentRound} PLAYING! Opening guesses...`, {
+          token,
+          round: currentRound,
+          location: currentLoc
+        });
 
-    sendToServer(payload);
+        sendToServer({
+          token,
+          mapName,
+          round: currentRound,
+          location: { lat: currentLoc.lat, lng: currentLoc.lng },
+          bounds,
+          roundFinished: false,
+          gameFinished: false
+        });
+      }
+    }
   }
 
   function sendToServer(payload) {
     const targetUrl = serverUrl.replace(/\/$/, '') + '/api/geoguessr/update';
-
-    if (typeof GM_xmlhttpRequest !== 'undefined') {
-      GM_xmlhttpRequest({
-        method: 'POST',
-        url: targetUrl,
-        headers: { 'Content-Type': 'application/json' },
-        data: JSON.stringify(payload),
-        onload: () => updateBadgeStatus(true),
-        onerror: () => updateBadgeStatus(false)
-      });
-    } else {
-      fetch(targetUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
+    (win.fetch || fetch)(targetUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    })
+      .then((res) => {
+        updateBadgeStatus(res.ok);
       })
-        .then(() => updateBadgeStatus(true))
-        .catch(() => updateBadgeStatus(false));
-    }
+      .catch(() => {
+        updateBadgeStatus(false);
+      });
   }
 
   // ==========================================
-  // 5. IN-GAME SCOREBOARD OVERLAY & SOCKET.IO
+  // 6. IN-GAME SCOREBOARD OVERLAY & SOCKET.IO
   // ==========================================
   let socket = null;
   let currentState = null;
@@ -455,9 +597,12 @@
       });
 
       socket.on('round-started', () => {
-        lastRoundResults = null;
-        lastRoundLocation = null;
-        clearViewerPins();
+        // Only clear pins if streamer has actually left the result screen
+        if (!isResultScreenActive()) {
+          lastRoundResults = null;
+          lastRoundLocation = null;
+          clearViewerPins();
+        }
         renderNativeOverlay();
       });
 
@@ -747,7 +892,8 @@
     totalGuesses.textContent = `${guesses.length} Guesses`;
 
     if (guesses.length === 0) {
-      listContainer.innerHTML = '<div class="cg-empty-text">Ketik <code>!g [nama_kota]</code> di YouTube chat!</div>';
+      listContainer.innerHTML =
+        '<div class="cg-empty-text">Ketik <code>!g [nama_kota]</code> di YouTube chat!</div>';
       return;
     }
 
@@ -874,7 +1020,10 @@
   }
 
   function enableDrag(element, handle) {
-    let pos1 = 0, pos2 = 0, pos3 = 0, pos4 = 0;
+    let pos1 = 0,
+      pos2 = 0,
+      pos3 = 0,
+      pos4 = 0;
     handle.onmousedown = dragMouseDown;
 
     function dragMouseDown(e) {
@@ -892,8 +1041,8 @@
       pos2 = pos4 - e.clientY;
       pos3 = e.clientX;
       pos4 = e.clientY;
-      element.style.top = (element.offsetTop - pos2) + 'px';
-      element.style.left = (element.offsetLeft - pos1) + 'px';
+      element.style.top = element.offsetTop - pos2 + 'px';
+      element.style.left = element.offsetLeft - pos1 + 'px';
       element.style.right = 'auto';
     }
 
@@ -905,7 +1054,11 @@
 
   function escapeHtml(str) {
     if (!str) return '';
-    return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    return str
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
   }
 
   // Initialize UI when DOM is ready
