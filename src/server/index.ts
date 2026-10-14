@@ -20,6 +20,13 @@ const io = new SocketIOServer(server, {
 app.use(cors())
 app.use(express.json())
 
+// Allow embedding overlay in GeoGuessr
+app.use((_req, res, next) => {
+  res.removeHeader('X-Frame-Options')
+  res.setHeader('Content-Security-Policy', "frame-ancestors *")
+  next()
+})
+
 // Serve static frontend files
 const publicDir = path.resolve(__dirname, '../../public')
 app.use(express.static(publicDir))
@@ -215,11 +222,43 @@ class GameServerManager {
   }
 
   startNewRound(roundNumber: number, location: { lat: number; lng: number }) {
+    // Check if this round is already active with the same location
+    if (
+      this.round === roundNumber &&
+      this.roundLocation &&
+      this.roundLocation.lat === location.lat &&
+      this.roundLocation.lng === location.lng &&
+      this.guessesOpen
+    ) {
+      return
+    }
+
+    const hadTemporaryGuesses =
+      this.round === roundNumber &&
+      this.roundLocation === null &&
+      Object.keys(this.roundGuesses).length > 0
+
     this.round = roundNumber
     this.roundLocation = location
-    this.roundGuesses = {}
     this.guessesOpen = true
     this.isFinished = false
+
+    if (hadTemporaryGuesses) {
+      console.log(
+        `[Server] Round ${this.round} location received (${location.lat}, ${location.lng}). Recalculating ${Object.keys(this.roundGuesses).length} pre-round guesses!`
+      )
+      for (const [userId, guess] of Object.entries(this.roundGuesses)) {
+        const distance = Math.round(haversineDistance(guess.position, this.roundLocation) * 100) / 100
+        const score = calculateScore(distance, this.mapScale, this.maxErrorDistance)
+        this.roundGuesses[userId] = {
+          ...guess,
+          distance,
+          score
+        }
+      }
+    } else {
+      this.roundGuesses = {}
+    }
 
     io.emit('round-started', {
       round: this.round,
@@ -359,6 +398,10 @@ app.post('/api/geoguessr/update', (req, res) => {
     req.body
 
   if (mapName) manager.mapName = mapName
+  if (token && manager.token && token !== manager.token) {
+    console.log(`[Server] New game detected (${manager.token} -> ${token}), resetting game state`)
+    manager.resetGame()
+  }
   if (token) manager.token = token
   if (bounds) {
     const scale = haversineDistance(bounds.min, bounds.max) / 7.458421
@@ -400,7 +443,7 @@ app.get('/dashboard', (_req, res) => {
   res.sendFile(path.join(publicDir, 'dashboard/index.html'))
 })
 
-app.get('/overlay', (_req, res) => {
+app.get(['/overlay', '/overlay/'], (_req, res) => {
   res.sendFile(path.join(publicDir, 'overlay/index.html'))
 })
 
