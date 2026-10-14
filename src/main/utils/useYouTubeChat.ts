@@ -11,6 +11,23 @@ axios.defaults.headers.common['Accept'] =
 axios.defaults.headers.common['Cookie'] =
   'SOCS=CAESEwgDEgk2ODE3ODg0MjAaAmVuIAEaBgiA_LyaBg; CONSENT=YES+cb.20210328-17-p0.en+FX+100;'
 
+// Fix YouTube unlisted & /live/ streams missing canonical <link> format required by youtube-chat
+axios.interceptors.response.use((response) => {
+  if (typeof response.data === 'string' && response.data.includes('INNERTUBE_API_KEY')) {
+    if (!response.data.match(/<link rel="canonical" href="https:\/\/www.youtube.com\/watch\?v=[^"]+">/)) {
+      const vMatch =
+        response.data.match(/<link rel="canonical" href="https:\/\/www.youtube.com\/(?:live\/|watch\?v=)([^"]+)">/) ||
+        response.data.match(/["']externalVideoId["']:\s*["']([^"']+)["']/) ||
+        response.data.match(/["']videoId["']:\s*["']([^"']+)["']/) ||
+        response.data.match(/\/watch\?v=([a-zA-Z0-9_-]{11})/)
+      if (vMatch && vMatch[1]) {
+        response.data = `<link rel="canonical" href="https://www.youtube.com/watch?v=${vMatch[1]}">\n` + response.data
+      }
+    }
+  }
+  return response
+})
+
 export function parseYouTubeInput(input: string): { liveId?: string; channelId?: string; handle?: string } {
   input = input.trim()
   if (!input) return {}

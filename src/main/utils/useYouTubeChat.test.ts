@@ -50,6 +50,18 @@ describe('parseYouTubeInput', () => {
     expect(result).toEqual({ handle: '@dutahad' })
   })
 
+  it('should parse popout chat URL with is_popout parameter', () => {
+    const input = 'https://www.youtube.com/live_chat?is_popout=1&v=dGRA_1ohvPg'
+    const result = parseYouTubeInput(input)
+    expect(result).toEqual({ liveId: 'dGRA_1ohvPg' })
+  })
+
+  it('should parse popout chat URL with v parameter first', () => {
+    const input = 'https://www.youtube.com/live_chat?v=dGRA_1ohvPg&is_popout=1'
+    const result = parseYouTubeInput(input)
+    expect(result).toEqual({ liveId: 'dGRA_1ohvPg' })
+  })
+
   it('should return empty object on empty string', () => {
     const input = '   '
     const result = parseYouTubeInput(input)
