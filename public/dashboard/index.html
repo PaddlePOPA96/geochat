@@ -395,7 +395,7 @@
         </p>
 
         <div class="input-group">
-          <input type="text" id="streamInput" placeholder="https://www.youtube.com/watch?v=... atau Video ID">
+          <input type="text" id="streamInput" placeholder="https://www.youtube.com/@Arvanna26 atau link video live">
           <button id="btnConnectYt" class="btn btn-primary" onclick="connectYouTube()">Connect</button>
           <button id="btnDisconnectYt" class="btn btn-danger" onclick="disconnectYouTube()" style="display: none;">Disconnect</button>
         </div>
@@ -405,6 +405,10 @@
             <span class="info-label">Active Target:</span>
             <span class="info-value" id="activeTarget">-</span>
           </div>
+        </div>
+
+        <div id="ytErrorBox" style="display: none; margin-top: 12px; padding: 10px 14px; background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.4); border-radius: 8px; color: #f87171; font-size: 12px;">
+          <span style="font-weight: 700;">Gagal Connect:</span> <span id="ytErrorText"></span>
         </div>
       </div>
 
@@ -501,6 +505,15 @@
       ytBadge.className = 'badge badge-' + currentState.youtubeStatus;
       ytBadgeText.textContent = currentState.youtubeStatus;
 
+      const errorBox = document.getElementById('ytErrorBox');
+      const errorText = document.getElementById('ytErrorText');
+      if (currentState.youtubeStatus === 'error' && currentState.youtubeError) {
+        errorBox.style.display = 'block';
+        errorText.textContent = currentState.youtubeError;
+      } else {
+        errorBox.style.display = 'none';
+      }
+
       if (currentState.youtubeStatus === 'connected') {
         btnConnectYt.style.display = 'none';
         btnDisconnectYt.style.display = 'inline-flex';
@@ -588,11 +601,18 @@
         alert('Masukkan link live stream atau video ID YouTube terlebih dahulu!');
         return;
       }
+      localStorage.setItem('cg_last_yt_target', streamUrl);
       await fetch('/api/youtube/connect', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ streamUrl })
       });
+    }
+
+    // Load saved stream input
+    const savedTarget = localStorage.getItem('cg_last_yt_target');
+    if (savedTarget) {
+      document.getElementById('streamInput').value = savedTarget;
     }
 
     async function disconnectYouTube() {

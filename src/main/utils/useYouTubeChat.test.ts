@@ -38,6 +38,18 @@ describe('parseYouTubeInput', () => {
     expect(result).toEqual({ channelId: 'UC_x5XG1OV2P6uZZ5FSM9Ttw' })
   })
 
+  it('should parse channel handle with @', () => {
+    const input = 'https://www.youtube.com/@geoguessr/live'
+    const result = parseYouTubeInput(input)
+    expect(result).toEqual({ handle: '@geoguessr' })
+  })
+
+  it('should parse raw @handle', () => {
+    const input = '@dutahad'
+    const result = parseYouTubeInput(input)
+    expect(result).toEqual({ handle: '@dutahad' })
+  })
+
   it('should return empty object on empty string', () => {
     const input = '   '
     const result = parseYouTubeInput(input)

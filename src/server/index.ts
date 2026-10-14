@@ -122,6 +122,7 @@ class GameServerManager {
     }
 
     this.youtubeStatus = 'connecting'
+    this.youtubeError = ''
     this.broadcastState()
 
     try {
