@@ -9,13 +9,14 @@
 // @grant        GM_setValue
 // @grant        GM_getValue
 // @grant        GM_xmlhttpRequest
+// @connect      *
 // ==/UserScript==
 
 (function () {
   'use strict';
 
-  // Default server URL (bisa diganti lewat tombol di layar)
-  const DEFAULT_SERVER_URL = 'http://localhost:3000';
+  // Default server URL
+  const DEFAULT_SERVER_URL = 'https://geochat-production-f099.up.railway.app';
   let serverUrl = (typeof GM_getValue !== 'undefined' ? GM_getValue('cg_server_url', DEFAULT_SERVER_URL) : localStorage.getItem('cg_server_url')) || DEFAULT_SERVER_URL;
 
   console.log('[ChatGuessr Connector] Initialized with Server:', serverUrl);

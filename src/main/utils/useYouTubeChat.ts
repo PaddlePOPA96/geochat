@@ -105,7 +105,7 @@ export default class YouTubeBackend extends EventEmitter {
         }
       }
 
-      if (messageText.startsWith('!g')) {
+      if (/^!g(\s|$)/i.test(messageText)) {
         this.emit('guess', userstate, messageText)
       } else if (messageText.startsWith('!')) {
         this.emit('message', userstate, messageText)

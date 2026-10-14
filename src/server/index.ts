@@ -167,16 +167,23 @@ class GameServerManager {
   }
 
   async handleChatGuess(userstate: any, message: string) {
-    if (!this.guessesOpen || !this.roundLocation) {
+    if (!this.guessesOpen) {
+      console.log(`[Guess Ignored] Guesses are closed: "${message}"`)
       return
     }
 
-    const clean = message.replace(/^!g\s+/, '').trim()
+    const clean = message.replace(/^!g\s*/i, '').trim()
     const coords = await resolveLocation(clean)
-    if (!coords) return
+    if (!coords) {
+      console.log(`[Guess Ignored] Could not resolve coordinates for: "${clean}"`)
+      return
+    }
 
-    const distance = haversineDistance(coords, this.roundLocation)
-    const score = calculateScore(distance, this.mapScale, this.maxErrorDistance)
+    const targetLoc = this.roundLocation || { lat: -6.2088, lng: 106.8456 }
+    const distance = Math.round(haversineDistance(coords, targetLoc) * 100) / 100
+    const score = this.roundLocation
+      ? calculateScore(distance, this.mapScale, this.maxErrorDistance)
+      : Math.max(1, 5000 - Math.round(distance * 2))
 
     const userId = userstate['user-id'] || userstate.username || 'unknown'
     const username = userstate['display-name'] || userstate.username || 'Anonymous'
