@@ -1,0 +1,630 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ChatGuessr Live Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <script src="/socket.io/socket.io.js"></script>
+  <style>
+    :root {
+      --bg-base: #090d16;
+      --bg-card: rgba(22, 28, 45, 0.7);
+      --bg-card-hover: rgba(30, 38, 60, 0.85);
+      --border-card: rgba(255, 255, 255, 0.08);
+      --primary: #ff0033;
+      --primary-hover: #e6002e;
+      --accent-blue: #38bdf8;
+      --accent-green: #10b981;
+      --accent-yellow: #f59e0b;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --radius-sm: 8px;
+      --radius-md: 14px;
+      --radius-lg: 20px;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Outfit', sans-serif;
+      background-color: var(--bg-base);
+      color: var(--text-main);
+      min-height: 100vh;
+      background-image: 
+        radial-gradient(circle at 15% 15%, rgba(255, 0, 51, 0.08) 0%, transparent 40%),
+        radial-gradient(circle at 85% 85%, rgba(56, 189, 248, 0.06) 0%, transparent 40%);
+      padding: 24px;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    /* Header */
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 16px 24px;
+      background: var(--bg-card);
+      border: 1px solid var(--border-card);
+      backdrop-filter: blur(16px);
+      border-radius: var(--radius-lg);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .brand-logo {
+      width: 40px;
+      height: 40px;
+      background: linear-gradient(135deg, #ff0033, #ff4d6d);
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      font-size: 20px;
+      box-shadow: 0 4px 14px rgba(255, 0, 51, 0.35);
+    }
+
+    .brand-title h1 {
+      font-size: 20px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+    }
+
+    .brand-title p {
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .header-actions {
+      display: flex;
+      gap: 12px;
+    }
+
+    /* Grid layout */
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+
+    @media (max-width: 900px) {
+      .grid-2 {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* Cards */
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-card);
+      backdrop-filter: blur(16px);
+      border-radius: var(--radius-lg);
+      padding: 22px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      position: relative;
+    }
+
+    .card-title {
+      font-size: 16px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: var(--text-main);
+    }
+
+    /* Badges */
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .badge-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+    }
+
+    .badge-disconnected {
+      background: rgba(148, 163, 184, 0.15);
+      color: var(--text-muted);
+    }
+    .badge-disconnected .badge-dot { background: var(--text-muted); }
+
+    .badge-connecting {
+      background: rgba(245, 158, 11, 0.15);
+      color: var(--accent-yellow);
+    }
+    .badge-connecting .badge-dot { background: var(--accent-yellow); }
+
+    .badge-connected {
+      background: rgba(16, 185, 129, 0.15);
+      color: var(--accent-green);
+    }
+    .badge-connected .badge-dot { background: var(--accent-green); }
+
+    .badge-error {
+      background: rgba(239, 68, 68, 0.15);
+      color: #ef4444;
+    }
+    .badge-error .badge-dot { background: #ef4444; }
+
+    /* Inputs & Buttons */
+    .input-group {
+      display: flex;
+      gap: 10px;
+    }
+
+    input[type="text"] {
+      flex: 1;
+      padding: 12px 16px;
+      background: rgba(0, 0, 0, 0.35);
+      border: 1px solid var(--border-card);
+      border-radius: var(--radius-md);
+      color: var(--text-main);
+      font-family: inherit;
+      font-size: 14px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    input[type="text"]:focus {
+      border-color: var(--primary);
+    }
+
+    .btn {
+      padding: 12px 20px;
+      border: none;
+      border-radius: var(--radius-md);
+      font-family: inherit;
+      font-weight: 600;
+      font-size: 14px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      transition: all 0.2s;
+      text-decoration: none;
+    }
+
+    .btn-primary {
+      background: var(--primary);
+      color: white;
+      box-shadow: 0 4px 12px rgba(255, 0, 51, 0.3);
+    }
+    .btn-primary:hover {
+      background: var(--primary-hover);
+      transform: translateY(-1px);
+    }
+
+    .btn-secondary {
+      background: rgba(255, 255, 255, 0.08);
+      color: var(--text-main);
+      border: 1px solid var(--border-card);
+    }
+    .btn-secondary:hover {
+      background: rgba(255, 255, 255, 0.12);
+    }
+
+    .btn-danger {
+      background: rgba(239, 68, 68, 0.15);
+      color: #f87171;
+      border: 1px solid rgba(239, 68, 68, 0.3);
+    }
+    .btn-danger:hover {
+      background: rgba(239, 68, 68, 0.25);
+    }
+
+    .btn-sm {
+      padding: 6px 12px;
+      font-size: 12px;
+      border-radius: var(--radius-sm);
+    }
+
+    /* Status Info Display */
+    .info-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .info-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 14px;
+      background: rgba(0, 0, 0, 0.25);
+      border-radius: var(--radius-sm);
+      font-size: 14px;
+    }
+
+    .info-label {
+      color: var(--text-muted);
+    }
+
+    .info-value {
+      font-weight: 600;
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    /* Scoreboard Table */
+    .table-container {
+      overflow-x: auto;
+      max-height: 480px;
+      border-radius: var(--radius-md);
+      background: rgba(0, 0, 0, 0.3);
+      border: 1px solid var(--border-card);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+      font-size: 14px;
+    }
+
+    th {
+      padding: 12px 16px;
+      background: rgba(255, 255, 255, 0.03);
+      color: var(--text-muted);
+      font-weight: 600;
+      text-transform: uppercase;
+      font-size: 11px;
+      letter-spacing: 0.6px;
+      border-bottom: 1px solid var(--border-card);
+      position: sticky;
+      top: 0;
+      backdrop-filter: blur(10px);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+    }
+
+    tr:hover td {
+      background: rgba(255, 255, 255, 0.02);
+    }
+
+    .user-cell {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .avatar {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: #334155;
+      object-fit: cover;
+    }
+
+    .rank-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      font-weight: 700;
+      font-size: 12px;
+    }
+
+    .rank-1 { background: linear-gradient(135deg, #fbbf24, #d97706); color: #000; }
+    .rank-2 { background: linear-gradient(135deg, #cbd5e1, #94a3b8); color: #000; }
+    .rank-3 { background: linear-gradient(135deg, #d97706, #92400e); color: #fff; }
+
+    .score-pts {
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 700;
+      color: var(--accent-green);
+    }
+
+    .distance-km {
+      font-family: 'JetBrains Mono', monospace;
+      color: var(--accent-blue);
+    }
+
+    .empty-state {
+      padding: 40px 20px;
+      text-align: center;
+      color: var(--text-muted);
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <header>
+      <div class="brand">
+        <div class="brand-logo">▶</div>
+        <div class="brand-title">
+          <h1>ChatGuessr YouTube Live</h1>
+          <p>Real-Time Web Dashboard & Engine</p>
+        </div>
+      </div>
+      <div class="header-actions">
+        <button class="btn btn-secondary btn-sm" onclick="copyOverlayUrl()">📋 Copy OBS Overlay URL</button>
+        <button class="btn btn-secondary btn-sm" onclick="openUserscriptModal()">🧩 Userscript Setup</button>
+      </div>
+    </header>
+
+    <!-- Controls Grid -->
+    <div class="grid-2">
+      <!-- YouTube Connect Card -->
+      <div class="card">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <div class="card-title">
+            <span style="color: #ff0033;">●</span> YouTube Live Stream
+          </div>
+          <span id="ytBadge" class="badge badge-disconnected">
+            <span class="badge-dot"></span> <span id="ytBadgeText">Disconnected</span>
+          </span>
+        </div>
+
+        <p style="font-size: 13px; color: var(--text-muted);">
+          Masukkan link live stream atau Video ID YouTube yang sedang tayang:
+        </p>
+
+        <div class="input-group">
+          <input type="text" id="streamInput" placeholder="https://www.youtube.com/watch?v=... atau Video ID">
+          <button id="btnConnectYt" class="btn btn-primary" onclick="connectYouTube()">Connect</button>
+          <button id="btnDisconnectYt" class="btn btn-danger" onclick="disconnectYouTube()" style="display: none;">Disconnect</button>
+        </div>
+
+        <div class="info-list">
+          <div class="info-item">
+            <span class="info-label">Active Target:</span>
+            <span class="info-value" id="activeTarget">-</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- GeoGuessr Game Status Card -->
+      <div class="card">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <div class="card-title">
+            <span style="color: #38bdf8;">●</span> GeoGuessr Game Status
+          </div>
+          <span id="guessBadge" class="badge badge-disconnected">
+            <span class="badge-dot"></span> <span id="guessBadgeText">Guesses Closed</span>
+          </span>
+        </div>
+
+        <div class="info-list">
+          <div class="info-item">
+            <span class="info-label">Map Name:</span>
+            <span class="info-value" id="mapNameDisplay">Waiting for game...</span>
+          </div>
+          <div class="info-item">
+            <span class="info-label">Round:</span>
+            <span class="info-value" id="roundDisplay">1</span>
+          </div>
+          <div class="info-item">
+            <span class="info-label">Current Round Guesses:</span>
+            <span class="info-value" id="guessCountDisplay">0</span>
+          </div>
+        </div>
+
+        <div style="display: flex; gap: 10px; margin-top: auto;">
+          <button id="btnToggleGuesses" class="btn btn-secondary btn-sm" onclick="toggleGuesses()">Open Guesses</button>
+          <button class="btn btn-danger btn-sm" onclick="resetGame()">Reset Game</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Live Scoreboard -->
+    <div class="card">
+      <div style="display: flex; justify-content: space-between; align-items: center;">
+        <div class="card-title">
+          <span>🏆</span> Live Round Guesses & Leaderboard
+        </div>
+        <div style="display: flex; gap: 8px;">
+          <button class="btn btn-sm btn-secondary active" id="tabRound" onclick="switchView('round')">Current Round</button>
+          <button class="btn btn-sm btn-secondary" id="tabGame" onclick="switchView('game')">Game Total</button>
+        </div>
+      </div>
+
+      <div class="table-container">
+        <table>
+          <thead>
+            <tr>
+              <th style="width: 60px;">Rank</th>
+              <th>Player</th>
+              <th>Distance</th>
+              <th style="text-align: right;">Score</th>
+            </tr>
+          </thead>
+          <tbody id="scoreboardBody">
+            <tr>
+              <td colspan="4" class="empty-state">Belum ada tebakan masuk di ronde ini. Penonton bisa mengetik <code>!g lat, lng</code> di YouTube chat!</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const socket = io();
+    let currentState = null;
+    let currentView = 'round'; // 'round' or 'game'
+
+    socket.on('state-update', (state) => {
+      currentState = state;
+      updateUI();
+    });
+
+    socket.on('guess-added', () => {
+      // Re-fetch or update state
+      socket.emit('request-state');
+    });
+
+    function updateUI() {
+      if (!currentState) return;
+
+      // Update YouTube connection
+      const ytBadge = document.getElementById('ytBadge');
+      const ytBadgeText = document.getElementById('ytBadgeText');
+      const btnConnectYt = document.getElementById('btnConnectYt');
+      const btnDisconnectYt = document.getElementById('btnDisconnectYt');
+      const activeTarget = document.getElementById('activeTarget');
+
+      ytBadge.className = 'badge badge-' + currentState.youtubeStatus;
+      ytBadgeText.textContent = currentState.youtubeStatus;
+
+      if (currentState.youtubeStatus === 'connected') {
+        btnConnectYt.style.display = 'none';
+        btnDisconnectYt.style.display = 'inline-flex';
+        activeTarget.textContent = currentState.youtubeStreamTarget || '-';
+      } else {
+        btnConnectYt.style.display = 'inline-flex';
+        btnDisconnectYt.style.display = 'none';
+        activeTarget.textContent = currentState.youtubeStreamTarget || '-';
+      }
+
+      // Update Game Status
+      document.getElementById('mapNameDisplay').textContent = currentState.mapName || 'Custom Game';
+      document.getElementById('roundDisplay').textContent = currentState.round;
+      document.getElementById('guessCountDisplay').textContent = (currentState.roundGuesses || []).length;
+
+      const guessBadge = document.getElementById('guessBadge');
+      const guessBadgeText = document.getElementById('guessBadgeText');
+      const btnToggleGuesses = document.getElementById('btnToggleGuesses');
+
+      if (currentState.guessesOpen) {
+        guessBadge.className = 'badge badge-connected';
+        guessBadgeText.textContent = 'Guesses Open';
+        btnToggleGuesses.textContent = 'Close Guesses';
+      } else {
+        guessBadge.className = 'badge badge-disconnected';
+        guessBadgeText.textContent = 'Guesses Closed';
+        btnToggleGuesses.textContent = 'Open Guesses';
+      }
+
+      renderScoreboard();
+    }
+
+    function switchView(view) {
+      currentView = view;
+      document.getElementById('tabRound').classList.toggle('btn-primary', view === 'round');
+      document.getElementById('tabRound').classList.toggle('btn-secondary', view !== 'round');
+      document.getElementById('tabGame').classList.toggle('btn-primary', view === 'game');
+      document.getElementById('tabGame').classList.toggle('btn-secondary', view !== 'game');
+      renderScoreboard();
+    }
+
+    function renderScoreboard() {
+      const tbody = document.getElementById('scoreboardBody');
+      if (!currentState) return;
+
+      const list = currentView === 'round' ? (currentState.roundGuesses || []) : (currentState.leaderboard || []);
+
+      if (list.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="4" class="empty-state">Belum ada tebakan. Penonton bisa mengetik <code>!g &lt;lat, lng&gt;</code> di chat YouTube!</td></tr>`;
+        return;
+      }
+
+      let html = '';
+      list.forEach((item, index) => {
+        const rank = index + 1;
+        let rankBadge = rank;
+        if (rank === 1) rankBadge = `<span class="rank-badge rank-1">1</span>`;
+        else if (rank === 2) rankBadge = `<span class="rank-badge rank-2">2</span>`;
+        else if (rank === 3) rankBadge = `<span class="rank-badge rank-3">3</span>`;
+
+        const avatar = item.avatar ? `<img class="avatar" src="${item.avatar}" alt="" />` : `<div class="avatar" style="display:flex;align-items:center;justify-content:center;font-size:12px;">👤</div>`;
+        const distance = currentView === 'round' ? `${item.distance} km` : `${Math.round(item.totalDistance)} km total`;
+        const score = currentView === 'round' ? `${item.score.toLocaleString()} pts` : `${item.totalScore.toLocaleString()} pts`;
+
+        html += `
+          <tr>
+            <td>${rankBadge}</td>
+            <td>
+              <div class="user-cell">
+                ${avatar}
+                <strong>${escapeHtml(item.username)}</strong>
+              </div>
+            </td>
+            <td><span class="distance-km">${distance}</span></td>
+            <td style="text-align: right;"><span class="score-pts">${score}</span></td>
+          </tr>
+        `;
+      });
+      tbody.innerHTML = html;
+    }
+
+    async function connectYouTube() {
+      const streamUrl = document.getElementById('streamInput').value.trim();
+      if (!streamUrl) {
+        alert('Masukkan link live stream atau video ID YouTube terlebih dahulu!');
+        return;
+      }
+      await fetch('/api/youtube/connect', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ streamUrl })
+      });
+    }
+
+    async function disconnectYouTube() {
+      await fetch('/api/youtube/disconnect', { method: 'POST' });
+    }
+
+    async function toggleGuesses() {
+      if (!currentState) return;
+      const endpoint = currentState.guessesOpen ? '/api/game/close-guesses' : '/api/game/open-guesses';
+      await fetch(endpoint, { method: 'POST' });
+    }
+
+    async function resetGame() {
+      if (confirm('Yakin ingin mereset papan skor game saat ini?')) {
+        await fetch('/api/game/reset', { method: 'POST' });
+      }
+    }
+
+    function copyOverlayUrl() {
+      const overlayUrl = window.location.origin + '/overlay';
+      navigator.clipboard.writeText(overlayUrl);
+      alert('URL OBS Overlay berhasil disalin: ' + overlayUrl);
+    }
+
+    function openUserscriptModal() {
+      alert(`Userscript Setup:\n\n1. Pasang ekstensi Tampermonkey di browser Anda.\n2. Buat script baru dan salin isi file "userscript/chatguessr-connector.user.js" dari project ini.\n3. Masukkan server URL Anda: ${window.location.origin}\n4. Buka GeoGuessr dan mainkan! Game token akan otomatis terkirim.`);
+    }
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+  </script>
+</body>
+</html>

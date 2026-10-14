@@ -1,6 +1,7 @@
 // shared/settings/defaultSettings.ts
 export const defaultSettings = {
   channelName: '',
+  youtubeStreamUrl: '',
   avatar: '',
   isMultiGuess: false,
   excludeBroadcasterData: false,
@@ -8,7 +9,7 @@ export const defaultSettings = {
   commands: {
     getChatguessrMap: {
       command: '!cg',
-      message: `Two ways to play: Link your Twitch account, guess and plonk with spacebar | or paste the command into chat without editing: <your cg link>`,
+      message: `Two ways to play: Guess in YouTube chat with !g <coords> | or paste the command into chat without editing: <your cg link>`,
       cooldown: 30
     },
     getGeoguessrMap: {

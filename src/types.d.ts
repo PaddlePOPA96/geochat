@@ -1,11 +1,21 @@
 type Socket = import('socket.io-client').Socket
-type ChatUserstate = import('tmi.js').ChatUserstate
 
-interface UserData extends ChatUserstate {
+interface UserData {
   'user-id': string
   'display-name': string
+  username?: string
   avatar?: string
+  color?: string
+  badges?: {
+    broadcaster?: string
+    moderator?: string
+    subscriber?: string
+    [key: string]: string | undefined
+  }
+  [key: string]: any
 }
+
+type ChatUserstate = UserData
 
 type LatLng = { lat: number; lng: number }
 
@@ -207,11 +217,13 @@ type Flag = {
   emoji?: string
 }
 
-type TwitchConnectionState =
+type YouTubeConnectionState =
   | { state: 'disconnected' }
   | { state: 'connecting' }
-  | { state: 'connected'; botUsername: string; channelName: string }
+  | { state: 'connected'; botUsername?: string; channelName?: string; liveId?: string }
   | { state: 'error'; error: unknown }
+
+type TwitchConnectionState = YouTubeConnectionState
 
 type SocketConnectionState =
   { state: 'disconnected' } | { state: 'connecting' } | { state: 'connected' }

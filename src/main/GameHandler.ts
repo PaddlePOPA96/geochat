@@ -1,19 +1,18 @@
 import { ipcMain } from 'electron'
 import { io } from 'socket.io-client'
 import Game from './Game'
-import TwitchBackend from './utils/useTwitchJS'
+import YouTubeBackend from './utils/useYouTubeChat'
 import { settings, saveSettings } from './utils/useSettings'
 import {
   isGameURL,
   makeGameSummaryLink,
   makeMapsUrl,
   fetchMap,
-  parseCoordinates,
   getRandomCoordsInLand,
-  getStreamerAvatar,
   parseUserDate,
   parseDistance
 } from './utils/gameHelper'
+import { resolveLocation } from '../shared/geocoding'
 import { getEmoji, randomCountryFlag, selectFlag } from './lib/flags/flags'
 
 const SOCKET_SERVER_URL =
@@ -23,22 +22,20 @@ export default class GameHandler {
   #db: Database
   #win: Electron.BrowserWindow
   #session: Session | undefined
-  #backend: TwitchBackend | undefined
+  #backend: YouTubeBackend | undefined
   #socket: Socket | undefined
   #game: Game
-  #requestAuthentication: () => Promise<void>
 
   constructor(
     db: Database,
     win: Electron.BrowserWindow,
-    options: { requestAuthentication: () => Promise<void> }
+    _options?: { requestAuthentication?: () => Promise<void> }
   ) {
     this.#db = db
     this.#win = win
     this.#backend = undefined
     this.#socket = undefined
     this.#game = new Game(db, settings)
-    this.#requestAuthentication = options.requestAuthentication
     this.#init()
   }
 
@@ -48,7 +45,7 @@ export default class GameHandler {
   }
 
   #setupIPCEvents() {
-    ipcMain.on('reconnect', () => this.#requestAuthentication())
+    ipcMain.on('reconnect', () => this.connectYouTube())
 
     ipcMain.on('next-round-click', () => this.#nextRound())
     ipcMain.on('open-guesses', () => this.#openGuesses())
@@ -246,7 +243,8 @@ export default class GameHandler {
       return {
         state: 'connected',
         botUsername: this.#backend.botUsername,
-        channelName: this.#backend.channelName
+        channelName: this.#backend.channelName,
+        liveId: this.#backend.liveId
       }
     }
     return { state: 'connecting' }
@@ -261,49 +259,53 @@ export default class GameHandler {
     return { state: 'connecting' }
   }
 
-  async authenticate(session: Session) {
-    this.#session = session
-    await this.#initBackend(session)
-    await this.#initSocket(session)
+  async connectYouTube() {
+    await this.#initBackend()
   }
 
-  async #initBackend(session: Session) {
-    this.#backend?.close()
+  async authenticate(session?: Session) {
+    this.#session = session
+    await this.connectYouTube()
+    if (session) {
+      await this.#initSocket(session)
+    }
+  }
+
+  async #initBackend() {
+    await this.#backend?.close()
     this.#backend = undefined
-    if (!settings.channelName) {
+
+    const streamTarget = settings.youtubeStreamUrl || settings.channelName
+    if (!streamTarget) {
+      this.#win.webContents.send('twitch-connection-state', { state: 'disconnected' })
       return
     }
-    if (session.user.app_metadata.provider === 'twitch' && session.provider_token) {
-      this.#backend = new TwitchBackend({
-        botUsername: session.user.user_metadata.name,
-        channelName: settings.channelName,
-        whisperToken: session.provider_token
-      })
-    } else {
-      throw new Error('unsupported provider')
-    }
 
-    const { avatar } = await getStreamerAvatar(settings.channelName)
-    if (avatar) {
-      settings.avatar = avatar
-      saveSettings(settings)
-    }
+    this.#backend = new YouTubeBackend({
+      streamInput: streamTarget
+    })
 
     const emitConnectionState = () => {
       const state = this.getTwitchConnectionState()
       this.#win.webContents.send('twitch-connection-state', state)
     }
 
-    this.#backend.on('connected', () => {
+    this.#backend.on('connected', (liveId: string) => {
       emitConnectionState()
-      this.#backend?.sendMessage('is now connected', { system: true })
+      console.log(`[YouTube] Live Chat connected for stream: ${liveId}`)
     })
-    this.#backend.on('disconnected', (requestedClose) => {
+
+    this.#backend.on('disconnected', (requestedClose: boolean, reason?: string) => {
       emitConnectionState()
-      if (!requestedClose) {
-        // Try to reconnect.
-        this.#requestAuthentication()
-      }
+      console.log(
+        `[YouTube] Live Chat disconnected (requested: ${requestedClose}), reason:`,
+        reason
+      )
+    })
+
+    this.#backend.on('error', (err) => {
+      this.#win.webContents.send('twitch-error', err)
+      console.error('[YouTube] Backend error:', err)
     })
 
     this.#backend.on('guess', (userstate: UserData, message: string) => {
@@ -323,7 +325,7 @@ export default class GameHandler {
       await this.#backend.connect()
     } catch (err) {
       this.#win.webContents.send('twitch-error', err)
-      console.error('Backend connection error:', err)
+      console.error('[YouTube] Backend connection error:', err)
     }
   }
 
@@ -374,7 +376,7 @@ export default class GameHandler {
     // Check if user is banned
     if (this.#isUserBanned(userstate.username!)) return
 
-    const location = parseCoordinates(message.replace(/^!g\s+/, ''))
+    const location = await resolveLocation(message.replace(/^!g\s+/, ''))
     if (!location) return
 
     try {

@@ -13,11 +13,8 @@ import { updateElectronApp } from 'update-electron-app'
 import fontList from 'font-list'
 
 import createMainWindow from './MainWindow'
-import createAuthWindow from '../auth/AuthWindow'
 import GameHandler from './GameHandler'
 import { database } from './utils/Database'
-import { supabase } from './utils/useSupabase'
-import { store } from './utils/store'
 import { loadCustomFlags, findFlagFile } from './lib/flags/flags'
 import { version } from '../../package.json'
 
@@ -40,15 +37,14 @@ app.whenReady().then(async () => {
 
   const gameHandler = new GameHandler(db, mainWindow, {
     async requestAuthentication() {
-      await authenticateWithTwitch(gameHandler, mainWindow)
+      await gameHandler.connectYouTube()
     }
   })
 
   ipcMain.handle('get-twitch-connection-state', () => gameHandler.getTwitchConnectionState())
   ipcMain.handle('get-socket-connection-state', () => gameHandler.getSocketConnectionState())
   ipcMain.handle('replace-session', async () => {
-    await supabase.auth.signOut()
-    await authenticateWithTwitch(gameHandler, mainWindow)
+    await gameHandler.connectYouTube()
   })
 
   ipcMain.handle('read-audio-file-as-buffer', async (_event, pathArg: string) => {
@@ -114,15 +110,7 @@ app.whenReady().then(async () => {
 
   ipcMain.handle('get-current-version', () => version)
 
-  supabase.auth.onAuthStateChange((event, session) => {
-    if (event === 'SIGNED_IN') {
-      store.set('session', session)
-    } else if (event === 'SIGNED_OUT') {
-      store.delete('session')
-    }
-  })
-
-  await authenticateWithTwitch(gameHandler, mainWindow)
+  await gameHandler.connectYouTube()
 
   app.on('activate', () => {
     // On OS X it's common to re-create a window in the app when the
@@ -141,49 +129,6 @@ app.on('window-all-closed', () => {
     app.quit()
   }
 })
-
-async function authenticateWithTwitch(gameHandler: GameHandler, parentWindow: BrowserWindow) {
-  const hasSession = !!store.get('session')?.access_token
-
-  const authConfig = await supabase.auth.signInWithOAuth({
-    provider: 'twitch',
-    options: {
-      redirectTo: new URL('/streamer/redirect', `https://${import.meta.env.VITE_CG_PUBLIC_URL}`)
-        .href,
-      scopes: ['chat:read', 'chat:edit', 'whispers:read'].join(' ')
-    }
-  })
-
-  // If we have an existing session, we try to go through the login flow without user interaction.
-  // This way users don't have to sign in manually every time they open ChatGuessr.
-  const authUrl = hasSession ? authConfig.data.url : undefined
-
-  const authWindow = await createAuthWindow(parentWindow, {
-    authUrl,
-    clearStorageData: !hasSession
-  })
-
-  const startAuth = () => {
-    supabase.auth.signOut().finally(() => {
-      // @ts-expect-error
-      authWindow.loadURL(authConfig.data.url)
-    })
-  }
-
-  const setSession = (_event: Electron.IpcMainEvent, session: Session) => {
-    supabase.auth.setSession(session)
-    gameHandler.authenticate(session)
-
-    authWindow.close()
-  }
-
-  ipcMain.once('set-session', setSession)
-  ipcMain.handle('start-auth', startAuth)
-  authWindow.on('closed', () => {
-    ipcMain.off('set-session', setSession)
-    ipcMain.removeHandler('start-auth')
-  })
-}
 
 function getAssetsDir() {
   return app.isPackaged

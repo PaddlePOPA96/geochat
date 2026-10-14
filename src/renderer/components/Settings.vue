@@ -4,7 +4,7 @@ import { useSettings } from '@/useSettings'
 import { useClipboard } from '@vueuse/core'
 
 import Tabs from './ui/Tabs.vue'
-import IconTwitch from '@/assets/icons/twitch.svg'
+import IconYouTube from '@/assets/icons/youtube.svg'
 
 const { chatguessrApi } = window
 
@@ -17,18 +17,19 @@ const { socketConnectionState, twitchConnectionState } = defineProps<{
 }>()
 
 const currentTab = shallowRef(
-  twitchConnectionState.state === 'disconnected' ? 'twitch-connect' : 'game-settings'
+  twitchConnectionState.state === 'disconnected' ? 'youtube-connect' : 'game-settings'
 )
 const tabs = shallowRef([
   { name: 'game-settings', value: 'Game Settings' },
   { name: 'chat-commands', value: 'Chat Commands & Notifications' },
-  { name: 'twitch-connect', value: 'Twitch Connect' },
+  { name: 'youtube-connect', value: 'YouTube Connect' },
   { name: 'ban-list', value: 'Ban List' }
 ])
 
-const newChannelName = shallowRef(settings.channelName)
-const onChannelNameUpdate = () => {
-  settings.channelName = newChannelName.value
+const streamUrl = shallowRef(settings.youtubeStreamUrl || settings.channelName)
+const onStreamUrlUpdate = () => {
+  settings.youtubeStreamUrl = streamUrl.value.trim()
+  settings.channelName = streamUrl.value.trim()
   chatguessrApi.reconnect()
 }
 
@@ -385,29 +386,29 @@ const currentVerion = shallowRef(await chatguessrApi.getCurrentVersion())
       </div>
     </div>
 
-    <div v-show="currentTab === 'twitch-connect'" class="content">
+    <div v-show="currentTab === 'youtube-connect'" class="content">
       <div class="flex flex-col items-center justify-center gap-02 my-1">
-        <IconTwitch class="mb-1" />
+        <IconYouTube class="mb-1" />
         <div class="form__group">
-          <button
-            :class="['btn', twitchConnectionState.state]"
-            @click="chatguessrApi.replaceSession()"
-          >
+          <button :class="['btn', twitchConnectionState.state]" @click="chatguessrApi.reconnect()">
             {{
               twitchConnectionState.state === 'disconnected'
-                ? 'Login'
+                ? 'Connect'
                 : twitchConnectionState.state === 'connecting'
                   ? 'Connecting...'
-                  : 'Change account'
+                  : 'Reconnect'
             }}
           </button>
         </div>
         <div class="form__group">
-          Your bot account :
+          Active Live Stream :
           <span :class="[twitchConnectionState.state]"
             >{{
               twitchConnectionState.state === 'connected'
-                ? 'connected as ' + twitchConnectionState.botUsername
+                ? 'connected to ' +
+                  (twitchConnectionState.liveId ||
+                    twitchConnectionState.channelName ||
+                    twitchConnectionState.botUsername)
                 : twitchConnectionState.state === 'error'
                   ? 'Error: ' + twitchConnectionState.error
                   : twitchConnectionState.state
@@ -416,23 +417,33 @@ const currentVerion = shallowRef(await chatguessrApi.getCurrentVersion())
         </div>
 
         <div class="form__group">
-          Your streaming channel :
+          YouTube Live URL / Video ID :
           <div class="flex gap-02">
-            <input v-model="newChannelName" type="text" spellcheck="false" required />
+            <input
+              v-model="streamUrl"
+              type="text"
+              spellcheck="false"
+              placeholder="https://www.youtube.com/watch?v=... atau Video ID"
+              style="min-width: 280px"
+              required
+            />
             <button
-              :disabled="newChannelName === settings.channelName"
+              :disabled="streamUrl === (settings.youtubeStreamUrl || settings.channelName)"
               class="btn bg-primary"
-              @click="onChannelNameUpdate()"
+              @click="onStreamUrlUpdate()"
             >
               Update
             </button>
           </div>
+          <small style="color: #888; margin-top: 4px; display: block; text-align: center">
+            Paste URL streaming live YouTube Anda yang sedang berlangsung
+          </small>
         </div>
       </div>
       <h2>Status :</h2>
       <div class="container">
         <div class="form__group">
-          Twitch :<span :class="[twitchConnectionState.state]">{{
+          YouTube Live Chat :<span :class="[twitchConnectionState.state]">{{
             twitchConnectionState.state
           }}</span>
         </div>

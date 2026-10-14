@@ -10,7 +10,8 @@ export default defineConfig({
         'better-sqlite3',
         'bufferutil',
         'utf-8-validate',
-        '@osm_borders/maritime_10m'
+        '@osm_borders/maritime_10m',
+        'youtube-chat'
       ]
     }
   }

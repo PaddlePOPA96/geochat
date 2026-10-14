@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ChatGuessr OBS Overlay</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800&family=JetBrains+Mono:wght@600;700&display=swap" rel="stylesheet">
+  <script src="/socket.io/socket.io.js"></script>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Outfit', sans-serif;
+      background: transparent;
+      color: #fff;
+      overflow: hidden;
+      width: 100vw;
+      height: 100vh;
+      display: flex;
+      justify-content: flex-end;
+      align-items: flex-start;
+      padding: 24px;
+    }
+
+    /* Scoreboard Widget */
+    .overlay-widget {
+      width: 360px;
+      background: rgba(11, 15, 25, 0.88);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      backdrop-filter: blur(12px);
+      border-radius: 18px;
+      box-shadow: 0 12px 36px rgba(0, 0, 0, 0.6);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      animation: fadeIn 0.4s ease-out;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(-10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .widget-header {
+      padding: 14px 18px;
+      background: linear-gradient(135deg, rgba(255, 0, 51, 0.25), rgba(56, 189, 248, 0.15));
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .header-logo {
+      width: 28px;
+      height: 28px;
+      background: #ff0033;
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      font-size: 14px;
+    }
+
+    .header-title {
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: -0.3px;
+    }
+
+    .round-tag {
+      font-size: 11px;
+      font-weight: 700;
+      background: rgba(255, 255, 255, 0.15);
+      padding: 3px 8px;
+      border-radius: 12px;
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .status-bar {
+      padding: 6px 18px;
+      background: rgba(0, 0, 0, 0.35);
+      font-size: 11px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-weight: 600;
+    }
+
+    .status-open {
+      color: #10b981;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .status-closed {
+      color: #94a3b8;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .status-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: currentColor;
+    }
+
+    /* List Rows */
+    .players-list {
+      max-height: 480px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .player-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 16px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+      transition: background 0.2s;
+      animation: rowSlideIn 0.3s ease-out;
+    }
+
+    @keyframes rowSlideIn {
+      from { opacity: 0; transform: translateX(20px); }
+      to { opacity: 1; transform: translateX(0); }
+    }
+
+    .player-row:nth-child(even) {
+      background: rgba(255, 255, 255, 0.015);
+    }
+
+    .player-left {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      overflow: hidden;
+    }
+
+    .rank-num {
+      width: 20px;
+      font-size: 12px;
+      font-weight: 700;
+      color: #64748b;
+      text-align: center;
+    }
+
+    .rank-gold { color: #fbbf24; font-size: 14px; }
+    .rank-silver { color: #cbd5e1; font-size: 13px; }
+    .rank-bronze { color: #d97706; font-size: 13px; }
+
+    .player-avatar {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      object-fit: cover;
+      background: #334155;
+    }
+
+    .player-name {
+      font-size: 13px;
+      font-weight: 600;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 140px;
+    }
+
+    .player-right {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .player-score {
+      font-size: 13px;
+      font-weight: 700;
+      color: #10b981;
+    }
+
+    .player-dist {
+      font-size: 10px;
+      color: #38bdf8;
+    }
+
+    .empty-row {
+      padding: 24px 16px;
+      text-align: center;
+      font-size: 12px;
+      color: #64748b;
+    }
+
+    /* Notification Toast */
+    .toast-container {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      pointer-events: none;
+    }
+
+    .toast {
+      background: rgba(15, 23, 42, 0.95);
+      border: 1px solid rgba(56, 189, 248, 0.3);
+      padding: 10px 16px;
+      border-radius: 12px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      animation: toastIn 0.3s cubic-bezier(0.16, 1, 0.3, 1), toastOut 0.3s cubic-bezier(0.16, 1, 0.3, 1) 3.7s forwards;
+    }
+
+    @keyframes toastIn {
+      from { opacity: 0; transform: translateY(20px) scale(0.95); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
+    @keyframes toastOut {
+      from { opacity: 1; transform: translateY(0) scale(1); }
+      to { opacity: 0; transform: translateY(10px) scale(0.95); }
+    }
+  </style>
+</head>
+<body>
+  <div class="overlay-widget">
+    <div class="widget-header">
+      <div class="header-left">
+        <div class="header-logo">▶</div>
+        <div class="header-title" id="mapTitle">GeoGuessr Live</div>
+      </div>
+      <div class="round-tag" id="roundTag">R1 / 5</div>
+    </div>
+
+    <div class="status-bar">
+      <div id="statusIndicator" class="status-closed">
+        <span class="status-dot"></span>
+        <span id="statusText">Guesses Closed</span>
+      </div>
+      <div style="color: #94a3b8;" id="totalGuessesText">0 Guesses</div>
+    </div>
+
+    <div class="players-list" id="playersList">
+      <div class="empty-row">Ketik <code>!g lat, lng</code> di YouTube chat!</div>
+    </div>
+  </div>
+
+  <div class="toast-container" id="toastContainer"></div>
+
+  <script>
+    const socket = io();
+    let currentState = null;
+
+    socket.on('state-update', (state) => {
+      currentState = state;
+      renderOverlay();
+    });
+
+    socket.on('guess-added', ({ guess, totalGuesses }) => {
+      showToast(guess);
+      document.getElementById('totalGuessesText').textContent = totalGuesses + ' Guesses';
+    });
+
+    function renderOverlay() {
+      if (!currentState) return;
+
+      document.getElementById('mapTitle').textContent = currentState.mapName || 'GeoGuessr';
+      document.getElementById('roundTag').textContent = `R${currentState.round} / 5`;
+
+      const statusIndicator = document.getElementById('statusIndicator');
+      const statusText = document.getElementById('statusText');
+
+      if (currentState.guessesOpen) {
+        statusIndicator.className = 'status-open';
+        statusText.textContent = 'Guesses Open';
+      } else {
+        statusIndicator.className = 'status-closed';
+        statusText.textContent = 'Guesses Closed';
+      }
+
+      const list = currentState.roundGuesses || [];
+      document.getElementById('totalGuessesText').textContent = list.length + ' Guesses';
+
+      const container = document.getElementById('playersList');
+      if (list.length === 0) {
+        container.innerHTML = '<div class="empty-row">Ketik <code>!g lat, lng</code> di YouTube chat!</div>';
+        return;
+      }
+
+      let html = '';
+      list.slice(0, 10).forEach((p, idx) => {
+        const rank = idx + 1;
+        let rankClass = 'rank-num';
+        if (rank === 1) rankClass += ' rank-gold';
+        else if (rank === 2) rankClass += ' rank-silver';
+        else if (rank === 3) rankClass += ' rank-bronze';
+
+        const avatar = p.avatar ? `<img class="player-avatar" src="${p.avatar}" alt="" />` : `<div class="player-avatar" style="display:flex;align-items:center;justify-content:center;font-size:10px;">👤</div>`;
+
+        html += `
+          <div class="player-row">
+            <div class="player-left">
+              <span class="${rankClass}">${rank}</span>
+              ${avatar}
+              <span class="player-name">${escapeHtml(p.username)}</span>
+            </div>
+            <div class="player-right">
+              <span class="player-score">${p.score.toLocaleString()}</span>
+              <span class="player-dist">${p.distance} km</span>
+            </div>
+          </div>
+        `;
+      });
+
+      container.innerHTML = html;
+    }
+
+    function showToast(guess) {
+      const container = document.getElementById('toastContainer');
+      const toast = document.createElement('div');
+      toast.className = 'toast';
+      toast.innerHTML = `
+        <span style="font-size: 16px;">🎯</span>
+        <div>
+          <strong style="font-size: 12px; color: #fff;">${escapeHtml(guess.username)}</strong>
+          <div style="font-size: 11px; color: #38bdf8; font-family: 'JetBrains Mono', monospace;">
+            ${guess.score} pts (${guess.distance} km)
+          </div>
+        </div>
+      `;
+      container.appendChild(toast);
+      setTimeout(() => {
+        toast.remove();
+      }, 4000);
+    }
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+  </script>
+</body>
+</html>
