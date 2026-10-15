@@ -1,7 +1,7 @@
 // ==UserScript==
-// @name         MabarBang YouTube - GeoGuessr Auto Connector, Overlay & Viewer Pins
+// @name         AHUNG SERVER MabarBang YouTube 
 // @namespace    http://tampermonkey.net/
-// @version      2.3
+// @version      2.4
 // @description  Otomatis mengirim data ronde GeoGuessr ke Railway/Local, menampilkan Scoreboard Overlay & PIN tebakan penonton di peta GeoGuessr
 // @author       MabarBang
 // @match        *://*.geoguessr.com/*
@@ -16,8 +16,8 @@
   'use strict';
 
   // Server URLs (Cloud Railway vs Local 5050)
-  const CLOUD_SERVER_URL = 'https://geochat-production-f099.up.railway.app';
-  const LOCAL_SERVER_URL = 'http://localhost:5050';
+  const CLOUD_SERVER_URL = 'https://geoindo.up.railway.app/';
+  const LOCAL_SERVER_URL = 'http://localhost:8080';
 
   let serverUrl = LOCAL_SERVER_URL;
   try {
@@ -28,7 +28,7 @@
     if (saved && saved.trim()) {
       serverUrl = saved.trim();
     }
-  } catch (_) {}
+  } catch (_) { }
 
   function getServerMode() {
     if (serverUrl.includes('localhost') || serverUrl.includes('127.0.0.1')) {
@@ -45,7 +45,7 @@
     if (typeof GM_setValue !== 'undefined') GM_setValue('cg_server_url', serverUrl);
     try {
       localStorage.setItem('cg_server_url', serverUrl);
-    } catch (_) {}
+    } catch (_) { }
     updateServerModeUI();
     initSocket();
     showToast({
@@ -243,7 +243,7 @@
             geodesic: true
           });
           polylines.push(line);
-        } catch (_) {}
+        } catch (_) { }
       }
     });
 
@@ -379,7 +379,7 @@
           .then((gameData) => {
             handleGeoGuessrGameData(gameData);
           })
-          .catch(() => {});
+          .catch(() => { });
       } catch (err) {
         console.error('[ChatGuessr] Error parsing fetch response:', err);
       }
@@ -400,7 +400,7 @@
           const gameData = JSON.parse(this.responseText);
           handleGeoGuessrGameData(gameData);
         }
-      } catch (_) {}
+      } catch (_) { }
     });
     return originalXHROpen.apply(this, args);
   };
@@ -439,7 +439,7 @@
     (win.fetch || fetch)(endpoint, { credentials: 'include' })
       .then((r) => r.json())
       .then((data) => handleGeoGuessrGameData(data))
-      .catch(() => {});
+      .catch(() => { });
   }
 
   setInterval(checkUrlForGame, 2000);
@@ -1307,7 +1307,7 @@
         element.style.top = clampT + 'px';
         element.style.right = 'auto';
       }
-    } catch (_) {}
+    } catch (_) { }
 
     // Double click header to reset to default top-right corner
     handle.addEventListener('dblclick', (e) => {
@@ -1317,7 +1317,7 @@
       element.style.left = 'auto';
       try {
         localStorage.removeItem('cg_widget_pos');
-      } catch (_) {}
+      } catch (_) { }
     });
 
     handle.addEventListener('pointerdown', onPointerDown);
@@ -1375,7 +1375,7 @@
       handle.removeEventListener('pointercancel', onPointerUp);
       try {
         handle.releasePointerCapture(e.pointerId);
-      } catch (_) {}
+      } catch (_) { }
 
       // Save position for persistence across reloads / rounds
       try {
@@ -1384,7 +1384,7 @@
           'cg_widget_pos',
           JSON.stringify({ left: Math.round(rect.left), top: Math.round(rect.top) })
         );
-      } catch (_) {}
+      } catch (_) { }
     }
   }
 

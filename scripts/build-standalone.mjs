@@ -19,14 +19,16 @@ console.log('2. Bundling server with esbuild...')
 fs.mkdirSync('dist', { recursive: true })
 fs.mkdirSync('bin', { recursive: true })
 execSync(
-  'npx esbuild src/server/index.ts --bundle --platform=node --target=node20 --format=cjs --outfile=dist/server-bundle.cjs',
+  'npx -y esbuild src/server/index.ts --bundle --platform=node --target=node20 --format=cjs --outfile=dist/server-bundle.cjs',
   { stdio: 'inherit' }
 )
 
 // 3. Compile standalone binaries with pkg
+// IMPORTANT: target must match the installed Node.js major version (node20)
+// Using node22 target on node20 causes force-close / crash at startup
 console.log('3. Compiling Windows & Mac binaries with pkg...')
 execSync(
-  'npx -y @yao-pkg/pkg dist/server-bundle.cjs --targets node22-win-x64,node22-macos-x64 --out-path bin',
+  'npx -y @yao-pkg/pkg@5.15.0 dist/server-bundle.cjs --targets node20-win-x64,node20-macos-x64 --out-path bin',
   { stdio: 'inherit' }
 )
 

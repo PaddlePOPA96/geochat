@@ -6,6 +6,7 @@ import path from 'path'
 import fs from 'fs'
 import { exec } from 'child_process'
 import YouTubeBackend from '../main/utils/useYouTubeChat'
+import TikTokBackend from '../main/utils/useTikTokChat'
 import { resolveLocation, parseCoordinates } from '../shared/geocoding'
 import { embeddedDashboardHtml, embeddedOverlayHtml } from './embeddedTemplates'
 
@@ -99,6 +100,11 @@ class GameServerManager {
   youtubeStatus: 'disconnected' | 'connecting' | 'connected' | 'error' = 'disconnected'
   youtubeError = ''
 
+  tiktokBackend: TikTokBackend | null = null
+  tiktokUsername = ''
+  tiktokStatus: 'disconnected' | 'connecting' | 'connected' | 'error' = 'disconnected'
+  tiktokError = ''
+
   token: string | null = null
   mapName = 'GeoGuessr Map'
   mapScale = 2000
@@ -110,6 +116,7 @@ class GameServerManager {
 
   roundGuesses: Record<string, PlayerGuess> = {}
   gameLeaderboard: Record<string, LeaderboardEntry> = {}
+  userLastGuessTime: Record<string, number> = {}
 
   // History of rounds in current game
   roundsHistory: {
@@ -184,11 +191,86 @@ class GameServerManager {
     this.broadcastState()
   }
 
+  connectTikTok(username: string) {
+    if (this.tiktokBackend) {
+      this.tiktokBackend.close()
+      this.tiktokBackend = null
+    }
+
+    this.tiktokUsername = username.trim().replace(/^@/, '')
+    if (!this.tiktokUsername) {
+      this.tiktokStatus = 'disconnected'
+      this.broadcastState()
+      return
+    }
+
+    this.tiktokStatus = 'connecting'
+    this.tiktokError = ''
+    this.broadcastState()
+
+    try {
+      this.tiktokBackend = new TikTokBackend({ username: this.tiktokUsername })
+
+      this.tiktokBackend.on('connected', (user: string) => {
+        this.tiktokStatus = 'connected'
+        console.log(`[Server] TikTok Live connected for @${user}`)
+        this.broadcastState()
+      })
+
+      this.tiktokBackend.on('disconnected', (_closing: boolean) => {
+        this.tiktokStatus = 'disconnected'
+        console.log(`[Server] TikTok Live disconnected`)
+        this.broadcastState()
+      })
+
+      this.tiktokBackend.on('error', (err: any) => {
+        this.tiktokStatus = 'error'
+        this.tiktokError = err?.message || String(err)
+        console.error(`[Server] TikTok Live error:`, err)
+        this.broadcastState()
+      })
+
+      this.tiktokBackend.on('guess', (userstate, message) => {
+        this.handleChatGuess(userstate, message).catch((err) => {
+          console.error('[Server] Error handling TikTok guess:', err)
+        })
+      })
+
+      this.tiktokBackend.connect().catch((err) => {
+        this.tiktokStatus = 'error'
+        this.tiktokError = err?.message || String(err)
+        this.broadcastState()
+      })
+    } catch (err: any) {
+      this.tiktokStatus = 'error'
+      this.tiktokError = err?.message || String(err)
+      this.broadcastState()
+    }
+  }
+
+  disconnectTikTok() {
+    if (this.tiktokBackend) {
+      this.tiktokBackend.close()
+      this.tiktokBackend = null
+    }
+    this.tiktokStatus = 'disconnected'
+    this.broadcastState()
+  }
+
   async handleChatGuess(userstate: any, message: string) {
     if (!this.guessesOpen) {
       console.log(`[Guess Ignored] Guesses are closed: "${message}"`)
       return
     }
+
+    const userId = userstate['user-id'] || userstate.username || 'unknown'
+    const now = Date.now()
+    const lastGuess = this.userLastGuessTime[userId] || 0
+    if (now - lastGuess < 5000) {
+      console.log(`[Guess Rate-Limited] ${userId} sent guess within 5 seconds`)
+      return
+    }
+    this.userLastGuessTime[userId] = now
 
     const clean = message.replace(/^!g\s*/i, '').trim()
     const coords = await resolveLocation(clean)
@@ -203,7 +285,6 @@ class GameServerManager {
       ? calculateScore(distance, this.mapScale, this.maxErrorDistance)
       : Math.max(1, 5000 - Math.round(distance * 2))
 
-    const userId = userstate['user-id'] || userstate.username || 'unknown'
     const username = userstate['display-name'] || userstate.username || 'Anonymous'
     const avatar = userstate.avatar || ''
 
@@ -363,6 +444,9 @@ class GameServerManager {
       youtubeStreamTarget: this.youtubeStreamTarget,
       youtubeStatus: this.youtubeStatus,
       youtubeError: this.youtubeError,
+      tiktokUsername: this.tiktokUsername,
+      tiktokStatus: this.tiktokStatus,
+      tiktokError: this.tiktokError,
       token: this.token,
       mapName: this.mapName,
       round: this.round,
@@ -400,6 +484,22 @@ app.post('/api/youtube/connect', (req, res) => {
 
 app.post('/api/youtube/disconnect', (_req, res) => {
   manager.disconnectYouTube()
+  res.json({ success: true, state: manager.getState() })
+})
+
+// TikTok Connect
+app.post('/api/tiktok/connect', (req, res) => {
+  const { username } = req.body
+  if (!username) {
+    res.status(400).json({ error: 'username is required' })
+    return
+  }
+  manager.connectTikTok(username)
+  res.json({ success: true, state: manager.getState() })
+})
+
+app.post('/api/tiktok/disconnect', (_req, res) => {
+  manager.disconnectTikTok()
   res.json({ success: true, state: manager.getState() })
 })
 
@@ -484,20 +584,57 @@ io.on('connection', (socket) => {
 
 const PORT = process.env.PORT || 5050
 if (process.env.NODE_ENV !== 'test') {
+  // Global error handler so console window doesn't crash or auto-close
+  process.on('uncaughtException', (err) => {
+    console.error('\n===============================================')
+    console.error('❌ TERJADI KESALAHAN PADA SERVER:')
+    console.error(err)
+    console.error('===============================================')
+    console.log('\nTekan tombol ENTER untuk keluar...')
+    process.stdin.resume()
+    process.stdin.on('data', () => process.exit(1))
+    setTimeout(() => {}, 86400000)
+  })
+
+  process.on('unhandledRejection', (reason) => {
+    console.warn('⚠️ Warning (Unhandled Rejection):', reason)
+  })
+
+  server.on('error', (err: any) => {
+    console.error(`\n===============================================`)
+    if (err.code === 'EADDRINUSE') {
+      console.error(`❌ PORT ${PORT} SUDAH DIGUNAKAN OLEH APLIKASI LAIN!`)
+      console.error(`Silakan tutup aplikasi lain atau instance MabarBang lain yang memakai port ${PORT}.`)
+    } else {
+      console.error(`❌ Gagal memulai server di port ${PORT}:`, err.message || err)
+    }
+    console.error(`===============================================`)
+    console.log(`\nTekan tombol ENTER untuk keluar...`)
+    process.stdin.resume()
+    process.stdin.on('data', () => process.exit(1))
+    setTimeout(() => {}, 86400000)
+  })
+
   server.listen(PORT, () => {
     console.log(`===============================================`)
-    console.log(`🚀 MabarBang Standalone Server running on port ${PORT}`)
+    console.log(`🚀 MabarBang Server: Online (Port ${PORT})`)
     console.log(`📱 Streamer Dashboard : http://localhost:${PORT}/dashboard`)
     console.log(`📺 OBS Studio Overlay: http://localhost:${PORT}/overlay`)
     console.log(`===============================================`)
-    console.log(`💡 Biarkan jendela ini tetap terbuka selama live stream berlangsung.`)
 
     // Auto-open browser on desktop if not in CI
     if (!process.env.CI) {
-      const startCmd = process.platform === 'win32' ? 'start' : (process.platform === 'darwin' ? 'open' : 'xdg-open')
-      try {
-        exec(`${startCmd} http://localhost:${PORT}/dashboard`)
-      } catch (_) {}
+      const url = `http://localhost:${PORT}/dashboard`
+      if (process.platform === 'win32') {
+        exec(`cmd /c start "" "${url}"`, () => {})
+      } else if (process.platform === 'darwin') {
+        exec(`open "${url}"`, () => {})
+      } else {
+        exec(`xdg-open "${url}"`, () => {})
+      }
     }
   })
+
+  // Keep console process alive on Windows/macOS
+  process.stdin.resume()
 }

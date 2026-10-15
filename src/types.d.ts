@@ -1,5 +1,3 @@
-type Socket = import('socket.io-client').Socket
-
 interface UserData {
   'user-id': string
   'display-name': string
@@ -222,8 +220,3 @@ type YouTubeConnectionState =
   | { state: 'connecting' }
   | { state: 'connected'; botUsername?: string; channelName?: string; liveId?: string }
   | { state: 'error'; error: unknown }
-
-type TwitchConnectionState = YouTubeConnectionState
-
-type SocketConnectionState =
-  { state: 'disconnected' } | { state: 'connecting' } | { state: 'connected' }

@@ -1,11 +1,9 @@
 import { ipcMain } from 'electron'
-import { io } from 'socket.io-client'
 import Game from './Game'
 import YouTubeBackend from './utils/useYouTubeChat'
 import { settings, saveSettings } from './utils/useSettings'
 import {
   isGameURL,
-  makeGameSummaryLink,
   makeMapsUrl,
   fetchMap,
   getRandomCoordsInLand,
@@ -15,26 +13,16 @@ import {
 import { resolveLocation } from '../shared/geocoding'
 import { getEmoji, randomCountryFlag, selectFlag } from './lib/flags/flags'
 
-const SOCKET_SERVER_URL =
-  import.meta.env.VITE_SOCKET_SERVER_URL ?? 'https://chatguessr-server.herokuapp.com'
-
 export default class GameHandler {
   #db: Database
   #win: Electron.BrowserWindow
-  #session: Session | undefined
   #backend: YouTubeBackend | undefined
-  #socket: Socket | undefined
   #game: Game
 
-  constructor(
-    db: Database,
-    win: Electron.BrowserWindow,
-    _options?: { requestAuthentication?: () => Promise<void> }
-  ) {
+  constructor(db: Database, win: Electron.BrowserWindow) {
     this.#db = db
     this.#win = win
     this.#backend = undefined
-    this.#socket = undefined
     this.#game = new Game(db, settings)
     this.#init()
   }
@@ -214,29 +202,13 @@ export default class GameHandler {
 
     this.#win.webContents.send('show-game-results', locations, gameResults)
 
-    let link: string | undefined
-
-    try {
-      link = await makeGameSummaryLink({
-        accessToken: this.#session!.access_token,
-        bot: this.#session!.user.user_metadata.name,
-        streamer: settings.channelName,
-        map: this.#game.mapName,
-        mode: this.#game.mode,
-        locations,
-        gameResults
-      })
-    } catch (err) {
-      console.error('could not upload summary', err)
-    }
     this.#sendNotification('gameFinished', {
       username: gameResults[0].player.username,
-      flag: gameResults[0].player.flag,
-      link: link
+      flag: gameResults[0].player.flag
     })
   }
 
-  getTwitchConnectionState(): TwitchConnectionState {
+  getYouTubeConnectionState(): YouTubeConnectionState {
     if (!this.#backend) {
       return { state: 'disconnected' }
     } else if (this.#backend.isConnected()) {
@@ -250,25 +222,8 @@ export default class GameHandler {
     return { state: 'connecting' }
   }
 
-  getSocketConnectionState(): SocketConnectionState {
-    if (!this.#socket) {
-      return { state: 'disconnected' }
-    } else if (this.#socket.connected) {
-      return { state: 'connected' }
-    }
-    return { state: 'connecting' }
-  }
-
   async connectYouTube() {
     await this.#initBackend()
-  }
-
-  async authenticate(session?: Session) {
-    this.#session = session
-    await this.connectYouTube()
-    if (session) {
-      await this.#initSocket(session)
-    }
   }
 
   async #initBackend() {
@@ -277,7 +232,7 @@ export default class GameHandler {
 
     const streamTarget = settings.youtubeStreamUrl || settings.channelName
     if (!streamTarget) {
-      this.#win.webContents.send('twitch-connection-state', { state: 'disconnected' })
+      this.#win.webContents.send('youtube-connection-state', { state: 'disconnected' })
       return
     }
 
@@ -286,8 +241,8 @@ export default class GameHandler {
     })
 
     const emitConnectionState = () => {
-      const state = this.getTwitchConnectionState()
-      this.#win.webContents.send('twitch-connection-state', state)
+      const state = this.getYouTubeConnectionState()
+      this.#win.webContents.send('youtube-connection-state', state)
     }
 
     this.#backend.on('connected', (liveId: string) => {
@@ -304,7 +259,7 @@ export default class GameHandler {
     })
 
     this.#backend.on('error', (err) => {
-      this.#win.webContents.send('twitch-error', err)
+      this.#win.webContents.send('youtube-error', err)
       console.error('[YouTube] Backend error:', err)
     })
 
@@ -324,49 +279,9 @@ export default class GameHandler {
     try {
       await this.#backend.connect()
     } catch (err) {
-      this.#win.webContents.send('twitch-error', err)
+      this.#win.webContents.send('youtube-error', err)
       console.error('[YouTube] Backend connection error:', err)
     }
-  }
-
-  async #initSocket(session: Session) {
-    if (this.#socket?.connected) {
-      this.#socket.disconnect()
-    }
-
-    const botUsername: string = session.user.user_metadata.name
-
-    this.#socket = io(SOCKET_SERVER_URL, {
-      transportOptions: {
-        polling: {
-          extraHeaders: {
-            access_token: session.access_token,
-            channelname: settings.channelName,
-            bot: botUsername
-          }
-        }
-      }
-    })
-
-    this.#socket.on('connect', () => {
-      this.#socket?.emit('join', botUsername)
-      this.#win.webContents.send('socket-connected')
-    })
-
-    this.#socket.on('disconnect', () => {
-      this.#win.webContents.send('socket-disconnected')
-    })
-
-    this.#socket.on('guess', (userData: UserData, guess: string) => {
-      this.#handleGuess(userData, guess).catch((err) => {
-        console.error(err)
-      })
-    })
-
-    if (!this.#socket) {
-      throw new Error('Socket is not initialized')
-    }
-    await new Promise<void>((resolve) => this.#socket!.once('connect', resolve))
   }
 
   async #handleGuess(userstate: UserData, message: string, isRandomPlonk: boolean = false) {

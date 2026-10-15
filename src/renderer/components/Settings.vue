@@ -11,13 +11,12 @@ const { chatguessrApi } = window
 const { settings } = useSettings()
 const { copy, copied } = useClipboard()
 
-const { socketConnectionState, twitchConnectionState } = defineProps<{
-  twitchConnectionState: TwitchConnectionState
-  socketConnectionState: SocketConnectionState
+const { youtubeConnectionState } = defineProps<{
+  youtubeConnectionState: YouTubeConnectionState
 }>()
 
 const currentTab = shallowRef(
-  twitchConnectionState.state === 'disconnected' ? 'youtube-connect' : 'game-settings'
+  youtubeConnectionState.state === 'disconnected' ? 'youtube-connect' : 'game-settings'
 )
 const tabs = shallowRef([
   { name: 'game-settings', value: 'Game Settings' },
@@ -34,8 +33,8 @@ const onStreamUrlUpdate = () => {
 }
 
 const cgLink = shallowRef(
-  twitchConnectionState.state === 'connected'
-    ? `chatguessr.com/map/${twitchConnectionState.botUsername}`
+  youtubeConnectionState.state === 'connected'
+    ? `chatguessr.com/map/${youtubeConnectionState.botUsername}`
     : ''
 )
 
@@ -110,7 +109,7 @@ const currentVerion = shallowRef(await chatguessrApi.getCurrentVersion())
         <div class="flex items-center justify-between">
           <p>
             Place your custom flags in this folder.<br />
-            Rename each image to match the desired Twitch command.<br />
+            Rename each image to match the desired chat command.<br />
             <small style="color: lightgray">
               Supported formats (.svg, .png, .jpg, .jpeg, .webp, .gif, .apng)
             </small>
@@ -390,11 +389,11 @@ const currentVerion = shallowRef(await chatguessrApi.getCurrentVersion())
       <div class="flex flex-col items-center justify-center gap-02 my-1">
         <IconYouTube class="mb-1" />
         <div class="form__group">
-          <button :class="['btn', twitchConnectionState.state]" @click="chatguessrApi.reconnect()">
+          <button :class="['btn', youtubeConnectionState.state]" @click="chatguessrApi.reconnect()">
             {{
-              twitchConnectionState.state === 'disconnected'
+              youtubeConnectionState.state === 'disconnected'
                 ? 'Connect'
-                : twitchConnectionState.state === 'connecting'
+                : youtubeConnectionState.state === 'connecting'
                   ? 'Connecting...'
                   : 'Reconnect'
             }}
@@ -402,16 +401,16 @@ const currentVerion = shallowRef(await chatguessrApi.getCurrentVersion())
         </div>
         <div class="form__group">
           Active Live Stream :
-          <span :class="[twitchConnectionState.state]"
+          <span :class="[youtubeConnectionState.state]"
             >{{
-              twitchConnectionState.state === 'connected'
+              youtubeConnectionState.state === 'connected'
                 ? 'connected to ' +
-                  (twitchConnectionState.liveId ||
-                    twitchConnectionState.channelName ||
-                    twitchConnectionState.botUsername)
-                : twitchConnectionState.state === 'error'
-                  ? 'Error: ' + twitchConnectionState.error
-                  : twitchConnectionState.state
+                  (youtubeConnectionState.liveId ||
+                    youtubeConnectionState.channelName ||
+                    youtubeConnectionState.botUsername)
+                : youtubeConnectionState.state === 'error'
+                  ? 'Error: ' + youtubeConnectionState.error
+                  : youtubeConnectionState.state
             }}
           </span>
         </div>
@@ -443,29 +442,17 @@ const currentVerion = shallowRef(await chatguessrApi.getCurrentVersion())
       <h2>Status :</h2>
       <div class="container">
         <div class="form__group">
-          YouTube Live Chat :<span :class="[twitchConnectionState.state]">{{
-            twitchConnectionState.state
+          YouTube Live Chat :<span :class="[youtubeConnectionState.state]">{{
+            youtubeConnectionState.state
           }}</span>
-        </div>
-        <div class="form__group">
-          ChatGuessr server :<span :class="[socketConnectionState.state]"
-            >{{ socketConnectionState.state }}
-            <button
-              v-if="socketConnectionState.state === 'connecting'"
-              :class="['btn', socketConnectionState.state]"
-              @click="chatguessrApi.reconnect()"
-            >
-              ⟳
-            </button>
-          </span>
         </div>
         <div class="form__group">
           Your cg link :
           <div class="flex gap-02">
             <input
               :value="
-                twitchConnectionState.state === 'connected'
-                  ? `chatguessr.com/map/${twitchConnectionState.botUsername}`
+                youtubeConnectionState.state === 'connected'
+                  ? `chatguessr.com/map/${youtubeConnectionState.botUsername}`
                   : ''
               "
               type="text"

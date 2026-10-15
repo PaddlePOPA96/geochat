@@ -19,7 +19,7 @@
 
   <div class="cg-menu">
     <button
-      :class="['cg-button', twitchConnectionState.state]"
+      :class="['cg-button', youtubeConnectionState.state]"
       title="Settings"
       @click="settingsVisible = true"
     >
@@ -76,7 +76,7 @@
 
   <Suspense>
     <Modal mode="v-if" :is-visible="settingsVisible" @close="settingsVisible = false">
-      <Settings :socket-connection-state :twitch-connection-state />
+      <Settings :youtube-connection-state />
     </Modal>
   </Suspense>
 
@@ -329,49 +329,25 @@ async function onStreamerRandomplonk() {
   }, 200)
 }
 
-/** Load and update twitch connection state. */
-const twitchConnectionState = useTwitchConnectionState()
-function useTwitchConnectionState() {
-  const conn = shallowRef<TwitchConnectionState>({ state: 'disconnected' })
+/** Load and update YouTube connection state. */
+const youtubeConnectionState = useYouTubeConnectionState()
+function useYouTubeConnectionState() {
+  const conn = shallowRef<YouTubeConnectionState>({ state: 'disconnected' })
 
   onMounted(async () => {
-    const state = await chatguessrApi.getTwitchConnectionState()
+    const state = await chatguessrApi.getYouTubeConnectionState()
     conn.value = state
   })
 
   onBeforeUnmount(
-    chatguessrApi.onTwitchConnectionStateChange((state) => {
+    chatguessrApi.onYouTubeConnectionStateChange((state) => {
       conn.value = state
     })
   )
 
   onBeforeUnmount(
-    chatguessrApi.onTwitchError((err) => {
+    chatguessrApi.onYouTubeError((err) => {
       conn.value = { state: 'error', error: err }
-    })
-  )
-
-  return conn
-}
-
-/** Load and update socket connection state. */
-const socketConnectionState = useSocketConnectionState()
-function useSocketConnectionState() {
-  const conn = shallowRef<SocketConnectionState>({ state: 'disconnected' })
-
-  onMounted(async () => {
-    const state = await chatguessrApi.getSocketConnectionState()
-    conn.value = state
-  })
-
-  onBeforeUnmount(
-    chatguessrApi.onSocketConnected(() => {
-      conn.value.state = 'connected'
-    })
-  )
-  onBeforeUnmount(
-    chatguessrApi.onSocketDisconnected(() => {
-      conn.value.state = 'disconnected'
     })
   )
 

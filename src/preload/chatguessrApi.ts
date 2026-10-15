@@ -132,32 +132,17 @@ export const chatguessrApi = {
     ipcRenderer.send('reconnect')
   },
 
-  replaceSession(): void {
-    ipcRenderer.invoke('replace-session')
+
+  getYouTubeConnectionState(): Promise<YouTubeConnectionState> {
+    return ipcRenderer.invoke('get-youtube-connection-state')
   },
 
-  getTwitchConnectionState(): Promise<TwitchConnectionState> {
-    return ipcRenderer.invoke('get-twitch-connection-state')
+  onYouTubeConnectionStateChange(callback: (state: YouTubeConnectionState) => void) {
+    return ipcRendererOn('youtube-connection-state', callback)
   },
 
-  onTwitchConnectionStateChange(callback: (state: TwitchConnectionState) => void) {
-    return ipcRendererOn('twitch-connection-state', callback)
-  },
-
-  onTwitchError(callback: (err: unknown) => void) {
-    return ipcRendererOn('twitch-error', callback)
-  },
-
-  getSocketConnectionState(): Promise<SocketConnectionState> {
-    return ipcRenderer.invoke('get-socket-connection-state')
-  },
-
-  onSocketConnected(callback: () => void) {
-    return ipcRendererOn('socket-connected', callback)
-  },
-
-  onSocketDisconnected(callback: () => void) {
-    return ipcRendererOn('socket-disconnected', callback)
+  onYouTubeError(callback: (err: unknown) => void) {
+    return ipcRendererOn('youtube-error', callback)
   },
 
   getCurrentVersion(): Promise<string> {

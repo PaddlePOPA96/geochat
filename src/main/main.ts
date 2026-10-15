@@ -34,18 +34,9 @@ app.whenReady().then(async () => {
   await serveFlags()
 
   const mainWindow = createMainWindow()
+  const gameHandler = new GameHandler(db, mainWindow)
 
-  const gameHandler = new GameHandler(db, mainWindow, {
-    async requestAuthentication() {
-      await gameHandler.connectYouTube()
-    }
-  })
-
-  ipcMain.handle('get-twitch-connection-state', () => gameHandler.getTwitchConnectionState())
-  ipcMain.handle('get-socket-connection-state', () => gameHandler.getSocketConnectionState())
-  ipcMain.handle('replace-session', async () => {
-    await gameHandler.connectYouTube()
-  })
+  ipcMain.handle('get-youtube-connection-state', () => gameHandler.getYouTubeConnectionState())
 
   ipcMain.handle('read-audio-file-as-buffer', async (_event, pathArg: string) => {
     const audioPath = getAppDataPathIfExists(pathArg)

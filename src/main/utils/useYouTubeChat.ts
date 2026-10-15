@@ -65,6 +65,9 @@ export default class YouTubeBackend extends EventEmitter {
   #liveChat: LiveChat | null = null
   #connected = false
   #closing = false
+  #reconnectTimer: NodeJS.Timeout | null = null
+  #reconnectAttempts = 0
+  #lastGuessTimestamp: Map<string, number> = new Map()
 
   liveId: string | undefined
   channelId: string | undefined
@@ -72,11 +75,21 @@ export default class YouTubeBackend extends EventEmitter {
 
   constructor(options: { streamInput: string }) {
     super()
-
     const parsed = parseYouTubeInput(options.streamInput)
     this.liveId = parsed.liveId
     this.channelId = parsed.channelId
     this.handle = parsed.handle
+
+    this.#createLiveChat()
+  }
+
+  #createLiveChat() {
+    if (this.#liveChat) {
+      try {
+        this.#liveChat.stop()
+      } catch (_) {}
+      this.#liveChat = null
+    }
 
     if (this.channelId) {
       this.#liveChat = new LiveChat({ channelId: this.channelId })
@@ -100,14 +113,23 @@ export default class YouTubeBackend extends EventEmitter {
   }
 
   async connect(): Promise<boolean> {
+    this.#closing = false
+    if (this.#reconnectTimer) {
+      clearTimeout(this.#reconnectTimer)
+      this.#reconnectTimer = null
+    }
+
+    if (!this.#liveChat) {
+      this.#createLiveChat()
+    }
+
     if (!this.#liveChat) {
       throw new Error('No valid YouTube live ID or channel ID provided')
     }
 
-    this.#closing = false
-
     this.#liveChat.on('start', (liveId) => {
       this.#connected = true
+      this.#reconnectAttempts = 0
       this.liveId = liveId
       this.emit('connected', liveId)
     })
@@ -115,12 +137,18 @@ export default class YouTubeBackend extends EventEmitter {
     this.#liveChat.on('end', (reason) => {
       this.#connected = false
       this.emit('disconnected', this.#closing, reason)
+      if (!this.#closing) {
+        this.#scheduleReconnect('Chat stream ended: ' + reason)
+      }
     })
 
     let lastError: Error | null = null
     this.#liveChat.on('error', (err) => {
       lastError = err instanceof Error ? err : new Error(String(err))
       this.emit('error', lastError)
+      if (!this.#closing && !this.#connected) {
+        this.#scheduleReconnect('Error encountered: ' + lastError.message)
+      }
     })
 
     this.#liveChat.on('chat', (chatItem) => {
@@ -143,6 +171,16 @@ export default class YouTubeBackend extends EventEmitter {
       }
 
       if (/^!g(\s|$)/i.test(messageText)) {
+        const userId = userstate['user-id'] || userstate.username || 'unknown'
+        const now = Date.now()
+        const lastGuess = this.#lastGuessTimestamp.get(userId) || 0
+
+        // Rate limiting 5 detik per penonton
+        if (now - lastGuess < 5000) {
+          return
+        }
+
+        this.#lastGuessTimestamp.set(userId, now)
         this.emit('guess', userstate, messageText)
       } else if (messageText.startsWith('!')) {
         this.emit('message', userstate, messageText)
@@ -152,15 +190,45 @@ export default class YouTubeBackend extends EventEmitter {
     const ok = await this.#liveChat.start()
     if (!ok) {
       this.#connected = false
+      if (!this.#closing) {
+        this.#scheduleReconnect('Failed to start chat fetcher')
+      }
       throw lastError || new Error('Failed to start YouTube live chat fetcher')
     }
 
     return true
   }
 
+  #scheduleReconnect(reason?: string) {
+    if (this.#closing || this.#reconnectTimer) return
+
+    // Exponential backoff: 3s, 6s, 12s, max 30s
+    this.#reconnectAttempts++
+    const delay = Math.min(3000 * Math.pow(2, this.#reconnectAttempts - 1), 30000)
+
+    console.log(
+      `[YouTube Auto-Reconnect] Attempt #${this.#reconnectAttempts} in ${delay / 1000}s. Reason: ${reason || 'Disconnected'}`
+    )
+
+    this.#reconnectTimer = setTimeout(async () => {
+      this.#reconnectTimer = null
+      if (this.#closing) return
+      try {
+        this.#createLiveChat()
+        await this.connect()
+      } catch (err) {
+        console.warn(`[YouTube Auto-Reconnect] Attempt #${this.#reconnectAttempts} failed:`, err)
+      }
+    }, delay)
+  }
+
   async close() {
     this.#closing = true
     this.#connected = false
+    if (this.#reconnectTimer) {
+      clearTimeout(this.#reconnectTimer)
+      this.#reconnectTimer = null
+    }
     if (this.#liveChat) {
       this.#liveChat.stop()
       this.#liveChat = null

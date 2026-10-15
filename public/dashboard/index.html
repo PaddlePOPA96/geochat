@@ -8,6 +8,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800;900&family=JetBrains+Mono:wght@600;700;800&display=swap" rel="stylesheet">
   <script src="/socket.io/socket.io.js"></script>
+  <script>if (typeof io === 'undefined') { document.write('<script src="https://cdn.socket.io/4.8.4/socket.io.min.js"><\/script>'); }</script>
   <style>
     :root {
       --bg-page: #9b87f5;
@@ -782,8 +783,41 @@
         </div>
       </div>
 
+      <!-- TikTok Live Connect Card -->
+      <div class="card card-pink">
+        <div class="card-header">
+          <div class="card-title">
+            <span>🎵</span> TikTok LIVE Stream
+          </div>
+          <span id="ttBadge" class="badge-pill badge-disconnected">
+            <span class="badge-dot"></span> <span id="ttBadgeText">Disconnected</span>
+          </span>
+        </div>
+
+        <p style="font-size: 13px; font-weight: 700; color: #1f2937;">
+          Masukkan username TikTok streamer (contoh: <code>@username</code>):
+        </p>
+
+        <div class="input-group">
+          <input type="text" id="tiktokInput" placeholder="@username_tiktok">
+          <button id="btnConnectTt" class="btn btn-black" onclick="connectTikTok()">Connect</button>
+          <button id="btnDisconnectTt" class="btn btn-red" onclick="disconnectTikTok()" style="display: none;">Disconnect</button>
+        </div>
+
+        <div class="info-list">
+          <div class="info-item">
+            <span class="info-label">🎯 Active TikTok:</span>
+            <span class="info-val" id="activeTikTokTarget">-</span>
+          </div>
+        </div>
+
+        <div id="ttErrorBox" style="display: none; padding: 10px 14px; background: #fee2e2; border: 2.5px solid #000; border-radius: 12px; box-shadow: 2px 2px 0px #000; color: #991b1b; font-size: 12px; font-weight: 800;">
+          <span>⚠️ Gagal Connect TikTok:</span> <span id="ttErrorText"></span>
+        </div>
+      </div>
+
       <!-- GeoGuessr Game Status Card -->
-      <div class="card card-green">
+      <div class="card card-green" style="grid-column: 1 / -1;">
         <div class="card-header">
           <div class="card-title">
             <span>🌍</span> GeoGuessr Game Status
@@ -908,6 +942,41 @@
         activeTarget.textContent = currentState.youtubeStreamTarget || '-';
       }
 
+      // Update TikTok Status
+      const ttBadge = document.getElementById('ttBadge');
+      const ttBadgeText = document.getElementById('ttBadgeText');
+      const btnConnectTt = document.getElementById('btnConnectTt');
+      const btnDisconnectTt = document.getElementById('btnDisconnectTt');
+      const activeTikTokTarget = document.getElementById('activeTikTokTarget');
+
+      if (ttBadge && ttBadgeText) {
+        ttBadge.className = 'badge-pill badge-' + (currentState.tiktokStatus || 'disconnected');
+        ttBadgeText.textContent = currentState.tiktokStatus || 'disconnected';
+      }
+
+      const ttErrorBox = document.getElementById('ttErrorBox');
+      const ttErrorText = document.getElementById('ttErrorText');
+      if (ttErrorBox && ttErrorText) {
+        if (currentState.tiktokStatus === 'error' && currentState.tiktokError) {
+          ttErrorBox.style.display = 'block';
+          ttErrorText.textContent = currentState.tiktokError;
+        } else {
+          ttErrorBox.style.display = 'none';
+        }
+      }
+
+      if (btnConnectTt && btnDisconnectTt && activeTikTokTarget) {
+        if (currentState.tiktokStatus === 'connected') {
+          btnConnectTt.style.display = 'none';
+          btnDisconnectTt.style.display = 'inline-flex';
+          activeTikTokTarget.textContent = currentState.tiktokUsername ? `@${currentState.tiktokUsername}` : '-';
+        } else {
+          btnConnectTt.style.display = 'inline-flex';
+          btnDisconnectTt.style.display = 'none';
+          activeTikTokTarget.textContent = currentState.tiktokUsername ? `@${currentState.tiktokUsername}` : '-';
+        }
+      }
+
       // Update Game Status
       document.getElementById('mapNameDisplay').textContent = currentState.mapName || 'GeoGuessr Map';
       document.getElementById('roundDisplay').textContent = `R${currentState.round} / 5`;
@@ -1001,6 +1070,29 @@
 
     async function disconnectYouTube() {
       await fetch('/api/youtube/disconnect', { method: 'POST' });
+    }
+
+    async function connectTikTok() {
+      const username = document.getElementById('tiktokInput').value.trim();
+      if (!username) {
+        alert('Masukkan username TikTok streamer terlebih dahulu!');
+        return;
+      }
+      localStorage.setItem('cg_last_tt_target', username);
+      await fetch('/api/tiktok/connect', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username })
+      });
+    }
+
+    const savedTtTarget = localStorage.getItem('cg_last_tt_target');
+    if (savedTtTarget && document.getElementById('tiktokInput')) {
+      document.getElementById('tiktokInput').value = savedTtTarget;
+    }
+
+    async function disconnectTikTok() {
+      await fetch('/api/tiktok/disconnect', { method: 'POST' });
     }
 
     async function toggleGuesses() {

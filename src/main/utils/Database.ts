@@ -9,9 +9,9 @@ function timestamp() {
 const migrations: ((db: SQLite.Database) => void)[] = [
   function initialSetup(db) {
     const usersTable = db.prepare(`CREATE TABLE users (
-            -- Twitch user ID
+            -- YouTube user ID
             id TEXT PRIMARY KEY NOT NULL,
-            -- Twitch display name
+            -- YouTube display name
             username TEXT NOT NULL,
             flag TEXT DEFAULT NULL,
             previous_guess TEXT DEFAULT NULL,
