@@ -114,6 +114,23 @@ class GameServerManager {
   guessesOpen = false
   isFinished = false
 
+  // Streamer Score & Stats
+  streamerStats: {
+    roundScore: number
+    roundDistance: number
+    totalScore: number
+    totalDistance: number
+    roundsCount: number
+    history: { round: number; score: number; distance: number }[]
+  } = {
+    roundScore: 0,
+    roundDistance: 0,
+    totalScore: 0,
+    totalDistance: 0,
+    roundsCount: 0,
+    history: []
+  }
+
   roundGuesses: Record<string, PlayerGuess> = {}
   gameLeaderboard: Record<string, LeaderboardEntry> = {}
   userLastGuessTime: Record<string, number> = {}
@@ -427,6 +444,14 @@ class GameServerManager {
     this.roundGuesses = {}
     this.gameLeaderboard = {}
     this.roundsHistory = []
+    this.streamerStats = {
+      roundScore: 0,
+      roundDistance: 0,
+      totalScore: 0,
+      totalDistance: 0,
+      roundsCount: 0,
+      history: []
+    }
     this.guessesOpen = false
     this.isFinished = false
     this.broadcastState()
@@ -451,6 +476,7 @@ class GameServerManager {
       mapName: this.mapName,
       round: this.round,
       roundLocation: this.roundLocation,
+      streamerStats: this.streamerStats,
       guessesOpen: this.guessesOpen,
       isFinished: this.isFinished,
       roundGuesses: Object.values(this.roundGuesses).sort((a, b) => b.score - a.score),
@@ -505,8 +531,17 @@ app.post('/api/tiktok/disconnect', (_req, res) => {
 
 // GeoGuessr Userscript Bridge Endpoint
 app.post('/api/geoguessr/update', (req, res) => {
-  const { token, mapName, round, location, bounds, maxErrorDistance, roundFinished, gameFinished } =
-    req.body
+  const {
+    token,
+    mapName,
+    round,
+    location,
+    bounds,
+    maxErrorDistance,
+    streamerGuess,
+    roundFinished,
+    gameFinished
+  } = req.body
 
   if (mapName) manager.mapName = mapName
   if (token && manager.token && token !== manager.token) {
@@ -519,6 +554,46 @@ app.post('/api/geoguessr/update', (req, res) => {
     manager.mapScale = scale || 2000
   }
   if (maxErrorDistance) manager.maxErrorDistance = maxErrorDistance
+
+  if (streamerGuess) {
+    const rScore = typeof streamerGuess.score === 'number' ? streamerGuess.score : 0
+    const rDist = typeof streamerGuess.distance === 'number' ? streamerGuess.distance : 0
+    const currentR = round || manager.round
+
+    manager.streamerStats.roundScore = rScore
+    manager.streamerStats.roundDistance = rDist
+    manager.streamerStats.totalScore = typeof streamerGuess.totalScore === 'number'
+      ? streamerGuess.totalScore
+      : manager.streamerStats.totalScore + rScore
+    manager.streamerStats.totalDistance = typeof streamerGuess.totalDistance === 'number'
+      ? streamerGuess.totalDistance
+      : manager.streamerStats.totalDistance + rDist
+    manager.streamerStats.roundsCount = currentR
+    manager.streamerStats.history.push({
+      round: currentR,
+      score: rScore,
+      distance: rDist
+    })
+
+    // Masukkan jawaban streamer langsung ke daftar tebakan (PlayerGuess)
+    const streamerPosition = (typeof streamerGuess.lat === 'number' && typeof streamerGuess.lng === 'number')
+      ? { lat: streamerGuess.lat, lng: streamerGuess.lng }
+      : (manager.roundLocation || { lat: 0, lng: 0 })
+
+    manager.roundGuesses['streamer'] = {
+      userId: 'streamer',
+      username: '👑 Streamer',
+      avatar: '',
+      position: streamerPosition,
+      distance: rDist,
+      score: rScore,
+      time: Date.now()
+    }
+
+    console.log(
+      `[Server] Streamer Guess inserted into answers: ${rScore} pts (${rDist} km).`
+    )
+  }
 
   if (gameFinished) {
     manager.finishGame()

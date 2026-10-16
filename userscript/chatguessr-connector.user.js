@@ -68,8 +68,26 @@
   let currentInfoWindow = null;
   let lastRoundResults = null;
   let lastRoundLocation = null;
+  let latestStreamerGuess = null;
   let showPinsEnabled = true;
   let CustomMarkerOverlay = null;
+
+  function haversineDistance(mk1, mk2) {
+    const R = 6371.071;
+    const rlat1 = mk1.lat * (Math.PI / 180);
+    const rlat2 = mk2.lat * (Math.PI / 180);
+    const difflat = rlat2 - rlat1;
+    const difflon = (mk2.lng - mk1.lng) * (Math.PI / 180);
+    return (
+      2 *
+      R *
+      Math.asin(
+        Math.sqrt(
+          Math.sin(difflat / 2) ** 2 + Math.cos(rlat1) * Math.cos(rlat2) * Math.sin(difflon / 2) ** 2
+        )
+      )
+    );
+  }
 
   function initOverlayViewClass() {
     if (CustomMarkerOverlay || !win.google?.maps?.OverlayView) return CustomMarkerOverlay;
@@ -525,13 +543,60 @@
     if (guessesCount > lastHandledGuessesCount) {
       const finishedRound = guessesCount;
       const finishedLocation = data.rounds[finishedRound - 1];
+      const streamerRawGuess = data.player?.guesses?.[finishedRound - 1];
+
+      // Extract streamer score & distance from GeoGuessr data
+      let streamerGuess = null;
+      if (streamerRawGuess) {
+        const rawScore = typeof streamerRawGuess.roundScoreInPoints === 'number'
+          ? streamerRawGuess.roundScoreInPoints
+          : (typeof streamerRawGuess.score === 'number' ? streamerRawGuess.score : 0);
+
+        let rawDist = 0;
+        if (typeof streamerRawGuess.distanceInMeters === 'number') {
+          rawDist = Math.round((streamerRawGuess.distanceInMeters / 1000) * 100) / 100;
+        } else if (typeof streamerRawGuess.distance === 'number') {
+          rawDist = Math.round(streamerRawGuess.distance * 100) / 100;
+        } else if (finishedLocation && typeof streamerRawGuess.lat === 'number' && typeof streamerRawGuess.lng === 'number') {
+          rawDist = Math.round(haversineDistance(
+            { lat: streamerRawGuess.lat, lng: streamerRawGuess.lng },
+            { lat: finishedLocation.lat, lng: finishedLocation.lng }
+          ) * 100) / 100;
+        }
+
+        // Calculate total streamer score from all rounds so far
+        let totalScore = 0;
+        let totalDistance = 0;
+        if (Array.isArray(data.player?.guesses)) {
+          for (const g of data.player.guesses) {
+            const sc = typeof g.roundScoreInPoints === 'number' ? g.roundScoreInPoints : (g.score || 0);
+            const dst = typeof g.distanceInMeters === 'number' ? (g.distanceInMeters / 1000) : (g.distance || 0);
+            totalScore += sc;
+            totalDistance += dst;
+          }
+        }
+
+        streamerGuess = {
+          score: rawScore,
+          distance: rawDist,
+          totalScore,
+          totalDistance: Math.round(totalDistance * 100) / 100,
+          lat: streamerRawGuess.lat,
+          lng: streamerRawGuess.lng
+        };
+
+        // Cache locally for immediate widget rendering
+        latestStreamerGuess = streamerGuess;
+      }
+
       lastHandledGuessesCount = guessesCount;
       lastHandledRound = finishedRound;
 
-      console.log(`[ChatGuessr] Round ${finishedRound} FINISHED! Forwarding results to server...`, {
+      console.log(`[ChatGuessr] Round ${finishedRound} FINISHED! Forwarding results with Streamer score to server...`, {
         token,
         round: finishedRound,
         location: finishedLocation,
+        streamerGuess,
         gameFinished: isGameFinished
       });
 
@@ -541,6 +606,7 @@
         round: finishedRound,
         location: finishedLocation ? { lat: finishedLocation.lat, lng: finishedLocation.lng } : null,
         bounds,
+        streamerGuess,
         roundFinished: true,
         gameFinished: isGameFinished
       });
@@ -972,33 +1038,78 @@
       statusLabel.textContent = 'Tebakan Ditutup';
     }
 
-    const guesses = currentState.roundGuesses || [];
-    totalGuesses.textContent = `${guesses.length} Guesses`;
+    let allGuesses = [...(currentState.roundGuesses || [])];
 
-    if (guesses.length === 0) {
+    // Jika streamer sudah menebak, masukkan tebakan streamer ke dalam daftar jawaban
+    const streamerData = currentState.streamerStats || latestStreamerGuess;
+    if (streamerData && (streamerData.roundScore > 0 || streamerData.score > 0 || streamerData.roundDistance > 0 || streamerData.distance > 0)) {
+      const sScore = typeof streamerData.roundScore === 'number'
+        ? streamerData.roundScore
+        : (typeof streamerData.score === 'number' ? streamerData.score : 0);
+      const sDist = typeof streamerData.roundDistance === 'number'
+        ? streamerData.roundDistance
+        : (typeof streamerData.distance === 'number' ? streamerData.distance : 0);
+
+      const existingIdx = allGuesses.findIndex((g) => g.userId === 'streamer');
+      const streamerItem = {
+        userId: 'streamer',
+        username: '👑 Streamer',
+        avatar: '',
+        position: streamerData.lat && streamerData.lng ? { lat: streamerData.lat, lng: streamerData.lng } : null,
+        distance: sDist,
+        score: sScore,
+        isStreamer: true
+      };
+
+      if (existingIdx !== -1) {
+        allGuesses[existingIdx] = streamerItem;
+      } else {
+        allGuesses.push(streamerItem);
+      }
+
+      // Sortir urutan jawaban berdasarkan skor tertinggi lalu jarak terdekat
+      allGuesses.sort((a, b) => {
+        if (b.score !== a.score) return b.score - a.score;
+        return a.distance - b.distance;
+      });
+    }
+
+    totalGuesses.textContent = `${allGuesses.length} Guesses`;
+
+    if (allGuesses.length === 0) {
       listContainer.innerHTML =
         '<div class="cg-empty-text">Ketik <code>!g [nama_kota]</code> di YouTube chat!</div>';
       return;
     }
 
     let html = '';
-    guesses.slice(0, 10).forEach((p, idx) => {
+    allGuesses.slice(0, 10).forEach((p, idx) => {
       const rank = idx + 1;
       let rankClass = '';
       if (rank === 1) rankClass = 'cg-rank-gold';
       else if (rank === 2) rankClass = 'cg-rank-silver';
       else if (rank === 3) rankClass = 'cg-rank-bronze';
 
+      const isStreamer = p.isStreamer || p.userId === 'streamer';
+      const streamerRowStyle = isStreamer
+        ? 'background: #fef08a !important; border-left: 4px solid #f59e0b !important; box-shadow: inset 0 0 0 1px rgba(245, 158, 11, 0.3); font-weight: 800;'
+        : '';
+      const streamerBadge = isStreamer
+        ? '<span style="background: #f59e0b; color: #000; font-size: 9px; font-weight: 900; padding: 1px 6px; border-radius: 999px; border: 1px solid #000; margin-left: 4px; box-shadow: 1px 1px 0 #000;">STREAMER</span>'
+        : '';
+      const scoreColor = isStreamer ? '#b45309' : '#0284c7';
+
       html += `
-        <div class="cg-player-row" data-user-id="${p.userId}" title="Klik untuk fokus pin pemain di peta">
-          <div style="display: flex; align-items: center; gap: 8px;">
-            <span class="${rankClass}" style="width: 14px; text-align: right;">${rank}</span>
-            <span style="font-weight: 600; max-width: 130px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+        <div class="cg-player-row" data-user-id="${p.userId}" style="${streamerRowStyle}" title="Klik untuk fokus pin di peta">
+          <div style="display: flex; align-items: center; gap: 6px; overflow: hidden;">
+            <span class="${rankClass}" style="width: 14px; text-align: right; flex-shrink: 0;">${rank}</span>
+            <span style="font-weight: ${isStreamer ? '900' : '600'}; max-width: 110px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #000000;">
               ${escapeHtml(p.username)}
             </span>
+            ${streamerBadge}
           </div>
-          <div style="text-align: right;">
-            <span style="font-weight: 700; color: #38bdf8;">${p.score.toLocaleString()}</span>
+          <div style="text-align: right; flex-shrink: 0;">
+            <span style="font-weight: 800; color: ${scoreColor}; font-size: 13px;">${p.score.toLocaleString()}</span>
             <span style="color: #64748b; font-size: 10px; margin-left: 4px;">${p.distance} km</span>
           </div>
         </div>
@@ -1010,7 +1121,7 @@
     // Attach click listeners to pan map to player position
     listContainer.querySelectorAll('.cg-player-row').forEach((row, i) => {
       row.onclick = () => {
-        const player = guesses[i];
+        const player = allGuesses[i];
         if (globalMap && player && player.position) {
           globalMap.panTo(player.position);
           globalMap.setZoom(Math.max(globalMap.getZoom() || 6, 8));
