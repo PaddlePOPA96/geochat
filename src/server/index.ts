@@ -643,6 +643,23 @@ app.get(['/overlay', '/overlay/'], (_req, res) => {
   }
 })
 
+// Serve Userscript directly so Tampermonkey can auto-update or @require it live
+app.get(['/chatguessr.user.js', '/userscript'], (_req, res) => {
+  const scriptCandidates = [
+    path.resolve(__dirname, '../../userscript/chatguessr-connector.user.js'),
+    path.join(process.cwd(), 'userscript/chatguessr-connector.user.js'),
+    path.resolve(__dirname, 'userscript/chatguessr-connector.user.js')
+  ]
+  const targetPath = scriptCandidates.find((p) => fs.existsSync(p))
+  if (targetPath) {
+    res.setHeader('Content-Type', 'application/javascript; charset=utf-8')
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate')
+    res.sendFile(targetPath)
+  } else {
+    res.status(404).send('// Userscript not found on disk')
+  }
+})
+
 app.get('/', (_req, res) => {
   res.redirect('/dashboard')
 })

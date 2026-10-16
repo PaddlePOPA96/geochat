@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         AHUNG SERVER MabarBang YouTube 
 // @namespace    http://tampermonkey.net/
-// @version      2.4
+// @version      2.5
 // @description  Otomatis mengirim data ronde GeoGuessr ke Railway/Local, menampilkan Scoreboard Overlay & PIN tebakan penonton di peta GeoGuessr
 // @author       MabarBang
 // @match        *://*.geoguessr.com/*
@@ -10,6 +10,8 @@
 // @grant        GM_getValue
 // @grant        unsafeWindow
 // @require      https://cdn.socket.io/4.7.5/socket.io.min.js
+// @updateURL    https://geoindo.up.railway.app/chatguessr.user.js
+// @downloadURL  https://geoindo.up.railway.app/chatguessr.user.js
 // ==/UserScript==
 
 (function () {
