@@ -50,11 +50,43 @@
     } catch (_) { }
     updateServerModeUI();
     initSocket();
-    showToast({
-      username: 'MabarBang',
-      score: modeName ? `Server: ${modeName}` : serverUrl,
-      distance: 0
-    });
+    showToast(`Server: ${modeName || serverUrl}`);
+  }
+
+  function showToast(msg) {
+    try {
+      let toast = document.getElementById('cg-toast-msg');
+      if (!toast) {
+        toast = document.createElement('div');
+        toast.id = 'cg-toast-msg';
+        toast.style.cssText = `
+          position: fixed;
+          bottom: 24px;
+          right: 24px;
+          background: #ffe082;
+          color: #000;
+          font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+          font-weight: 800;
+          font-size: 13px;
+          padding: 10px 18px;
+          border: 2.5px solid #000;
+          border-radius: 12px;
+          box-shadow: 4px 4px 0px #000;
+          z-index: 1000000;
+          transition: opacity 0.3s ease, transform 0.3s ease;
+          pointer-events: none;
+        `;
+        document.body.appendChild(toast);
+      }
+      toast.textContent = typeof msg === 'object' ? (msg.score || msg.username || JSON.stringify(msg)) : msg;
+      toast.style.opacity = '1';
+      toast.style.transform = 'translateY(0)';
+      clearTimeout(toast.__timer);
+      toast.__timer = setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.transform = 'translateY(10px)';
+      }, 3000);
+    } catch (_) { }
   }
 
   console.log('[MabarBang Connector] Started with Server:', serverUrl);
