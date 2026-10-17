@@ -8,7 +8,7 @@ import { exec } from 'child_process'
 import YouTubeBackend from '../main/utils/useYouTubeChat'
 import TikTokBackend from '../main/utils/useTikTokChat'
 import { resolveLocation, parseCoordinates } from '../shared/geocoding'
-import { embeddedDashboardHtml, embeddedOverlayHtml } from './embeddedTemplates'
+import { embeddedDashboardHtml, embeddedOverlayHtml, embeddedUserscript } from './embeddedTemplates'
 
 export { resolveLocation, parseCoordinates }
 
@@ -698,10 +698,12 @@ app.get(['/chatguessr.user.js', '/userscript'], (_req, res) => {
     path.resolve(__dirname, 'userscript/chatguessr-connector.user.js')
   ]
   const targetPath = scriptCandidates.find((p) => fs.existsSync(p))
+  res.setHeader('Content-Type', 'application/javascript; charset=utf-8')
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate')
   if (targetPath) {
-    res.setHeader('Content-Type', 'application/javascript; charset=utf-8')
-    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate')
     res.sendFile(targetPath)
+  } else if (embeddedUserscript) {
+    res.send(embeddedUserscript)
   } else {
     res.status(404).send('// Userscript not found on disk')
   }

@@ -8,6 +8,7 @@ ENV PORT=2121
 # server.cjs sudah fully bundled (esbuild bawaan) berisi semua dependensi backend
 COPY server.cjs ./server.cjs
 COPY public ./public
+COPY userscript ./userscript
 
 EXPOSE 2121
 
