@@ -135,6 +135,43 @@ class GameServerManager {
   gameLeaderboard: Record<string, LeaderboardEntry> = {}
   userLastGuessTime: Record<string, number> = {}
 
+  // Batch queue for incoming guesses to prevent socket flood
+  guessBatchQueue: PlayerGuess[] = []
+  batchIntervalTimer: NodeJS.Timeout | null = null
+  stateBroadcastTimer: NodeJS.Timeout | null = null
+
+  constructor() {
+    // Start flush timer: Flush guess batches every 250ms
+    this.batchIntervalTimer = setInterval(() => {
+      this.flushGuessBatch()
+    }, 250)
+
+    // Periodically clean stale rate-limit timestamps (every 5 minutes)
+    setInterval(() => {
+      const now = Date.now()
+      for (const [uid, time] of Object.entries(this.userLastGuessTime)) {
+        if (now - time > 120000) {
+          delete this.userLastGuessTime[uid]
+        }
+      }
+    }, 300000)
+  }
+
+  flushGuessBatch() {
+    if (this.guessBatchQueue.length === 0) return
+    const batch = this.guessBatchQueue.splice(0)
+    io.emit('guesses-batch', {
+      guesses: batch,
+      totalGuesses: Object.keys(this.roundGuesses).length
+    })
+    // Also emit guess-added with the latest guess for backward compatibility
+    const latest = batch[batch.length - 1]
+    io.emit('guess-added', {
+      guess: latest,
+      totalGuesses: Object.keys(this.roundGuesses).length
+    })
+  }
+
   // History of rounds in current game
   roundsHistory: {
     round: number
@@ -318,12 +355,10 @@ class GameServerManager {
     }
 
     this.roundGuesses[userId] = playerGuess
+    this.guessBatchQueue.push(playerGuess)
 
-    io.emit('guess-added', {
-      guess: playerGuess,
-      isNewPlayer,
-      totalGuesses: Object.keys(this.roundGuesses).length
-    })
+    // Trigger throttled state update so clients get live scores smoothly
+    this.throttleBroadcastState()
 
     console.log(
       `[Guess] ${username} [${clean}]: ${playerGuess.distance} km -> ${playerGuess.score} pts`
@@ -484,7 +519,19 @@ class GameServerManager {
     }
   }
 
+  throttleBroadcastState() {
+    if (this.stateBroadcastTimer) return
+    this.stateBroadcastTimer = setTimeout(() => {
+      this.stateBroadcastTimer = null
+      this.broadcastState()
+    }, 400)
+  }
+
   broadcastState() {
+    if (this.stateBroadcastTimer) {
+      clearTimeout(this.stateBroadcastTimer)
+      this.stateBroadcastTimer = null
+    }
     io.emit('state-update', this.getState())
   }
 }

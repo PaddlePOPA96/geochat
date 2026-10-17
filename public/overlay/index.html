@@ -609,6 +609,15 @@
       document.getElementById('totalGuessesText').textContent = totalGuesses + ' Guesses';
     });
 
+    socket.on('guesses-batch', ({ guesses, totalGuesses }) => {
+      if (Array.isArray(guesses) && guesses.length > 0) {
+        // Only toast the latest 2 guesses to prevent OBS DOM clutter
+        const recent = guesses.slice(-2);
+        recent.forEach((g) => showToast(g));
+      }
+      document.getElementById('totalGuessesText').textContent = totalGuesses + ' Guesses';
+    });
+
     function renderOverlay() {
       if (!currentState) return;
 
@@ -665,6 +674,10 @@
 
     function showToast(guess) {
       const container = document.getElementById('toastContainer');
+      // Limit max 4 toasts on screen
+      while (container.children.length >= 4) {
+        container.removeChild(container.firstChild);
+      }
       const toast = document.createElement('div');
       toast.className = 'toast';
       toast.innerHTML = `

@@ -898,10 +898,6 @@
       updateUI();
     });
 
-    socket.on('guess-added', () => {
-      socket.emit('request-state');
-    });
-
     socket.on('round-started', () => {
       socket.emit('request-state');
     });
