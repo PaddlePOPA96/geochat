@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         AHUNG SERVER MabarBang YouTube 
 // @namespace    http://tampermonkey.net/
-// @version      2.5
+// @version      2.6
 // @description  Otomatis mengirim data ronde GeoGuessr ke Railway/Local, menampilkan Scoreboard Overlay & PIN tebakan penonton di peta GeoGuessr
 // @author       MabarBang
 // @match        *://*.geoguessr.com/*
@@ -1287,140 +1287,152 @@
       document.body.appendChild(modal);
     }
 
-    const currentMode = getServerMode();
+    const renderModalContent = () => {
+      const currentMode = getServerMode();
+      modal.innerHTML = `
+        <div style="
+          background: #ffffff;
+          border: 3.5px solid #000;
+          border-radius: 24px;
+          box-shadow: 8px 8px 0px #000;
+          padding: 24px 26px;
+          max-width: 390px;
+          width: 90vw;
+          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+          color: #000;
+          animation: cgWidgetPopIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+        " onclick="event.stopPropagation()">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
+            <h3 style="font-size: 17px; font-weight: 900; margin: 0; display: flex; align-items: center; gap: 6px;">
+              <span>🌐</span> Pilih Server MabarBang
+            </h3>
+            <button id="cg-close-modal" style="
+              background: #ff5964;
+              color: #fff;
+              border: 2px solid #000;
+              border-radius: 50%;
+              width: 28px;
+              height: 28px;
+              cursor: pointer;
+              font-weight: 900;
+              box-shadow: 2px 2px 0px #000;
+            ">✕</button>
+          </div>
 
-    modal.innerHTML = `
-      <div style="
-        background: #ffffff;
-        border: 3.5px solid #000;
-        border-radius: 24px;
-        box-shadow: 8px 8px 0px #000;
-        padding: 24px 26px;
-        max-width: 390px;
-        width: 90vw;
-        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-        color: #000;
-        animation: cgWidgetPopIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
-      " onclick="event.stopPropagation()">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
-          <h3 style="font-size: 17px; font-weight: 900; margin: 0; display: flex; align-items: center; gap: 6px;">
-            <span>🌐</span> Pilih Server MabarBang
-          </h3>
-          <button id="cg-close-modal" style="
-            background: #ff5964;
-            color: #fff;
-            border: 2px solid #000;
-            border-radius: 50%;
-            width: 28px;
-            height: 28px;
-            cursor: pointer;
-            font-weight: 900;
-            box-shadow: 2px 2px 0px #000;
-          ">✕</button>
+          <p style="font-size: 12px; color: #475569; font-weight: 700; margin-bottom: 16px;">
+            Pilih server untuk menghubungkan tebakan viewer YouTube ke GeoGuessr:
+          </p>
+
+          <div style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 14px;">
+            <!-- Tombol Local Server -->
+            <button id="cg-btn-local" style="
+              display: flex;
+              align-items: center;
+              justify-content: space-between;
+              background: ${currentMode === 'local' ? '#c8f560' : '#f8fafc'};
+              border: 2.5px solid #000;
+              border-radius: 14px;
+              padding: 12px 14px;
+              cursor: pointer;
+              box-shadow: ${currentMode === 'local' ? '4px 4px 0px #000' : '2px 2px 0px #000'};
+              text-align: left;
+              transition: all 0.15s ease;
+            ">
+              <div>
+                <div style="font-size: 14px; font-weight: 900; display: flex; align-items: center; gap: 6px;">
+                  <span>💻</span> Local Server (PC Ini)
+                  ${currentMode === 'local' ? '<span style="background: #000; color: #fff; font-size: 9px; padding: 2px 6px; border-radius: 99px;">AKTIF</span>' : ''}
+                </div>
+                <div style="font-size: 11px; color: #475569; font-weight: 700; margin-top: 2px;">
+                  http://localhost:5050 (Standalone / Local)
+                </div>
+              </div>
+              <span style="font-size: 16px; font-weight: 900;">${currentMode === 'local' ? '✓' : '➔'}</span>
+            </button>
+
+            <!-- Tombol Cloud Server -->
+            <button id="cg-btn-cloud" style="
+              display: flex;
+              align-items: center;
+              justify-content: space-between;
+              background: ${currentMode === 'cloud' ? '#ffe082' : '#f8fafc'};
+              border: 2.5px solid #000;
+              border-radius: 14px;
+              padding: 12px 14px;
+              cursor: pointer;
+              box-shadow: ${currentMode === 'cloud' ? '4px 4px 0px #000' : '2px 2px 0px #000'};
+              text-align: left;
+              transition: all 0.15s ease;
+            ">
+              <div>
+                <div style="font-size: 14px; font-weight: 900; display: flex; align-items: center; gap: 6px;">
+                  <span>☁️</span> Cloud Server (Railway)
+                  ${currentMode === 'cloud' ? '<span style="background: #000; color: #fff; font-size: 9px; padding: 2px 6px; border-radius: 99px;">AKTIF</span>' : ''}
+                </div>
+                <div style="font-size: 11px; color: #475569; font-weight: 700; margin-top: 2px;">
+                  geoindo.up.railway.app
+                </div>
+              </div>
+              <span style="font-size: 16px; font-weight: 900;">${currentMode === 'cloud' ? '✓' : '➔'}</span>
+            </button>
+
+            <!-- Tombol Custom Server -->
+            <button id="cg-btn-custom" style="
+              display: flex;
+              align-items: center;
+              justify-content: space-between;
+              background: ${currentMode === 'custom' ? '#70d6ff' : '#f8fafc'};
+              border: 2px solid #000;
+              border-radius: 12px;
+              padding: 10px 14px;
+              cursor: pointer;
+              box-shadow: ${currentMode === 'custom' ? '3px 3px 0px #000' : '2px 2px 0px #000'};
+              text-align: left;
+            ">
+              <div style="font-size: 12px; font-weight: 800;">
+                <span>⚙️</span> Custom URL Server...
+                ${currentMode === 'custom' ? '<span style="background: #000; color: #fff; font-size: 9px; padding: 2px 6px; border-radius: 99px; margin-left: 6px;">AKTIF</span>' : ''}
+              </div>
+              <span style="font-size: 13px;">${currentMode === 'custom' ? '✓' : '✎'}</span>
+            </button>
+          </div>
         </div>
+      `;
 
-        <p style="font-size: 12px; color: #475569; font-weight: 700; margin-bottom: 16px;">
-          Pilih server untuk menghubungkan tebakan viewer YouTube ke GeoGuessr:
-        </p>
+      document.getElementById('cg-close-modal').onclick = () => {
+        modal.style.display = 'none';
+      };
 
-        <div style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 14px;">
-          <!-- Tombol Local Server -->
-          <button id="cg-btn-local" style="
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            background: ${currentMode === 'local' ? '#c8f560' : '#f8fafc'};
-            border: 2.5px solid #000;
-            border-radius: 14px;
-            padding: 12px 14px;
-            cursor: pointer;
-            box-shadow: ${currentMode === 'local' ? '4px 4px 0px #000' : '2px 2px 0px #000'};
-            text-align: left;
-            transition: all 0.15s ease;
-          ">
-            <div>
-              <div style="font-size: 14px; font-weight: 900; display: flex; align-items: center; gap: 6px;">
-                <span>💻</span> Local Server (PC Ini)
-                ${currentMode === 'local' ? '<span style="background: #000; color: #fff; font-size: 9px; padding: 2px 6px; border-radius: 99px;">AKTIF</span>' : ''}
-              </div>
-              <div style="font-size: 11px; color: #475569; font-weight: 700; margin-top: 2px;">
-                http://localhost:5050 (Standalone .exe)
-              </div>
-            </div>
-            <span style="font-size: 16px; font-weight: 900;">➔</span>
-          </button>
+      document.getElementById('cg-btn-local').onclick = () => {
+        setServerUrl(LOCAL_SERVER_URL, 'Local (5050)');
+        renderModalContent();
+        setTimeout(() => {
+          modal.style.display = 'none';
+        }, 220);
+      };
 
-          <!-- Tombol Cloud Server -->
-          <button id="cg-btn-cloud" style="
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            background: ${currentMode === 'cloud' ? '#ffe082' : '#f8fafc'};
-            border: 2.5px solid #000;
-            border-radius: 14px;
-            padding: 12px 14px;
-            cursor: pointer;
-            box-shadow: ${currentMode === 'cloud' ? '4px 4px 0px #000' : '2px 2px 0px #000'};
-            text-align: left;
-            transition: all 0.15s ease;
-          ">
-            <div>
-              <div style="font-size: 14px; font-weight: 900; display: flex; align-items: center; gap: 6px;">
-                <span>☁️</span> Cloud Server (Railway)
-                ${currentMode === 'cloud' ? '<span style="background: #000; color: #fff; font-size: 9px; padding: 2px 6px; border-radius: 99px;">AKTIF</span>' : ''}
-              </div>
-              <div style="font-size: 11px; color: #475569; font-weight: 700; margin-top: 2px;">
-                geochat-production-f099.up.railway.app
-              </div>
-            </div>
-            <span style="font-size: 16px; font-weight: 900;">➔</span>
-          </button>
+      document.getElementById('cg-btn-cloud').onclick = () => {
+        setServerUrl(CLOUD_SERVER_URL, 'Cloud (Railway)');
+        renderModalContent();
+        setTimeout(() => {
+          modal.style.display = 'none';
+        }, 220);
+      };
 
-          <!-- Tombol Custom Server -->
-          <button id="cg-btn-custom" style="
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            background: ${currentMode === 'custom' ? '#70d6ff' : '#f8fafc'};
-            border: 2px solid #000;
-            border-radius: 12px;
-            padding: 10px 14px;
-            cursor: pointer;
-            box-shadow: ${currentMode === 'custom' ? '3px 3px 0px #000' : '2px 2px 0px #000'};
-            text-align: left;
-          ">
-            <div style="font-size: 12px; font-weight: 800;">
-              <span>⚙️</span> Custom URL Server...
-            </div>
-            <span style="font-size: 13px;">✎</span>
-          </button>
-        </div>
-      </div>
-    `;
+      document.getElementById('cg-btn-custom').onclick = () => {
+        const customUrl = prompt('Masukkan URL Server Custom:', serverUrl);
+        if (customUrl && customUrl.trim()) {
+          setServerUrl(customUrl.trim(), 'Custom');
+          renderModalContent();
+          setTimeout(() => {
+            modal.style.display = 'none';
+          }, 220);
+        }
+      };
+    };
 
+    renderModalContent();
     modal.style.display = 'flex';
-
-    document.getElementById('cg-close-modal').onclick = () => {
-      modal.style.display = 'none';
-    };
-
-    document.getElementById('cg-btn-local').onclick = () => {
-      setServerUrl(LOCAL_SERVER_URL, 'Local (5050)');
-      modal.style.display = 'none';
-    };
-
-    document.getElementById('cg-btn-cloud').onclick = () => {
-      setServerUrl(CLOUD_SERVER_URL, 'Cloud (Railway)');
-      modal.style.display = 'none';
-    };
-
-    document.getElementById('cg-btn-custom').onclick = () => {
-      const customUrl = prompt('Masukkan URL Server Custom:', serverUrl);
-      if (customUrl && customUrl.trim()) {
-        setServerUrl(customUrl.trim(), 'Custom');
-      }
-      modal.style.display = 'none';
-    };
   }
 
   function updateBadgeStatus(connected) {
