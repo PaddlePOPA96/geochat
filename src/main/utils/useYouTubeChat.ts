@@ -1,32 +1,6 @@
 import { EventEmitter } from 'events'
-import { LiveChat } from 'youtube-chat'
-import axios from 'axios'
-
-// Set browser headers & consent cookie to avoid Google Consent & Datacenter block
-axios.defaults.headers.common['User-Agent'] =
-  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36'
-axios.defaults.headers.common['Accept-Language'] = 'en-US,en;q=0.9'
-axios.defaults.headers.common['Accept'] =
-  'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8'
-axios.defaults.headers.common['Cookie'] =
-  'SOCS=CAESEwgDEgk2ODE3ODg0MjAaAmVuIAEaBgiA_LyaBg; CONSENT=YES+cb.20210328-17-p0.en+FX+100;'
-
-// Fix YouTube unlisted & /live/ streams missing canonical <link> format required by youtube-chat
-axios.interceptors.response.use((response) => {
-  if (typeof response.data === 'string' && response.data.includes('INNERTUBE_API_KEY')) {
-    if (!response.data.match(/<link rel="canonical" href="https:\/\/www.youtube.com\/watch\?v=[^"]+">/)) {
-      const vMatch =
-        response.data.match(/<link rel="canonical" href="https:\/\/www.youtube.com\/(?:live\/|watch\?v=)([^"]+)">/) ||
-        response.data.match(/["']externalVideoId["']:\s*["']([^"']+)["']/) ||
-        response.data.match(/["']videoId["']:\s*["']([^"']+)["']/) ||
-        response.data.match(/\/watch\?v=([a-zA-Z0-9_-]{11})/)
-      if (vMatch && vMatch[1]) {
-        response.data = `<link rel="canonical" href="https://www.youtube.com/watch?v=${vMatch[1]}">\n` + response.data
-      }
-    }
-  }
-  return response
-})
+// @ts-ignore
+import { Innertube, UniversalCache } from 'youtubei.js'
 
 export function parseYouTubeInput(input: string): { liveId?: string; channelId?: string; handle?: string } {
   input = input.trim()
@@ -62,54 +36,38 @@ export function parseYouTubeInput(input: string): { liveId?: string; channelId?:
 }
 
 export default class YouTubeBackend extends EventEmitter {
-  #liveChat: LiveChat | null = null
+  #yt: any = null
+  #liveChat: any = null
   #connected = false
   #closing = false
   #reconnectTimer: NodeJS.Timeout | null = null
   #reconnectAttempts = 0
   #lastGuessTimestamp: Map<string, number> = new Map()
 
+  streamInput = ''
   liveId: string | undefined
   channelId: string | undefined
   handle: string | undefined
 
   constructor(options: { streamInput: string }) {
     super()
-    const parsed = parseYouTubeInput(options.streamInput)
+    this.streamInput = options.streamInput.trim()
+    const parsed = parseYouTubeInput(this.streamInput)
     this.liveId = parsed.liveId
     this.channelId = parsed.channelId
     this.handle = parsed.handle
-
-    this.#createLiveChat()
-  }
-
-  #createLiveChat() {
-    if (this.#liveChat) {
-      try {
-        this.#liveChat.stop()
-      } catch (_) {}
-      this.#liveChat = null
-    }
-
-    if (this.channelId) {
-      this.#liveChat = new LiveChat({ channelId: this.channelId })
-    } else if (this.handle) {
-      this.#liveChat = new LiveChat({ handle: this.handle })
-    } else if (this.liveId) {
-      this.#liveChat = new LiveChat({ liveId: this.liveId })
-    }
   }
 
   get botUsername(): string {
-    return this.liveId || this.channelId || 'YouTubeStream'
+    return this.liveId || this.handle || this.channelId || 'YouTubeStream'
   }
 
   get channelName(): string {
-    return this.liveId || this.channelId || ''
+    return this.liveId || this.handle || this.channelId || ''
   }
 
   get streamTarget(): string {
-    return this.liveId || this.channelId || ''
+    return this.liveId || this.handle || this.channelId || this.streamInput
   }
 
   async connect(): Promise<boolean> {
@@ -119,92 +77,135 @@ export default class YouTubeBackend extends EventEmitter {
       this.#reconnectTimer = null
     }
 
-    if (!this.#liveChat) {
-      this.#createLiveChat()
-    }
+    try {
+      if (!this.#yt) {
+        this.#yt = await Innertube.create({
+          cache: new UniversalCache(false),
+          generate_session_locally: true
+        })
+      }
 
-    if (!this.#liveChat) {
-      throw new Error('No valid YouTube live ID or channel ID provided')
-    }
+      let targetVideoId = this.liveId
 
-    this.#liveChat.on('start', (liveId) => {
+      // If handle or channelId provided, find the active live stream
+      if (!targetVideoId) {
+        if (this.handle || this.channelId) {
+          const target = this.handle || this.channelId
+          console.log(`[YouTube] Looking up active live stream for ${target}...`)
+          const channel = await this.#yt.getChannel(target)
+          const liveTab = await channel.getLiveStreams().catch(() => null)
+          const activeLive = liveTab?.videos?.find((v: any) => v.is_live) || channel.videos?.find((v: any) => v.is_live)
+          if (activeLive && activeLive.id) {
+            targetVideoId = activeLive.id
+            console.log(`[YouTube] Found active live stream: ${targetVideoId}`)
+          }
+        }
+      }
+
+      if (!targetVideoId) {
+        targetVideoId = this.streamInput.replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 11)
+      }
+
+      if (!targetVideoId) {
+        throw new Error('Video ID YouTube tidak ditemukan!')
+      }
+
+      console.log(`[YouTube] Fetching live stream info for: ${targetVideoId}...`)
+      const videoInfo = await this.#yt.getInfo(targetVideoId)
+      
+      const liveChat = videoInfo.getLiveChat()
+      if (!liveChat) {
+        throw new Error(`Live stream ${targetVideoId} tidak memiliki live chat atau sudah berakhir!`)
+      }
+
+      this.#liveChat = liveChat
+      this.liveId = targetVideoId
+
+      this.#liveChat.on('chat-update', (action: any) => {
+        // Handle normal text message or superchat
+        try {
+          const authorName = action.author?.name?.toString() || 'YouTubeUser'
+          const authorId = action.author?.id?.toString() || action.author?.channel_id?.toString() || authorName
+          const avatar = action.author?.thumbnails?.[0]?.url || ''
+          const messageText = action.message?.toString()?.trim() || ''
+
+          if (!messageText) return
+
+          console.log(`[YouTube Live Chat] ${authorName}: "${messageText}"`)
+
+          const userstate: UserData = {
+            'user-id': `yt_${authorId}`,
+            'display-name': authorName,
+            username: authorName,
+            avatar: avatar,
+            badges: {
+              broadcaster: action.author?.is_owner ? '1' : undefined,
+              moderator: action.author?.is_moderator ? '1' : undefined,
+              subscriber: action.author?.is_sponsor ? '1' : undefined
+            }
+          }
+
+          if (/^!g(\s|$)/i.test(messageText)) {
+            const now = Date.now()
+            const lastGuess = this.#lastGuessTimestamp.get(authorId) || 0
+
+            // Rate limiting 5 detik per penonton
+            if (now - lastGuess < 5000) {
+              console.log(`[YouTube Guess Ignored] ${authorName} rate-limited (5s)`)
+              return
+            }
+
+            this.#lastGuessTimestamp.set(authorId, now)
+            console.log(`[YouTube Guess Detected] ${authorName}: "${messageText}"`)
+            this.emit('guess', userstate, messageText)
+          } else if (messageText.startsWith('!')) {
+            this.emit('message', userstate, messageText)
+          }
+        } catch (err) {
+          console.error('[YouTube] Error processing chat action:', err)
+        }
+      })
+
+      this.#liveChat.on('end', () => {
+        console.log(`[YouTube] Live Chat ended for ${this.liveId}`)
+        this.#connected = false
+        this.emit('disconnected', this.#closing)
+        if (!this.#closing) {
+          this.#scheduleReconnect('Live chat ended')
+        }
+      })
+
+      this.#liveChat.on('error', (err: any) => {
+        console.error(`[YouTube Live Error]:`, err)
+        const errorObj = err instanceof Error ? err : new Error(String(err))
+        this.emit('error', errorObj)
+      })
+
+      // Start live chat streaming
+      this.#liveChat.start()
       this.#connected = true
       this.#reconnectAttempts = 0
-      this.liveId = liveId
-      this.emit('connected', liveId)
-    })
-
-    this.#liveChat.on('end', (reason) => {
+      console.log(`[YouTube Live] Successfully connected to live stream: ${targetVideoId}`)
+      this.emit('connected', targetVideoId)
+      return true
+    } catch (err: any) {
       this.#connected = false
-      this.emit('disconnected', this.#closing, reason)
+      const errorMsg = err?.message || String(err)
+      console.error(`[YouTube Connect Error]:`, errorMsg)
+      this.emit('error', new Error(errorMsg))
       if (!this.#closing) {
-        this.#scheduleReconnect('Chat stream ended: ' + reason)
+        this.#scheduleReconnect(errorMsg)
       }
-    })
-
-    let lastError: Error | null = null
-    this.#liveChat.on('error', (err) => {
-      lastError = err instanceof Error ? err : new Error(String(err))
-      this.emit('error', lastError)
-      if (!this.#closing && !this.#connected) {
-        this.#scheduleReconnect('Error encountered: ' + lastError.message)
-      }
-    })
-
-    this.#liveChat.on('chat', (chatItem) => {
-      const messageText = (chatItem.message || [])
-        .map((m: any) => ('text' in m ? m.text : m.emojiText || ''))
-        .join('')
-        .trim()
-
-      const userstate: UserData = {
-        'user-id': chatItem.author.channelId,
-        'display-name': chatItem.author.name,
-        username: chatItem.author.name,
-        avatar: chatItem.author.thumbnail?.url,
-        color: chatItem.superchat?.color || '#FFFFFF',
-        badges: {
-          broadcaster: chatItem.isOwner ? '1' : undefined,
-          moderator: chatItem.isModerator ? '1' : undefined,
-          subscriber: chatItem.isMembership ? '1' : undefined
-        }
-      }
-
-      if (/^!g(\s|$)/i.test(messageText)) {
-        const userId = userstate['user-id'] || userstate.username || 'unknown'
-        const now = Date.now()
-        const lastGuess = this.#lastGuessTimestamp.get(userId) || 0
-
-        // Rate limiting 5 detik per penonton
-        if (now - lastGuess < 5000) {
-          return
-        }
-
-        this.#lastGuessTimestamp.set(userId, now)
-        this.emit('guess', userstate, messageText)
-      } else if (messageText.startsWith('!')) {
-        this.emit('message', userstate, messageText)
-      }
-    })
-
-    const ok = await this.#liveChat.start()
-    if (!ok) {
-      this.#connected = false
-      if (!this.#closing) {
-        this.#scheduleReconnect('Failed to start chat fetcher')
-      }
-      throw lastError || new Error('Failed to start YouTube live chat fetcher')
+      throw new Error(errorMsg)
     }
-
-    return true
   }
 
   #scheduleReconnect(reason?: string) {
     if (this.#closing || this.#reconnectTimer) return
 
-    // Exponential backoff: 3s, 6s, 12s, max 30s
+    // Exponential backoff: 5s, 10s, 20s, max 30s
     this.#reconnectAttempts++
-    const delay = Math.min(3000 * Math.pow(2, this.#reconnectAttempts - 1), 30000)
+    const delay = Math.min(5000 * Math.pow(2, this.#reconnectAttempts - 1), 30000)
 
     console.log(
       `[YouTube Auto-Reconnect] Attempt #${this.#reconnectAttempts} in ${delay / 1000}s. Reason: ${reason || 'Disconnected'}`
@@ -214,7 +215,6 @@ export default class YouTubeBackend extends EventEmitter {
       this.#reconnectTimer = null
       if (this.#closing) return
       try {
-        this.#createLiveChat()
         await this.connect()
       } catch (err) {
         console.warn(`[YouTube Auto-Reconnect] Attempt #${this.#reconnectAttempts} failed:`, err)
@@ -230,7 +230,9 @@ export default class YouTubeBackend extends EventEmitter {
       this.#reconnectTimer = null
     }
     if (this.#liveChat) {
-      this.#liveChat.stop()
+      try {
+        this.#liveChat.stop()
+      } catch (_) {}
       this.#liveChat = null
     }
     this.emit('disconnected', true)
@@ -238,9 +240,5 @@ export default class YouTubeBackend extends EventEmitter {
 
   isConnected() {
     return this.#connected
-  }
-
-  async sendMessage(message: string, _options: { system?: boolean } = {}) {
-    console.log(`[YouTube Bot Message]: ${message}`)
   }
 }
