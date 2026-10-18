@@ -3,6 +3,7 @@
 AppName=MabarBang
 AppVersion=3.1.5
 AppPublisher=kikobooo x arvana prod
+SourceDir=..
 DefaultDirName={userappdata}\Programs\MabarBang
 DefaultGroupName=MabarBang
 OutputDir=dist-installer

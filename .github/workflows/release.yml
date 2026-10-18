@@ -23,15 +23,20 @@ jobs:
           node-version: 20
 
       - name: Install Dependencies
-        run: npm ci
+        run: npm ci --ignore-scripts
 
       - name: Bundle Server & Build Standalone
         run: npm run build:exe
 
       - name: Build Windows Installer (MabarBang-Setup.exe)
+        shell: pwsh
         run: |
-          choco install innosetup --no-progress
-          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" scripts/installer.iss
+          choco install innosetup --yes --no-progress
+          $iscc = (Get-Command iscc.exe -ErrorAction SilentlyContinue)?.Source
+          if (-not $iscc -or -not (Test-Path $iscc)) {
+            $iscc = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
+          }
+          & $iscc scripts/installer.iss
 
       - name: Create Release & Upload Assets
         uses: softprops/action-gh-release@v2
