@@ -190035,30 +190035,7 @@ Tekan tombol ENTER untuk keluar...`);
       console.log(`\u{1F514} UPDATE TERSEDIA: v${update.latestVersion} (Versi saat ini: v${update.currentVersion})`);
       console.log(`\u{1F4E5} Download Link  : ${update.downloadUrl}`);
       console.log(`\u{1F517} Catatan Rilis  : ${update.releaseUrl}`);
-      if (process.platform === "win32" && update.downloadUrl.endsWith(".exe")) {
-        console.log(`\u{1F680} Men-download update otomatis di background...`);
-        try {
-          const tempDir = import_os2.default.tmpdir();
-          const installerPath = import_path3.default.join(tempDir, `MabarBang-Update-${update.latestVersion}.exe`);
-          fetch(update.downloadUrl).then(async (downloadRes) => {
-            if (!downloadRes.ok) throw new Error(`HTTP ${downloadRes.status}`);
-            const buffer = Buffer.from(await downloadRes.arrayBuffer());
-            import_fs.default.writeFileSync(installerPath, buffer);
-            console.log(`
-================================================================================`);
-            console.log(`\u2728 UPDATE v${update.latestVersion} SIAP DI-INSTALL!`);
-            console.log(`\u{1F449} Installer telah diunduh otomatis ke: ${installerPath}`);
-            console.log(`\u{1F4A1} Menjalankan installer untuk memperbarui aplikasi...`);
-            console.log(`================================================================================
-`);
-            (0, import_child_process.exec)(`start "" "${installerPath}" /VERYSILENT /SUPPRESSMSGBOXES`, () => {
-            });
-          }).catch((err2) => {
-            console.warn(`\u26A0\uFE0F Gagal download update otomatis (${err2.message}). Silakan unduh manual: ${update.downloadUrl}`);
-          });
-        } catch (e) {
-        }
-      }
+      console.log(`\u{1F4A1} Buka tautan di atas jika Anda ingin memperbarui secara manual.`);
     } else {
       console.log(`\u2705 Aplikasi sudah menggunakan versi terbaru (v${APP_VERSION})`);
     }

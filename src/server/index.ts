@@ -929,31 +929,8 @@ ${cPurple}geoguessr interactive program${cReset}
       console.log(`📥 Download Link  : ${update.downloadUrl}`)
       console.log(`🔗 Catatan Rilis  : ${update.releaseUrl}`)
 
-      // Otomatis download & update installer di background jika user memakai Windows
-      if (process.platform === 'win32' && update.downloadUrl.endsWith('.exe')) {
-        console.log(`🚀 Men-download update otomatis di background...`)
-        try {
-          const tempDir = os.tmpdir()
-          const installerPath = path.join(tempDir, `MabarBang-Update-${update.latestVersion}.exe`)
-          
-          fetch(update.downloadUrl).then(async (downloadRes) => {
-            if (!downloadRes.ok) throw new Error(`HTTP ${downloadRes.status}`)
-            const buffer = Buffer.from(await downloadRes.arrayBuffer())
-            fs.writeFileSync(installerPath, buffer)
-            console.log(`\n================================================================================`)
-            console.log(`✨ UPDATE v${update.latestVersion} SIAP DI-INSTALL!`)
-            console.log(`👉 Installer telah diunduh otomatis ke: ${installerPath}`)
-            console.log(`💡 Menjalankan installer untuk memperbarui aplikasi...`)
-            console.log(`================================================================================\n`)
-            // Jalankan installer /VERYSILENT /SUPPRESSMSGBOXES agar auto update
-            exec(`start "" "${installerPath}" /VERYSILENT /SUPPRESSMSGBOXES`, () => {})
-          }).catch(err => {
-            console.warn(`⚠️ Gagal download update otomatis (${err.message}). Silakan unduh manual: ${update.downloadUrl}`)
-          })
-        } catch (e) {
-          // ignore background update error
-        }
-      }
+      // Tampilkan notifikasi rilis saja tanpa auto-download file installer ke folder temp
+      console.log(`💡 Buka tautan di atas jika Anda ingin memperbarui secara manual.`)
     } else {
       console.log(`✅ Aplikasi sudah menggunakan versi terbaru (v${APP_VERSION})`)
     }
