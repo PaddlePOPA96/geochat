@@ -732,6 +732,26 @@
   </div>
 
   <div class="container">
+    <!-- Update Alert Banner -->
+    <div id="updateBanner" style="display: none; background: #ffe082; border: var(--border-thick); border-radius: var(--radius-card); box-shadow: var(--shadow-solid); padding: 14px 20px; align-items: center; justify-content: space-between; gap: 14px; animation: popIntro 0.4s ease;">
+      <div style="display: flex; align-items: center; gap: 14px; flex-wrap: wrap;">
+        <span style="font-size: 26px;">🚀</span>
+        <div>
+          <div style="font-weight: 900; font-size: 15px; display: flex; align-items: center; gap: 8px;">
+            <span>Update Baru Tersedia:</span>
+            <span id="latestVerText" style="background: #ff5964; color: #fff; padding: 2px 8px; border-radius: 6px; border: 2px solid #000; font-size: 13px;">v3.1.5</span>
+          </div>
+          <div style="font-size: 12px; font-weight: 700; color: #475569; margin-top: 2px;" id="updateDescText">Installer versi terbaru sudah siap diunduh dari GitHub!</div>
+        </div>
+      </div>
+      <div style="display: flex; gap: 8px; align-items: center;">
+        <a id="updateDownloadBtn" href="#" target="_blank" class="btn btn-green btn-sm" style="text-decoration: none; display: inline-flex; align-items: center; gap: 6px;">
+          <span>⚡ Download Installer</span>
+        </a>
+        <button class="btn btn-white btn-sm" onclick="document.getElementById('updateBanner').style.display='none'">✕</button>
+      </div>
+    </div>
+
     <!-- Header -->
     <header>
       <div class="brand">
@@ -904,6 +924,23 @@
 
     socket.on('round-finished', () => {
       socket.emit('request-state');
+    });
+
+    socket.on('update-info', (info) => {
+      if (info && info.hasUpdate) {
+        const banner = document.getElementById('updateBanner');
+        const verText = document.getElementById('latestVerText');
+        const dlBtn = document.getElementById('updateDownloadBtn');
+        const descText = document.getElementById('updateDescText');
+        if (banner) {
+          banner.style.display = 'flex';
+          if (verText) verText.textContent = 'v' + info.latestVersion;
+          if (dlBtn) dlBtn.href = info.downloadUrl || info.releaseUrl;
+          if (descText && info.releaseNotes) {
+            descText.textContent = info.releaseNotes.slice(0, 100) + '...';
+          }
+        }
+      }
     });
 
     function updateUI() {

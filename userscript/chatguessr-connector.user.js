@@ -19,7 +19,7 @@
 
   // Server URLs (Cloud Railway vs Local 5050)
   const CLOUD_SERVER_URL = 'https://geoindo.up.railway.app/';
-  const LOCAL_SERVER_URL = 'http://localhost:8080';
+  const LOCAL_SERVER_URL = 'http://localhost:5050';
 
   let serverUrl = LOCAL_SERVER_URL;
   try {
