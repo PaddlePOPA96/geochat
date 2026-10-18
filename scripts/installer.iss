@@ -1,13 +1,17 @@
+#ifndef AppVersion
+#define AppVersion "3.1.6"
+#endif
+
 ; Script Inno Setup untuk MabarBang (Per-User / Tanpa UAC Admin)
 [Setup]
 AppName=MabarBang
-AppVersion=3.1.5
+AppVersion={#AppVersion}
 AppPublisher=kikobooo x arvana prod
 SourceDir=..
 DefaultDirName={userappdata}\Programs\MabarBang
 DefaultGroupName=MabarBang
 OutputDir=dist-installer
-OutputBaseFilename=MabarBang-3.1.5.Setup
+OutputBaseFilename=MabarBang-{#AppVersion}.Setup
 Compression=lzma2/max
 SolidCompression=yes
 PrivilegesRequired=lowest
