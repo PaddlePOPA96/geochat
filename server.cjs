@@ -184518,11 +184518,14 @@ var TikTokBackend = class extends import_events3.EventEmitter {
       this.emit("error", err2 instanceof Error ? err2 : new Error(String(err2)));
     });
     this.#tiktokLive.on("chat", (data) => {
-      const comment = (data.comment || "").trim();
-      const username = data.nickname || data.uniqueId || "TikTokUser";
-      const userId = `tt_${data.userId || data.uniqueId}`;
-      const avatar = data.profilePictureUrl || "";
+      const comment = (data.comment || data.content || "").trim();
+      const u2 = data.user || data;
+      const username = u2.nickname || u2.uniqueId || data.nickname || data.uniqueId || "TikTokUser";
+      const rawId = u2.userId || u2.uniqueId || data.userId || data.uniqueId || username;
+      const userId = `tt_${rawId}`;
+      const avatar = u2.profilePictureUrl || data.profilePictureUrl || "";
       console.log(`[TikTok Live Chat] ${username}: "${comment}"`);
+      if (!comment) return;
       const userstate = {
         "user-id": userId,
         "display-name": `${username} (TikTok)`,

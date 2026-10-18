@@ -61,12 +61,16 @@ export default class TikTokBackend extends EventEmitter {
     })
 
     this.#tiktokLive.on('chat', (data: any) => {
-      const comment = (data.comment || '').trim()
-      const username = data.nickname || data.uniqueId || 'TikTokUser'
-      const userId = `tt_${data.userId || data.uniqueId}`
-      const avatar = data.profilePictureUrl || ''
+      const comment = (data.comment || data.content || '').trim()
+      const u = data.user || data
+      const username = u.nickname || u.uniqueId || data.nickname || data.uniqueId || 'TikTokUser'
+      const rawId = u.userId || u.uniqueId || data.userId || data.uniqueId || username
+      const userId = `tt_${rawId}`
+      const avatar = u.profilePictureUrl || data.profilePictureUrl || ''
 
       console.log(`[TikTok Live Chat] ${username}: "${comment}"`)
+
+      if (!comment) return
 
       const userstate: TikTokUserData = {
         'user-id': userId,
