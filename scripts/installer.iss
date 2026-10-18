@@ -1,0 +1,28 @@
+; Script Inno Setup untuk MabarBang (Per-User / Tanpa UAC Admin)
+[Setup]
+AppName=MabarBang
+AppVersion=3.1.5
+AppPublisher=kikobooo x arvana prod
+DefaultDirName={userappdata}\Programs\MabarBang
+DefaultGroupName=MabarBang
+OutputDir=dist-installer
+OutputBaseFilename=MabarBang-3.1.5.Setup
+Compression=lzma2/max
+SolidCompression=yes
+PrivilegesRequired=lowest
+DisableDirPage=yes
+DisableProgramGroupPage=yes
+DisableWelcomePage=no
+UninstallDisplayIcon={app}\MabarBang.exe
+
+[Files]
+Source: "bin\MabarBang.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "run.bat"; DestDir: "{app}"; Flags: ignoreversion
+
+[Icons]
+Name: "{userdesktop}\MabarBang"; Filename: "{app}\MabarBang.exe"
+Name: "{userprograms}\MabarBang\MabarBang"; Filename: "{app}\MabarBang.exe"
+Name: "{userprograms}\MabarBang\Uninstall MabarBang"; Filename: "{uninstallexe}"
+
+[Run]
+Filename: "{app}\MabarBang.exe"; Description: "Jalankan MabarBang Sekarang"; Flags: nowait postinstall skipifsilent
