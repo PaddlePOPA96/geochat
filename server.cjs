@@ -88186,7 +88186,10 @@ var require_source = __commonJS({
 // src/server/index.ts
 var server_exports = {};
 __export(server_exports, {
+  APP_VERSION: () => APP_VERSION,
+  GITHUB_REPO: () => GITHUB_REPO,
   calculateScore: () => calculateScore,
+  checkForAppUpdates: () => checkForAppUpdates,
   haversineDistance: () => haversineDistance,
   parseCoordinates: () => parseCoordinates,
   resolveLocation: () => resolveLocation
@@ -153826,6 +153829,26 @@ var embeddedDashboardHtml = `<!DOCTYPE html>
   </div>
 
   <div class="container">
+    <!-- Update Alert Banner -->
+    <div id="updateBanner" style="display: none; background: #ffe082; border: var(--border-thick); border-radius: var(--radius-card); box-shadow: var(--shadow-solid); padding: 14px 20px; align-items: center; justify-content: space-between; gap: 14px; animation: popIntro 0.4s ease;">
+      <div style="display: flex; align-items: center; gap: 14px; flex-wrap: wrap;">
+        <span style="font-size: 26px;">\u{1F680}</span>
+        <div>
+          <div style="font-weight: 900; font-size: 15px; display: flex; align-items: center; gap: 8px;">
+            <span>Update Baru Tersedia:</span>
+            <span id="latestVerText" style="background: #ff5964; color: #fff; padding: 2px 8px; border-radius: 6px; border: 2px solid #000; font-size: 13px;">v3.1.5</span>
+          </div>
+          <div style="font-size: 12px; font-weight: 700; color: #475569; margin-top: 2px;" id="updateDescText">Installer versi terbaru sudah siap diunduh dari GitHub!</div>
+        </div>
+      </div>
+      <div style="display: flex; gap: 8px; align-items: center;">
+        <a id="updateDownloadBtn" href="#" target="_blank" class="btn btn-green btn-sm" style="text-decoration: none; display: inline-flex; align-items: center; gap: 6px;">
+          <span>\u26A1 Download Installer</span>
+        </a>
+        <button class="btn btn-white btn-sm" onclick="document.getElementById('updateBanner').style.display='none'">\u2715</button>
+      </div>
+    </div>
+
     <!-- Header -->
     <header>
       <div class="brand">
@@ -153998,6 +154021,23 @@ var embeddedDashboardHtml = `<!DOCTYPE html>
 
     socket.on('round-finished', () => {
       socket.emit('request-state');
+    });
+
+    socket.on('update-info', (info) => {
+      if (info && info.hasUpdate) {
+        const banner = document.getElementById('updateBanner');
+        const verText = document.getElementById('latestVerText');
+        const dlBtn = document.getElementById('updateDownloadBtn');
+        const descText = document.getElementById('updateDescText');
+        if (banner) {
+          banner.style.display = 'flex';
+          if (verText) verText.textContent = 'v' + info.latestVersion;
+          if (dlBtn) dlBtn.href = info.downloadUrl || info.releaseUrl;
+          if (descText && info.releaseNotes) {
+            descText.textContent = info.releaseNotes.slice(0, 100) + '...';
+          }
+        }
+      }
     });
 
     function updateUI() {
@@ -155018,7 +155058,7 @@ var embeddedUserscript = `// ==UserScript==
 
   // Server URLs (Cloud Railway vs Local 5050)
   const CLOUD_SERVER_URL = 'https://geoindo.up.railway.app/';
-  const LOCAL_SERVER_URL = 'http://localhost:8080';
+  const LOCAL_SERVER_URL = 'http://localhost:5050';
 
   let serverUrl = LOCAL_SERVER_URL;
   try {
@@ -157093,10 +157133,80 @@ app.get(["/chatguessr.user.js", "/userscript"], (_req, res) => {
 app.get("/", (_req, res) => {
   res.redirect("/dashboard");
 });
+var APP_VERSION = "3.1.4";
+var GITHUB_REPO = "PaddlePOPA96/geochat";
+var cachedUpdateInfo = {
+  hasUpdate: false,
+  currentVersion: APP_VERSION,
+  latestVersion: APP_VERSION,
+  releaseUrl: `https://github.com/${GITHUB_REPO}/releases`,
+  downloadUrl: `https://github.com/${GITHUB_REPO}/releases/latest`,
+  releaseNotes: "",
+  checkedAt: 0
+};
+function compareSemVer(v1, v2) {
+  const clean1 = v1.replace(/^v/, "").split(".").map((x) => parseInt(x, 10) || 0);
+  const clean2 = v2.replace(/^v/, "").split(".").map((x) => parseInt(x, 10) || 0);
+  const maxLen = Math.max(clean1.length, clean2.length);
+  for (let i2 = 0; i2 < maxLen; i2++) {
+    const a2 = clean1[i2] || 0;
+    const b = clean2[i2] || 0;
+    if (a2 > b) return 1;
+    if (a2 < b) return -1;
+  }
+  return 0;
+}
+async function checkForAppUpdates() {
+  try {
+    const controller = new AbortController();
+    const timer2 = setTimeout(() => controller.abort(), 3e3);
+    const res = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/releases/latest`, {
+      signal: controller.signal,
+      headers: {
+        "User-Agent": "MabarBang-App",
+        Accept: "application/vnd.github.v3+json"
+      }
+    });
+    clearTimeout(timer2);
+    if (res.ok) {
+      const data = await res.json();
+      const latestTag = (data.tag_name || "").replace(/^v/, "").trim();
+      const releaseUrl = data.html_url || `https://github.com/${GITHUB_REPO}/releases/latest`;
+      let downloadUrl = releaseUrl;
+      if (Array.isArray(data.assets) && data.assets.length > 0) {
+        const exeAsset = data.assets.find(
+          (a2) => typeof a2.name === "string" && (a2.name.endsWith(".exe") || a2.name.endsWith(".zip"))
+        );
+        if (exeAsset?.browser_download_url) {
+          downloadUrl = exeAsset.browser_download_url;
+        }
+      }
+      const isNewer = latestTag && compareSemVer(latestTag, APP_VERSION) > 0;
+      cachedUpdateInfo = {
+        hasUpdate: Boolean(isNewer),
+        currentVersion: APP_VERSION,
+        latestVersion: latestTag || APP_VERSION,
+        releaseUrl,
+        downloadUrl,
+        releaseNotes: (data.body || "").slice(0, 300),
+        checkedAt: Date.now()
+      };
+      return cachedUpdateInfo;
+    }
+  } catch (_err) {
+  }
+  cachedUpdateInfo.checkedAt = Date.now();
+  return cachedUpdateInfo;
+}
+app.get("/api/update-info", (_req, res) => {
+  res.json(cachedUpdateInfo);
+});
 io2.on("connection", (socket) => {
   socket.emit("state-update", manager.getState());
+  socket.emit("update-info", cachedUpdateInfo);
   socket.on("request-state", () => {
     socket.emit("state-update", manager.getState());
+    socket.emit("update-info", cachedUpdateInfo);
   });
 });
 var PORT = process.env.PORT || 5050;
@@ -157132,31 +157242,47 @@ Tekan tombol ENTER untuk keluar...`);
     setTimeout(() => {
     }, 864e5);
   });
-  server.listen(PORT, () => {
+  (async () => {
     console.log(`===============================================`);
-    console.log(`\u{1F680} MabarBang Server: Online (Port ${PORT})`);
-    console.log(`\u{1F4F1} Streamer Dashboard : http://localhost:${PORT}/dashboard`);
-    console.log(`\u{1F4FA} OBS Studio Overlay: http://localhost:${PORT}/overlay`);
-    console.log(`===============================================`);
-    if (!process.env.CI) {
-      const url2 = `http://localhost:${PORT}/dashboard`;
-      if (process.platform === "win32") {
-        (0, import_child_process.exec)(`cmd /c start "" "${url2}"`, () => {
-        });
-      } else if (process.platform === "darwin") {
-        (0, import_child_process.exec)(`open "${url2}"`, () => {
-        });
-      } else {
-        (0, import_child_process.exec)(`xdg-open "${url2}"`, () => {
-        });
-      }
+    console.log(`\u26A1 MabarBang v${APP_VERSION} (kikobooo x arvana prod)`);
+    console.log(`\u{1F50D} Memeriksa pembaruan di GitHub Releases...`);
+    const update = await checkForAppUpdates();
+    if (update.hasUpdate) {
+      console.log(`\u{1F514} UPDATE TERSEDIA: v${update.latestVersion} (Versi saat ini: v${update.currentVersion})`);
+      console.log(`\u{1F4E5} Download Installer: ${update.downloadUrl}`);
+      console.log(`\u{1F517} Catatan Rilis    : ${update.releaseUrl}`);
+    } else {
+      console.log(`\u2705 Aplikasi sudah menggunakan versi terbaru (v${APP_VERSION})`);
     }
-  });
+    console.log(`===============================================`);
+    server.listen(PORT, () => {
+      console.log(`\u{1F680} MabarBang Server: Online (Port ${PORT})`);
+      console.log(`\u{1F4F1} Streamer Dashboard : http://localhost:${PORT}/dashboard`);
+      console.log(`\u{1F4FA} OBS Studio Overlay: http://localhost:${PORT}/overlay`);
+      console.log(`===============================================`);
+      if (!process.env.CI) {
+        const url2 = `http://localhost:${PORT}/dashboard`;
+        if (process.platform === "win32") {
+          (0, import_child_process.exec)(`cmd /c start "" "${url2}"`, () => {
+          });
+        } else if (process.platform === "darwin") {
+          (0, import_child_process.exec)(`open "${url2}"`, () => {
+          });
+        } else {
+          (0, import_child_process.exec)(`xdg-open "${url2}"`, () => {
+          });
+        }
+      }
+    });
+  })();
   process.stdin.resume();
 }
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
+  APP_VERSION,
+  GITHUB_REPO,
   calculateScore,
+  checkForAppUpdates,
   haversineDistance,
   parseCoordinates,
   resolveLocation

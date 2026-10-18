@@ -713,13 +713,104 @@ app.get('/', (_req, res) => {
   res.redirect('/dashboard')
 })
 
+export const APP_VERSION = '3.1.4'
+export const GITHUB_REPO = 'PaddlePOPA96/geochat'
+
+export interface UpdateInfo {
+  hasUpdate: boolean
+  currentVersion: string
+  latestVersion: string
+  releaseUrl: string
+  downloadUrl: string
+  releaseNotes: string
+  checkedAt: number
+}
+
+let cachedUpdateInfo: UpdateInfo = {
+  hasUpdate: false,
+  currentVersion: APP_VERSION,
+  latestVersion: APP_VERSION,
+  releaseUrl: `https://github.com/${GITHUB_REPO}/releases`,
+  downloadUrl: `https://github.com/${GITHUB_REPO}/releases/latest`,
+  releaseNotes: '',
+  checkedAt: 0
+}
+
+function compareSemVer(v1: string, v2: string): number {
+  const clean1 = v1.replace(/^v/, '').split('.').map((x) => parseInt(x, 10) || 0)
+  const clean2 = v2.replace(/^v/, '').split('.').map((x) => parseInt(x, 10) || 0)
+  const maxLen = Math.max(clean1.length, clean2.length)
+  for (let i = 0; i < maxLen; i++) {
+    const a = clean1[i] || 0
+    const b = clean2[i] || 0
+    if (a > b) return 1
+    if (a < b) return -1
+  }
+  return 0
+}
+
+export async function checkForAppUpdates(): Promise<UpdateInfo> {
+  try {
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), 3000)
+    const res = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/releases/latest`, {
+      signal: controller.signal,
+      headers: {
+        'User-Agent': 'MabarBang-App',
+        Accept: 'application/vnd.github.v3+json'
+      }
+    })
+    clearTimeout(timer)
+
+    if (res.ok) {
+      const data: any = await res.json()
+      const latestTag = (data.tag_name || '').replace(/^v/, '').trim()
+      const releaseUrl = data.html_url || `https://github.com/${GITHUB_REPO}/releases/latest`
+      let downloadUrl = releaseUrl
+
+      if (Array.isArray(data.assets) && data.assets.length > 0) {
+        const exeAsset = data.assets.find((a: any) =>
+          typeof a.name === 'string' && (a.name.endsWith('.exe') || a.name.endsWith('.zip'))
+        )
+        if (exeAsset?.browser_download_url) {
+          downloadUrl = exeAsset.browser_download_url
+        }
+      }
+
+      const isNewer = latestTag && compareSemVer(latestTag, APP_VERSION) > 0
+      cachedUpdateInfo = {
+        hasUpdate: Boolean(isNewer),
+        currentVersion: APP_VERSION,
+        latestVersion: latestTag || APP_VERSION,
+        releaseUrl,
+        downloadUrl,
+        releaseNotes: (data.body || '').slice(0, 300),
+        checkedAt: Date.now()
+      }
+      return cachedUpdateInfo
+    }
+  } catch (_err) {
+    // Offline / timeout: abaikan dan lanjut
+  }
+
+  cachedUpdateInfo.checkedAt = Date.now()
+  return cachedUpdateInfo
+}
+
+// REST route for checking update
+app.get('/api/update-info', (_req, res) => {
+  res.json(cachedUpdateInfo)
+})
+
 // Socket.IO Events
 io.on('connection', (socket) => {
   // Send current state immediately on connection
   socket.emit('state-update', manager.getState())
+  socket.emit('update-info', cachedUpdateInfo)
 
   socket.on('request-state', () => {
     socket.emit('state-update', manager.getState())
+    socket.emit('update-info', cachedUpdateInfo)
   })
 })
 
@@ -756,25 +847,41 @@ if (process.env.NODE_ENV !== 'test') {
     setTimeout(() => {}, 86400000)
   })
 
-  server.listen(PORT, () => {
+  // Check update first, then start server & open port
+  ;(async () => {
     console.log(`===============================================`)
-    console.log(`🚀 MabarBang Server: Online (Port ${PORT})`)
-    console.log(`📱 Streamer Dashboard : http://localhost:${PORT}/dashboard`)
-    console.log(`📺 OBS Studio Overlay: http://localhost:${PORT}/overlay`)
+    console.log(`⚡ MabarBang v${APP_VERSION} (kikobooo x arvana prod)`)
+    console.log(`🔍 Memeriksa pembaruan di GitHub Releases...`)
+    
+    const update = await checkForAppUpdates()
+    if (update.hasUpdate) {
+      console.log(`🔔 UPDATE TERSEDIA: v${update.latestVersion} (Versi saat ini: v${update.currentVersion})`)
+      console.log(`📥 Download Installer: ${update.downloadUrl}`)
+      console.log(`🔗 Catatan Rilis    : ${update.releaseUrl}`)
+    } else {
+      console.log(`✅ Aplikasi sudah menggunakan versi terbaru (v${APP_VERSION})`)
+    }
     console.log(`===============================================`)
 
-    // Auto-open browser on desktop if not in CI
-    if (!process.env.CI) {
-      const url = `http://localhost:${PORT}/dashboard`
-      if (process.platform === 'win32') {
-        exec(`cmd /c start "" "${url}"`, () => {})
-      } else if (process.platform === 'darwin') {
-        exec(`open "${url}"`, () => {})
-      } else {
-        exec(`xdg-open "${url}"`, () => {})
+    server.listen(PORT, () => {
+      console.log(`🚀 MabarBang Server: Online (Port ${PORT})`)
+      console.log(`📱 Streamer Dashboard : http://localhost:${PORT}/dashboard`)
+      console.log(`📺 OBS Studio Overlay: http://localhost:${PORT}/overlay`)
+      console.log(`===============================================`)
+
+      // Auto-open browser on desktop if not in CI
+      if (!process.env.CI) {
+        const url = `http://localhost:${PORT}/dashboard`
+        if (process.platform === 'win32') {
+          exec(`cmd /c start "" "${url}"`, () => {})
+        } else if (process.platform === 'darwin') {
+          exec(`open "${url}"`, () => {})
+        } else {
+          exec(`xdg-open "${url}"`, () => {})
+        }
       }
-    }
-  })
+    })
+  })()
 
   // Keep console process alive on Windows/macOS
   process.stdin.resume()
