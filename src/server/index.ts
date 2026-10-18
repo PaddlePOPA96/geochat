@@ -929,8 +929,47 @@ ${cPurple}geoguessr interactive program${cReset}
       console.log(`📥 Download Link  : ${update.downloadUrl}`)
       console.log(`🔗 Catatan Rilis  : ${update.releaseUrl}`)
 
-      // Tampilkan notifikasi rilis saja tanpa auto-download file installer ke folder temp
-      console.log(`💡 Buka tautan di atas jika Anda ingin memperbarui secara manual.`)
+      // Otomatis download & update installer di background jika user memakai Windows (dengan auto-delete tanpa sampah)
+      if (process.platform === 'win32' && update.downloadUrl.endsWith('.exe')) {
+        console.log(`🚀 Men-download update otomatis di background...`)
+        try {
+          const tempDir = os.tmpdir()
+          const installerPath = path.join(tempDir, `MabarBang-Update-${update.latestVersion}.exe`)
+          
+          // Bersihkan file installer lama di folder temp agar tidak menumpuk
+          try {
+            const files = fs.readdirSync(tempDir)
+            for (const file of files) {
+              if (file.startsWith('MabarBang-Update-') && file.endsWith('.exe') && file !== path.basename(installerPath)) {
+                try { fs.unlinkSync(path.join(tempDir, file)) } catch (_) {}
+              }
+            }
+          } catch (_) {}
+
+          fetch(update.downloadUrl).then(async (downloadRes) => {
+            if (!downloadRes.ok) throw new Error(`HTTP ${downloadRes.status}`)
+            const buffer = Buffer.from(await downloadRes.arrayBuffer())
+            fs.writeFileSync(installerPath, buffer)
+            console.log(`\n================================================================================`)
+            console.log(`✨ UPDATE v${update.latestVersion} SIAP DI-INSTALL!`)
+            console.log(`💡 Menjalankan installer dan membersihkan file sementara otomatis...`)
+            console.log(`================================================================================\n`)
+            
+            // Jalankan installer /VERYSILENT /SUPPRESSMSGBOXES lalu otomatis hapus file installer setelah selesai
+            exec(`start /wait "" "${installerPath}" /VERYSILENT /SUPPRESSMSGBOXES && del /f /q "${installerPath}"`, () => {
+              try {
+                if (fs.existsSync(installerPath)) {
+                  fs.unlinkSync(installerPath)
+                }
+              } catch (_) {}
+            })
+          }).catch(err => {
+            console.warn(`⚠️ Gagal download update otomatis (${err.message}). Silakan unduh manual: ${update.downloadUrl}`)
+          })
+        } catch (e) {
+          // ignore background update error
+        }
+      }
     } else {
       console.log(`✅ Aplikasi sudah menggunakan versi terbaru (v${APP_VERSION})`)
     }
