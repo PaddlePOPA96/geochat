@@ -36,7 +36,14 @@ jobs:
           if (-not $iscc -or -not (Test-Path $iscc)) {
             $iscc = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
           }
-          & $iscc scripts/installer.iss
+          $pkgVersion = (Get-Content package.json | ConvertFrom-Json).version
+          if ($env:GITHUB_REF -match 'refs/tags/v?(.*)') {
+            $ver = $matches[1]
+          } else {
+            $ver = $pkgVersion
+          }
+          Write-Host "Building Installer for version: $ver"
+          & $iscc "/DAppVersion=$ver" scripts/installer.iss
 
       - name: Clean Old Release Assets
         uses: actions/github-script@v7
