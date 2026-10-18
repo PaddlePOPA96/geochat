@@ -30,19 +30,30 @@ execSync(
 // 3. Compile standalone binary with pkg (Windows only)
 console.log('3. Compiling Windows binary with pkg...')
 execSync(
-  'npx -y @yao-pkg/pkg@5.15.0 dist/server-bundle.cjs --targets node20-win-x64 --out-path bin',
+  'npx -y @yao-pkg/pkg@5.15.0 dist/server-bundle.cjs --targets node20-win-x64 --output bin/MabarBang.exe',
   { stdio: 'inherit' }
 )
 
-// Rename to clean user-friendly filename
-const winCandidates = ['bin/server-bundle-win.exe', 'bin/server-bundle-win-x64.exe']
+// Fallback rename if pkg placed it in a default candidate name
+const winCandidates = [
+  'bin/server-bundle.exe',
+  'bin/server-bundle-win.exe',
+  'bin/server-bundle-win-x64.exe'
+]
 for (const f of winCandidates) {
   if (fs.existsSync(f)) {
-    fs.copyFileSync(f, 'bin/MabarBang.exe')
+    if (!fs.existsSync('bin/MabarBang.exe')) {
+      fs.copyFileSync(f, 'bin/MabarBang.exe')
+    }
     try { fs.unlinkSync(f) } catch (_) {}
   }
 }
 
-console.log('✅ Build Complete!')
-console.log('📁 Windows Exe: bin/MabarBang.exe (dan bin/ChatGuessr.exe)')
-console.log('📁 Mac Binary : bin/MabarBang-macos')
+if (!fs.existsSync('bin/MabarBang.exe')) {
+  const anyExe = fs.readdirSync('bin').find((f) => f.endsWith('.exe'))
+  if (anyExe) {
+    fs.copyFileSync(path.join('bin', anyExe), 'bin/MabarBang.exe')
+  }
+}
+
+console.log('✅ Build Complete! bin/MabarBang.exe siap.')
