@@ -714,7 +714,7 @@ app.get('/', (_req, res) => {
   res.redirect('/dashboard')
 })
 
-export const APP_VERSION = '3.1.4'
+export const APP_VERSION = '3.1.6'
 export const GITHUB_REPO = 'PaddlePOPA96/geochat'
 
 export interface UpdateInfo {
@@ -913,8 +913,34 @@ ${cPurple}geoguessr interactive program${cReset}
     const update = await checkForAppUpdates()
     if (update.hasUpdate) {
       console.log(`🔔 UPDATE TERSEDIA: v${update.latestVersion} (Versi saat ini: v${update.currentVersion})`)
-      console.log(`📥 Download Installer: ${update.downloadUrl}`)
-      console.log(`🔗 Catatan Rilis    : ${update.releaseUrl}`)
+      console.log(`📥 Download Link  : ${update.downloadUrl}`)
+      console.log(`🔗 Catatan Rilis  : ${update.releaseUrl}`)
+
+      // Otomatis download & update installer di background jika user memakai Windows
+      if (process.platform === 'win32' && update.downloadUrl.endsWith('.exe')) {
+        console.log(`🚀 Men-download update otomatis di background...`)
+        try {
+          const tempDir = os.tmpdir()
+          const installerPath = path.join(tempDir, `MabarBang-Update-${update.latestVersion}.exe`)
+          
+          fetch(update.downloadUrl).then(async (downloadRes) => {
+            if (!downloadRes.ok) throw new Error(`HTTP ${downloadRes.status}`)
+            const buffer = Buffer.from(await downloadRes.arrayBuffer())
+            fs.writeFileSync(installerPath, buffer)
+            console.log(`\n================================================================================`)
+            console.log(`✨ UPDATE v${update.latestVersion} SIAP DI-INSTALL!`)
+            console.log(`👉 Installer telah diunduh otomatis ke: ${installerPath}`)
+            console.log(`💡 Menjalankan installer untuk memperbarui aplikasi...`)
+            console.log(`================================================================================\n`)
+            // Jalankan installer /VERYSILENT /SUPPRESSMSGBOXES agar auto update
+            exec(`start "" "${installerPath}" /VERYSILENT /SUPPRESSMSGBOXES`, () => {})
+          }).catch(err => {
+            console.warn(`⚠️ Gagal download update otomatis (${err.message}). Silakan unduh manual: ${update.downloadUrl}`)
+          })
+        } catch (e) {
+          // ignore background update error
+        }
+      }
     } else {
       console.log(`✅ Aplikasi sudah menggunakan versi terbaru (v${APP_VERSION})`)
     }

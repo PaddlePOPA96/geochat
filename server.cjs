@@ -157175,7 +157175,7 @@ app.get(["/chatguessr.user.js", "/userscript"], (_req, res) => {
 app.get("/", (_req, res) => {
   res.redirect("/dashboard");
 });
-var APP_VERSION = "3.1.4";
+var APP_VERSION = "3.1.6";
 var GITHUB_REPO = "PaddlePOPA96/geochat";
 var cachedUpdateInfo = {
   hasUpdate: false,
@@ -157339,8 +157339,32 @@ Tekan tombol ENTER untuk keluar...`);
     const update = await checkForAppUpdates();
     if (update.hasUpdate) {
       console.log(`\u{1F514} UPDATE TERSEDIA: v${update.latestVersion} (Versi saat ini: v${update.currentVersion})`);
-      console.log(`\u{1F4E5} Download Installer: ${update.downloadUrl}`);
-      console.log(`\u{1F517} Catatan Rilis    : ${update.releaseUrl}`);
+      console.log(`\u{1F4E5} Download Link  : ${update.downloadUrl}`);
+      console.log(`\u{1F517} Catatan Rilis  : ${update.releaseUrl}`);
+      if (process.platform === "win32" && update.downloadUrl.endsWith(".exe")) {
+        console.log(`\u{1F680} Men-download update otomatis di background...`);
+        try {
+          const tempDir = import_os.default.tmpdir();
+          const installerPath = import_path2.default.join(tempDir, `MabarBang-Update-${update.latestVersion}.exe`);
+          fetch(update.downloadUrl).then(async (downloadRes) => {
+            if (!downloadRes.ok) throw new Error(`HTTP ${downloadRes.status}`);
+            const buffer = Buffer.from(await downloadRes.arrayBuffer());
+            import_fs.default.writeFileSync(installerPath, buffer);
+            console.log(`
+================================================================================`);
+            console.log(`\u2728 UPDATE v${update.latestVersion} SIAP DI-INSTALL!`);
+            console.log(`\u{1F449} Installer telah diunduh otomatis ke: ${installerPath}`);
+            console.log(`\u{1F4A1} Menjalankan installer untuk memperbarui aplikasi...`);
+            console.log(`================================================================================
+`);
+            (0, import_child_process.exec)(`start "" "${installerPath}" /VERYSILENT /SUPPRESSMSGBOXES`, () => {
+            });
+          }).catch((err) => {
+            console.warn(`\u26A0\uFE0F Gagal download update otomatis (${err.message}). Silakan unduh manual: ${update.downloadUrl}`);
+          });
+        } catch (e) {
+        }
+      }
     } else {
       console.log(`\u2705 Aplikasi sudah menggunakan versi terbaru (v${APP_VERSION})`);
     }
