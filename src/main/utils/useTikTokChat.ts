@@ -66,6 +66,8 @@ export default class TikTokBackend extends EventEmitter {
       const userId = `tt_${data.userId || data.uniqueId}`
       const avatar = data.profilePictureUrl || ''
 
+      console.log(`[TikTok Live Chat] ${username}: "${comment}"`)
+
       const userstate: TikTokUserData = {
         'user-id': userId,
         'display-name': `${username} (TikTok)`,
@@ -81,10 +83,12 @@ export default class TikTokBackend extends EventEmitter {
 
         // Rate limit 5s per user
         if (now - lastGuess < 5000) {
+          console.log(`[TikTok Guess Ignored] ${username} rate limited (5s)`)
           return
         }
 
         this.#lastGuessTimestamp.set(userId, now)
+        console.log(`[TikTok Guess Detected] ${username}: "${comment}"`)
         this.emit('guess', userstate, comment)
       } else if (comment.startsWith('!')) {
         this.emit('message', userstate, comment)

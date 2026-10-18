@@ -252,7 +252,16 @@ class GameServerManager {
       this.tiktokBackend = null
     }
 
-    this.tiktokUsername = username.trim().replace(/^@/, '')
+    // Clean username (handle URLs like https://www.tiktok.com/@mygnuga/live or @mygnuga)
+    let cleanUser = username.trim()
+    const urlMatch = cleanUser.match(/tiktok\.com\/@([^/?#]+)/i)
+    if (urlMatch && urlMatch[1]) {
+      cleanUser = urlMatch[1]
+    } else {
+      cleanUser = cleanUser.replace(/^@/, '').split('/')[0].split('?')[0].trim()
+    }
+
+    this.tiktokUsername = cleanUser
     if (!this.tiktokUsername) {
       this.tiktokStatus = 'disconnected'
       this.broadcastState()
@@ -404,6 +413,10 @@ class GameServerManager {
     } else {
       this.roundGuesses = {}
     }
+
+    // Reset nilai tebakan streamer untuk ronde yang baru berjalan
+    this.streamerStats.roundScore = 0
+    this.streamerStats.roundDistance = 0
 
     io.emit('round-started', {
       round: this.round,

@@ -151856,6 +151856,7 @@ var TikTokBackend = class extends import_events3.EventEmitter {
       const username = data.nickname || data.uniqueId || "TikTokUser";
       const userId = `tt_${data.userId || data.uniqueId}`;
       const avatar = data.profilePictureUrl || "";
+      console.log(`[TikTok Live Chat] ${username}: "${comment}"`);
       const userstate = {
         "user-id": userId,
         "display-name": `${username} (TikTok)`,
@@ -151867,9 +151868,11 @@ var TikTokBackend = class extends import_events3.EventEmitter {
         const now = Date.now();
         const lastGuess = this.#lastGuessTimestamp.get(userId) || 0;
         if (now - lastGuess < 5e3) {
+          console.log(`[TikTok Guess Ignored] ${username} rate limited (5s)`);
           return;
         }
         this.#lastGuessTimestamp.set(userId, now);
+        console.log(`[TikTok Guess Detected] ${username}: "${comment}"`);
         this.emit("guess", userstate, comment);
       } else if (comment.startsWith("!")) {
         this.emit("message", userstate, comment);
@@ -155576,6 +155579,7 @@ var embeddedUserscript = `// ==UserScript==
         nextBtn.__cg_attached = true;
         nextBtn.addEventListener('click', () => {
           console.log('[ChatGuessr] Streamer clicked Next Round button!');
+          latestStreamerGuess = null;
           clearViewerPins();
           lastRoundResults = null;
           lastRoundLocation = null;
@@ -155591,6 +155595,7 @@ var embeddedUserscript = `// ==UserScript==
         playAgainBtn.__cg_attached = true;
         playAgainBtn.addEventListener('click', () => {
           console.log('[ChatGuessr] Streamer clicked Play Again button!');
+          latestStreamerGuess = null;
           clearViewerPins();
           lastRoundResults = null;
           lastRoundLocation = null;
@@ -155637,6 +155642,7 @@ var embeddedUserscript = `// ==UserScript==
       lastHandledToken = token;
       lastHandledGuessesCount = 0;
       lastHandledRound = 0;
+      latestStreamerGuess = null;
       clearViewerPins();
       lastRoundResults = null;
       lastRoundLocation = null;
@@ -155723,6 +155729,7 @@ var embeddedUserscript = `// ==UserScript==
 
       if (currentRound !== lastHandledRound && currentLoc) {
         lastHandledRound = currentRound;
+        latestStreamerGuess = null;
         console.log(\`[ChatGuessr] Round \${currentRound} PLAYING! Opening guesses...\`, {
           token,
           round: currentRound,
@@ -156143,9 +156150,18 @@ var embeddedUserscript = `// ==UserScript==
 
     let allGuesses = [...(currentState.roundGuesses || [])];
 
-    // Jika streamer sudah menebak, masukkan tebakan streamer ke dalam daftar jawaban
+    // Jika ronde selesai / tebakan ditutup dan streamer sudah menebak di ronde ini, masukkan ke daftar jawaban
     const streamerData = currentState.streamerStats || latestStreamerGuess;
-    if (streamerData && (streamerData.roundScore > 0 || streamerData.score > 0 || streamerData.roundDistance > 0 || streamerData.distance > 0)) {
+    const hasStreamerGuessedThisRound =
+      !currentState.guessesOpen &&
+      streamerData &&
+      (
+        (typeof streamerData.roundScore === 'number' && streamerData.roundScore > 0) ||
+        (typeof streamerData.roundDistance === 'number' && streamerData.roundDistance > 0) ||
+        (typeof streamerData.score === 'number' && streamerData.score > 0)
+      );
+
+    if (hasStreamerGuessedThisRound) {
       const sScore = typeof streamerData.roundScore === 'number'
         ? streamerData.roundScore
         : (typeof streamerData.score === 'number' ? streamerData.score : 0);
@@ -156801,7 +156817,14 @@ var GameServerManager = class {
       this.tiktokBackend.close();
       this.tiktokBackend = null;
     }
-    this.tiktokUsername = username.trim().replace(/^@/, "");
+    let cleanUser = username.trim();
+    const urlMatch = cleanUser.match(/tiktok\.com\/@([^/?#]+)/i);
+    if (urlMatch && urlMatch[1]) {
+      cleanUser = urlMatch[1];
+    } else {
+      cleanUser = cleanUser.replace(/^@/, "").split("/")[0].split("?")[0].trim();
+    }
+    this.tiktokUsername = cleanUser;
     if (!this.tiktokUsername) {
       this.tiktokStatus = "disconnected";
       this.broadcastState();
@@ -156918,6 +156941,8 @@ var GameServerManager = class {
     } else {
       this.roundGuesses = {};
     }
+    this.streamerStats.roundScore = 0;
+    this.streamerStats.roundDistance = 0;
     io2.emit("round-started", {
       round: this.round,
       location: this.roundLocation,

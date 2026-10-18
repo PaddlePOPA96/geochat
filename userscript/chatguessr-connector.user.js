@@ -517,6 +517,7 @@
         nextBtn.__cg_attached = true;
         nextBtn.addEventListener('click', () => {
           console.log('[ChatGuessr] Streamer clicked Next Round button!');
+          latestStreamerGuess = null;
           clearViewerPins();
           lastRoundResults = null;
           lastRoundLocation = null;
@@ -532,6 +533,7 @@
         playAgainBtn.__cg_attached = true;
         playAgainBtn.addEventListener('click', () => {
           console.log('[ChatGuessr] Streamer clicked Play Again button!');
+          latestStreamerGuess = null;
           clearViewerPins();
           lastRoundResults = null;
           lastRoundLocation = null;
@@ -578,6 +580,7 @@
       lastHandledToken = token;
       lastHandledGuessesCount = 0;
       lastHandledRound = 0;
+      latestStreamerGuess = null;
       clearViewerPins();
       lastRoundResults = null;
       lastRoundLocation = null;
@@ -664,6 +667,7 @@
 
       if (currentRound !== lastHandledRound && currentLoc) {
         lastHandledRound = currentRound;
+        latestStreamerGuess = null;
         console.log(`[ChatGuessr] Round ${currentRound} PLAYING! Opening guesses...`, {
           token,
           round: currentRound,
@@ -1084,9 +1088,18 @@
 
     let allGuesses = [...(currentState.roundGuesses || [])];
 
-    // Jika streamer sudah menebak, masukkan tebakan streamer ke dalam daftar jawaban
+    // Jika ronde selesai / tebakan ditutup dan streamer sudah menebak di ronde ini, masukkan ke daftar jawaban
     const streamerData = currentState.streamerStats || latestStreamerGuess;
-    if (streamerData && (streamerData.roundScore > 0 || streamerData.score > 0 || streamerData.roundDistance > 0 || streamerData.distance > 0)) {
+    const hasStreamerGuessedThisRound =
+      !currentState.guessesOpen &&
+      streamerData &&
+      (
+        (typeof streamerData.roundScore === 'number' && streamerData.roundScore > 0) ||
+        (typeof streamerData.roundDistance === 'number' && streamerData.roundDistance > 0) ||
+        (typeof streamerData.score === 'number' && streamerData.score > 0)
+      );
+
+    if (hasStreamerGuessedThisRound) {
       const sScore = typeof streamerData.roundScore === 'number'
         ? streamerData.roundScore
         : (typeof streamerData.score === 'number' ? streamerData.score : 0);
