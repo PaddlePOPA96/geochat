@@ -157175,7 +157175,7 @@ app.get(["/chatguessr.user.js", "/userscript"], (_req, res) => {
 app.get("/", (_req, res) => {
   res.redirect("/dashboard");
 });
-var APP_VERSION = "3.1.6";
+var APP_VERSION = "3.1.7";
 var GITHUB_REPO = "PaddlePOPA96/geochat";
 var cachedUpdateInfo = {
   hasUpdate: false,
