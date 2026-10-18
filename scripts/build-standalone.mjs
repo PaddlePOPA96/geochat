@@ -27,30 +27,18 @@ execSync(
   { stdio: 'inherit' }
 )
 
-// 3. Compile standalone binaries with pkg
-// IMPORTANT: target must match the installed Node.js major version (node20)
-// Using node22 target on node20 causes force-close / crash at startup
-console.log('3. Compiling Windows & Mac binaries with pkg...')
+// 3. Compile standalone binary with pkg (Windows only)
+console.log('3. Compiling Windows binary with pkg...')
 execSync(
-  'npx -y @yao-pkg/pkg@5.15.0 dist/server-bundle.cjs --targets node20-win-x64,node20-macos-x64 --out-path bin',
+  'npx -y @yao-pkg/pkg@5.15.0 dist/server-bundle.cjs --targets node20-win-x64 --out-path bin',
   { stdio: 'inherit' }
 )
 
-// Rename to clean user-friendly filenames
+// Rename to clean user-friendly filename
 const winCandidates = ['bin/server-bundle-win.exe', 'bin/server-bundle-win-x64.exe']
 for (const f of winCandidates) {
   if (fs.existsSync(f)) {
     fs.copyFileSync(f, 'bin/MabarBang.exe')
-    fs.copyFileSync(f, 'bin/ChatGuessr.exe')
-    try { fs.unlinkSync(f) } catch (_) {}
-  }
-}
-
-const macCandidates = ['bin/server-bundle-macos', 'bin/server-bundle-macos-x64']
-for (const f of macCandidates) {
-  if (fs.existsSync(f)) {
-    fs.copyFileSync(f, 'bin/MabarBang-macos')
-    fs.copyFileSync(f, 'bin/ChatGuessr-macos')
     try { fs.unlinkSync(f) } catch (_) {}
   }
 }
