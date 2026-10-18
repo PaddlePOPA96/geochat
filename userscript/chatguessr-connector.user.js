@@ -220,6 +220,9 @@
 
   hookGoogleMaps();
 
+  // Maksimal pin yang dirender di layar peta untuk menjaga FPS browser tetap lancar
+  const MAX_MAP_PINS = 1000;
+
   function drawViewerPins(results, targetLocation) {
     if (!globalMap || !results || results.length === 0 || !showPinsEnabled) {
       return;
@@ -234,9 +237,16 @@
       scale: 2
     };
 
-    results.forEach((p, idx) => {
+    // Ambil maksimal 1.000 pin teratas, dan pastikan pin streamer tetap masuk jika ada
+    const displayList = results.slice(0, MAX_MAP_PINS);
+    const streamerPin = results.find((p) => p.userId === 'streamer' || p.isStreamer);
+    if (streamerPin && !displayList.some((p) => p.userId === 'streamer')) {
+      displayList.push(streamerPin);
+    }
+
+    displayList.forEach((p, idx) => {
       if (!p.position || typeof p.position.lat !== 'number' || typeof p.position.lng !== 'number') return;
-      const rank = idx + 1;
+      const rank = p.rank || (idx + 1);
       const markerContent = createCustomMarkerElement(p, rank);
 
       let marker = null;

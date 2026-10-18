@@ -4,3 +4,7 @@ bin
 .vite
 *.exe
 .DS_Store
+
+# Test scripts & data
+scripts/test-10000-pins.*
+test-10000-pins.*
