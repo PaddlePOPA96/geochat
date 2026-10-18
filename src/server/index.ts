@@ -4,6 +4,7 @@ import { Server as SocketIOServer } from 'socket.io'
 import cors from 'cors'
 import path from 'path'
 import fs from 'fs'
+import os from 'os'
 import { exec } from 'child_process'
 import YouTubeBackend from '../main/utils/useYouTubeChat'
 import TikTokBackend from '../main/utils/useTikTokChat'
@@ -847,9 +848,65 @@ if (process.env.NODE_ENV !== 'test') {
     setTimeout(() => {}, 86400000)
   })
 
+  function printNeofetchBanner() {
+    const cpus = os.cpus() || []
+    const rawCpu = cpus.length > 0 ? cpus[0].model.replace(/\s+/g, ' ').trim() : 'Unknown CPU'
+    const totalMemGB = (os.totalmem() / 1024 ** 3).toFixed(2)
+    const freeMemGB = (os.freemem() / 1024 ** 3).toFixed(2)
+    const usedMemGB = ((os.totalmem() - os.freemem()) / 1024 ** 3).toFixed(2)
+    const memPercent = (((os.totalmem() - os.freemem()) / os.totalmem()) * 100).toFixed(1)
+    
+    const uptimeSec = os.uptime()
+    const uptimeDays = Math.floor(uptimeSec / 86400)
+    const uptimeHours = Math.floor((uptimeSec % 86400) / 3600)
+    const uptimeMins = Math.floor((uptimeSec % 3600) / 60)
+    const uptimeStr = uptimeDays > 0 
+      ? `${uptimeDays}d ${uptimeHours}h ${uptimeMins}m`
+      : `${uptimeHours}h ${uptimeMins}m`
+
+    let osName = os.type()
+    if (osName === 'Windows_NT') osName = 'Windows'
+    else if (osName === 'Darwin') osName = 'macOS'
+
+    const cCyan = '\x1b[36m'
+    const cYellow = '\x1b[33m'
+    const cGreen = '\x1b[32m'
+    const cMagenta = '\x1b[35m'
+    const cReset = '\x1b[0m'
+    const cBold = '\x1b[1m'
+    const cDim = '\x1b[2m'
+
+    const cBlue = '\x1b[38;2;122;162;255m'
+    const cBlue2 = '\x1b[38;2;140;153;253m'
+    const cBlue3 = '\x1b[38;2;149;148;252m'
+    const cBlue4 = '\x1b[38;2;158;144;251m'
+    const cPurple = '\x1b[38;2;167;139;250m'
+    const cLine = '\x1b[38;2;145;151;253m'
+
+    console.log(`
+${cBlue}███╗   ███╗  █████╗  ██████╗   █████╗  ██████╗ ${cReset}
+${cBlue2}████╗ ████║ ██╔══██╗ ██╔══██╗ ██╔══██╗ ██╔══██╗${cReset}
+${cBlue2}██╔████╔██║ ███████║ ██████╔╝ ███████║ ██████╔╝${cReset}
+${cBlue3}██║╚██╔╝██║ ██╔══██║ ██╔══██╗ ██╔══██║ ██╔══██╗${cReset}
+${cBlue4}██║ ╚═╝ ██║ ██║  ██║ ██████╔╝ ██║  ██║ ██║  ██║${cReset}
+${cPurple}╚═╝     ╚═╝ ╚═╝  ╚═╝ ╚═════╝  ╚═╝  ╚═╝ ╚═╝  ╚═╝${cReset}
+${cLine}┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄${cReset}
+${cPurple}geoguessr interactive program${cReset}
+
+  ${cBold}${cCyan}OS${cReset}      : ${osName} ${os.release()} (${os.arch()})
+  ${cBold}${cCyan}Host${cReset}    : ${os.hostname()}
+  ${cBold}${cCyan}CPU${cReset}     : ${rawCpu} (${cpus.length} threads)
+  ${cBold}${cCyan}RAM${cReset}     : ${usedMemGB} GB / ${totalMemGB} GB ${cDim}(${memPercent}% used, ${freeMemGB} GB free)${cReset}
+  ${cBold}${cCyan}Uptime${cReset}  : ${uptimeStr}
+  ${cBold}${cCyan}Node.js${cReset} : ${process.version} (${process.platform})
+`)
+  }
+
   // Check update first, then start server & open port
   ;(async () => {
-    console.log(`===============================================`)
+    printNeofetchBanner()
+
+    console.log(`================================================================================`)
     console.log(`⚡ MabarBang v${APP_VERSION} (kikobooo x arvana prod)`)
     console.log(`🔍 Memeriksa pembaruan di GitHub Releases...`)
     
@@ -861,13 +918,13 @@ if (process.env.NODE_ENV !== 'test') {
     } else {
       console.log(`✅ Aplikasi sudah menggunakan versi terbaru (v${APP_VERSION})`)
     }
-    console.log(`===============================================`)
+    console.log(`================================================================================`)
 
     server.listen(PORT, () => {
       console.log(`🚀 MabarBang Server: Online (Port ${PORT})`)
       console.log(`📱 Streamer Dashboard : http://localhost:${PORT}/dashboard`)
-      console.log(`📺 OBS Studio Overlay: http://localhost:${PORT}/overlay`)
-      console.log(`===============================================`)
+      console.log(`📺 OBS Studio Overlay : http://localhost:${PORT}/overlay`)
+      console.log(`================================================================================`)
 
       // Auto-open browser on desktop if not in CI
       if (!process.env.CI) {

@@ -5,7 +5,11 @@ var __getOwnPropNames = Object.getOwnPropertyNames;
 var __getProtoOf = Object.getPrototypeOf;
 var __hasOwnProp = Object.prototype.hasOwnProperty;
 var __commonJS = (cb, mod) => function __require() {
-  return mod || (0, cb[__getOwnPropNames(cb)[0]])((mod = { exports: {} }).exports, mod), mod.exports;
+  try {
+    return mod || (0, cb[__getOwnPropNames(cb)[0]])((mod = { exports: {} }).exports, mod), mod.exports;
+  } catch (e) {
+    throw mod = 0, e;
+  }
 };
 var __export = (target, all5) => {
   for (var name in all5)
@@ -509,7 +513,7 @@ var require_has_flag = __commonJS({
 var require_supports_color = __commonJS({
   "node_modules/supports-color/index.js"(exports2, module2) {
     "use strict";
-    var os2 = require("os");
+    var os3 = require("os");
     var tty = require("tty");
     var hasFlag = require_has_flag();
     var { env } = process;
@@ -557,7 +561,7 @@ var require_supports_color = __commonJS({
         return min;
       }
       if (process.platform === "win32") {
-        const osRelease = os2.release().split(".");
+        const osRelease = os3.release().split(".");
         if (Number(osRelease[0]) >= 10 && Number(osRelease[2]) >= 10586) {
           return Number(osRelease[2]) >= 14931 ? 3 : 2;
         }
@@ -20433,7 +20437,7 @@ var require_shams = __commonJS({
         return true;
       }
       var obj = {};
-      var sym = Symbol("test");
+      var sym = /* @__PURE__ */ Symbol("test");
       var symObj = Object(sym);
       if (typeof sym === "string") {
         return false;
@@ -20492,7 +20496,7 @@ var require_has_symbols = __commonJS({
       if (typeof origSymbol("foo") !== "symbol") {
         return false;
       }
-      if (typeof Symbol("bar") !== "symbol") {
+      if (typeof /* @__PURE__ */ Symbol("bar") !== "symbol") {
         return false;
       }
       return hasSymbolSham();
@@ -20749,7 +20753,7 @@ var require_get_intrinsic = __commonJS({
     var throwTypeError = function() {
       throw new $TypeError();
     };
-    var ThrowTypeError = $gOPD ? function() {
+    var ThrowTypeError = $gOPD ? (function() {
       try {
         arguments.callee;
         return throwTypeError;
@@ -20760,7 +20764,7 @@ var require_get_intrinsic = __commonJS({
           return throwTypeError;
         }
       }
-    }() : throwTypeError;
+    })() : throwTypeError;
     var hasSymbols = require_has_symbols()();
     var getProto = require_get_proto();
     var $ObjectGPO = require_Object_getPrototypeOf();
@@ -21024,7 +21028,7 @@ var require_get_intrinsic = __commonJS({
             if (!allowMissing) {
               throw new $TypeError("base intrinsic for " + name + " exists, but the property is not available.");
             }
-            return void 0;
+            return void undefined2;
           }
           if ($gOPD && i2 + 1 >= parts.length) {
             var desc = $gOPD(value, part);
@@ -21289,13 +21293,13 @@ var require_utils2 = __commonJS({
     var setMaxIndex = function setMaxIndex2(obj, maxIndex) {
       overflowChannel.set(obj, maxIndex);
     };
-    var hexTable = function() {
+    var hexTable = (function() {
       var array = [];
       for (var i2 = 0; i2 < 256; ++i2) {
         array[array.length] = "%" + ((i2 < 16 ? "0" : "") + i2.toString(16)).toUpperCase();
       }
       return array;
-    }();
+    })();
     var compactQueue = function compactQueue2(queue) {
       while (queue.length > 1) {
         var item = queue.pop();
@@ -22450,11 +22454,17 @@ var require_parseurl = __commonJS({
             }
             break;
           case 9:
+          /* \t */
           case 10:
+          /* \n */
           case 12:
+          /* \f */
           case 13:
+          /* \r */
           case 32:
+          /*    */
           case 35:
+          /* #  */
           case 160:
           case 65279:
             return parse(str);
@@ -32343,7 +32353,7 @@ var require_ipaddr = __commonJS({
         }
         return defaultName;
       };
-      ipaddr.IPv4 = function() {
+      ipaddr.IPv4 = (function() {
         function IPv4(octets) {
           var k, len, octet;
           if (octets.length !== 4) {
@@ -32428,7 +32438,7 @@ var require_ipaddr = __commonJS({
           return 32 - cidr;
         };
         return IPv4;
-      }();
+      })();
       ipv4Part = "(0?\\d+|0x[a-f0-9]+)";
       ipv4Regexes = {
         fourOctet: new RegExp("^" + ipv4Part + "\\." + ipv4Part + "\\." + ipv4Part + "\\." + ipv4Part + "$", "i"),
@@ -32444,7 +32454,7 @@ var require_ipaddr = __commonJS({
           }
         };
         if (match = string.match(ipv4Regexes.fourOctet)) {
-          return function() {
+          return (function() {
             var k, len, ref, results;
             ref = match.slice(1, 6);
             results = [];
@@ -32453,25 +32463,25 @@ var require_ipaddr = __commonJS({
               results.push(parseIntAuto(part));
             }
             return results;
-          }();
+          })();
         } else if (match = string.match(ipv4Regexes.longValue)) {
           value = parseIntAuto(match[1]);
           if (value > 4294967295 || value < 0) {
             throw new Error("ipaddr: address outside defined range");
           }
-          return function() {
+          return (function() {
             var k, results;
             results = [];
             for (shift = k = 0; k <= 24; shift = k += 8) {
               results.push(value >> shift & 255);
             }
             return results;
-          }().reverse();
+          })().reverse();
         } else {
           return null;
         }
       };
-      ipaddr.IPv6 = function() {
+      ipaddr.IPv6 = (function() {
         function IPv6(parts, zoneId) {
           var i2, k, l, len, part, ref;
           if (parts.length === 16) {
@@ -32531,7 +32541,7 @@ var require_ipaddr = __commonJS({
         };
         IPv6.prototype.toNormalizedString = function() {
           var addr, part, suffix;
-          addr = function() {
+          addr = (function() {
             var k, len, ref, results;
             ref = this.parts;
             results = [];
@@ -32540,7 +32550,7 @@ var require_ipaddr = __commonJS({
               results.push(part.toString(16));
             }
             return results;
-          }.call(this).join(":");
+          }).call(this).join(":");
           suffix = "";
           if (this.zoneId) {
             suffix = "%" + this.zoneId;
@@ -32549,7 +32559,7 @@ var require_ipaddr = __commonJS({
         };
         IPv6.prototype.toFixedLengthString = function() {
           var addr, part, suffix;
-          addr = function() {
+          addr = (function() {
             var k, len, ref, results;
             ref = this.parts;
             results = [];
@@ -32558,7 +32568,7 @@ var require_ipaddr = __commonJS({
               results.push(part.toString(16).padStart(4, "0"));
             }
             return results;
-          }.call(this).join(":");
+          }).call(this).join(":");
           suffix = "";
           if (this.zoneId) {
             suffix = "%" + this.zoneId;
@@ -32643,7 +32653,7 @@ var require_ipaddr = __commonJS({
           return 128 - cidr;
         };
         return IPv6;
-      }();
+      })();
       ipv6Part = "(?:[0-9a-f]+::?)+";
       zoneIndex = "%[0-9a-z]{1,}";
       ipv6Regexes = {
@@ -32687,7 +32697,7 @@ var require_ipaddr = __commonJS({
         if (string[string.length - 1] === ":") {
           string = string.slice(0, -1);
         }
-        parts = function() {
+        parts = (function() {
           var k, len, ref, results;
           ref = string.split(":");
           results = [];
@@ -32696,7 +32706,7 @@ var require_ipaddr = __commonJS({
             results.push(parseInt(part, 16));
           }
           return results;
-        }();
+        })();
         return {
           parts,
           zoneId
@@ -55525,6 +55535,7 @@ var require_response = __commonJS({
       var req = this.req;
       var app2 = this.app;
       switch (typeof chunk2) {
+        // string defaulting to html
         case "string":
           encoding = "utf8";
           const type = this.get("Content-Type");
@@ -55926,6 +55937,7 @@ var require_response = __commonJS({
               return "\\u003e";
             case 38:
               return "\\u0026";
+            /* istanbul ignore next: unreachable default */
             default:
               return c3;
           }
@@ -66099,7 +66111,7 @@ var require_parser_v3 = __commonJS({
 var require_transport = __commonJS({
   "node_modules/engine.io/build/transport.js"(exports2) {
     "use strict";
-    var __createBinding = exports2 && exports2.__createBinding || (Object.create ? function(o2, m, k, k2) {
+    var __createBinding = exports2 && exports2.__createBinding || (Object.create ? (function(o2, m, k, k2) {
       if (k2 === void 0) k2 = k;
       var desc = Object.getOwnPropertyDescriptor(m, k);
       if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
@@ -66108,16 +66120,16 @@ var require_transport = __commonJS({
         } };
       }
       Object.defineProperty(o2, k2, desc);
-    } : function(o2, m, k, k2) {
+    }) : (function(o2, m, k, k2) {
       if (k2 === void 0) k2 = k;
       o2[k2] = m[k];
-    });
-    var __setModuleDefault = exports2 && exports2.__setModuleDefault || (Object.create ? function(o2, v) {
+    }));
+    var __setModuleDefault = exports2 && exports2.__setModuleDefault || (Object.create ? (function(o2, v) {
       Object.defineProperty(o2, "default", { enumerable: true, value: v });
-    } : function(o2, v) {
+    }) : function(o2, v) {
       o2["default"] = v;
     });
-    var __importStar = exports2 && exports2.__importStar || /* @__PURE__ */ function() {
+    var __importStar = exports2 && exports2.__importStar || /* @__PURE__ */ (function() {
       var ownKeys = function(o2) {
         ownKeys = Object.getOwnPropertyNames || function(o3) {
           var ar = [];
@@ -66135,7 +66147,7 @@ var require_transport = __commonJS({
         __setModuleDefault(result, mod);
         return result;
       };
-    }();
+    })();
     var __importDefault = exports2 && exports2.__importDefault || function(mod) {
       return mod && mod.__esModule ? mod : { "default": mod };
     };
@@ -67152,7 +67164,7 @@ var require_polling = __commonJS({
 var require_polling_jsonp = __commonJS({
   "node_modules/engine.io/build/transports/polling-jsonp.js"(exports2) {
     "use strict";
-    var __createBinding = exports2 && exports2.__createBinding || (Object.create ? function(o2, m, k, k2) {
+    var __createBinding = exports2 && exports2.__createBinding || (Object.create ? (function(o2, m, k, k2) {
       if (k2 === void 0) k2 = k;
       var desc = Object.getOwnPropertyDescriptor(m, k);
       if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
@@ -67161,16 +67173,16 @@ var require_polling_jsonp = __commonJS({
         } };
       }
       Object.defineProperty(o2, k2, desc);
-    } : function(o2, m, k, k2) {
+    }) : (function(o2, m, k, k2) {
       if (k2 === void 0) k2 = k;
       o2[k2] = m[k];
-    });
-    var __setModuleDefault = exports2 && exports2.__setModuleDefault || (Object.create ? function(o2, v) {
+    }));
+    var __setModuleDefault = exports2 && exports2.__setModuleDefault || (Object.create ? (function(o2, v) {
       Object.defineProperty(o2, "default", { enumerable: true, value: v });
-    } : function(o2, v) {
+    }) : function(o2, v) {
       o2["default"] = v;
     });
-    var __importStar = exports2 && exports2.__importStar || /* @__PURE__ */ function() {
+    var __importStar = exports2 && exports2.__importStar || /* @__PURE__ */ (function() {
       var ownKeys = function(o2) {
         ownKeys = Object.getOwnPropertyNames || function(o3) {
           var ar = [];
@@ -67188,7 +67200,7 @@ var require_polling_jsonp = __commonJS({
         __setModuleDefault(result, mod);
         return result;
       };
-    }();
+    })();
     Object.defineProperty(exports2, "__esModule", { value: true });
     exports2.JSONP = void 0;
     var polling_1 = require_polling();
@@ -67872,10 +67884,10 @@ var require_constants = __commonJS({
       EMPTY_BUFFER: Buffer.alloc(0),
       GUID: "258EAFA5-E914-47DA-95CA-C5AB0DC85B11",
       hasBlob,
-      kForOnEventAttribute: Symbol("kIsForOnEventAttribute"),
-      kListener: Symbol("kListener"),
-      kStatusCode: Symbol("status-code"),
-      kWebSocket: Symbol("websocket"),
+      kForOnEventAttribute: /* @__PURE__ */ Symbol("kIsForOnEventAttribute"),
+      kListener: /* @__PURE__ */ Symbol("kListener"),
+      kStatusCode: /* @__PURE__ */ Symbol("status-code"),
+      kWebSocket: /* @__PURE__ */ Symbol("websocket"),
       NOOP: () => {
       }
     };
@@ -67961,8 +67973,8 @@ var require_buffer_util = __commonJS({
 var require_limiter = __commonJS({
   "node_modules/ws/lib/limiter.js"(exports2, module2) {
     "use strict";
-    var kDone = Symbol("kDone");
-    var kRun = Symbol("kRun");
+    var kDone = /* @__PURE__ */ Symbol("kDone");
+    var kRun = /* @__PURE__ */ Symbol("kRun");
     var Limiter = class {
       /**
        * Creates a new `Limiter`.
@@ -68017,11 +68029,11 @@ var require_permessage_deflate = __commonJS({
     var { kStatusCode } = require_constants();
     var FastBuffer = Buffer[Symbol.species];
     var TRAILER = Buffer.from([0, 0, 255, 255]);
-    var kPerMessageDeflate = Symbol("permessage-deflate");
-    var kTotalLength = Symbol("total-length");
-    var kCallback = Symbol("callback");
-    var kBuffers = Symbol("buffers");
-    var kError = Symbol("error");
+    var kPerMessageDeflate = /* @__PURE__ */ Symbol("permessage-deflate");
+    var kTotalLength = /* @__PURE__ */ Symbol("total-length");
+    var kCallback = /* @__PURE__ */ Symbol("callback");
+    var kBuffers = /* @__PURE__ */ Symbol("buffers");
+    var kError = /* @__PURE__ */ Symbol("error");
     var zlibLimiter;
     var PerMessageDeflate2 = class {
       /**
@@ -69227,7 +69239,7 @@ var require_sender = __commonJS({
     var { EMPTY_BUFFER: EMPTY_BUFFER2, kWebSocket, NOOP } = require_constants();
     var { isBlob: isBlob3, isValidStatusCode } = require_validation();
     var { mask: applyMask, toBuffer } = require_buffer_util();
-    var kByteLength = Symbol("kByteLength");
+    var kByteLength = /* @__PURE__ */ Symbol("kByteLength");
     var maskBuffer = Buffer.alloc(4);
     var RANDOM_POOL_SIZE = 8 * 1024;
     var randomPool;
@@ -69712,14 +69724,14 @@ var require_event_target = __commonJS({
   "node_modules/ws/lib/event-target.js"(exports2, module2) {
     "use strict";
     var { kForOnEventAttribute, kListener } = require_constants();
-    var kCode = Symbol("kCode");
-    var kData = Symbol("kData");
-    var kError = Symbol("kError");
-    var kMessage = Symbol("kMessage");
-    var kReason = Symbol("kReason");
-    var kTarget = Symbol("kTarget");
-    var kType = Symbol("kType");
-    var kWasClean = Symbol("kWasClean");
+    var kCode = /* @__PURE__ */ Symbol("kCode");
+    var kData = /* @__PURE__ */ Symbol("kData");
+    var kError = /* @__PURE__ */ Symbol("kError");
+    var kMessage = /* @__PURE__ */ Symbol("kMessage");
+    var kReason = /* @__PURE__ */ Symbol("kReason");
+    var kTarget = /* @__PURE__ */ Symbol("kTarget");
+    var kType = /* @__PURE__ */ Symbol("kType");
+    var kWasClean = /* @__PURE__ */ Symbol("kWasClean");
     var Event = class {
       /**
        * Create a new `Event`.
@@ -70121,7 +70133,7 @@ var require_websocket2 = __commonJS({
     } = require_event_target();
     var { format, parse } = require_extension();
     var { toBuffer } = require_buffer_util();
-    var kAborted = Symbol("kAborted");
+    var kAborted = /* @__PURE__ */ Symbol("kAborted");
     var protocolVersions = [8, 13];
     var readyStates = ["CONNECTING", "OPEN", "CLOSING", "CLOSED"];
     var subprotocolRegex = /^[!#$%&'*+\-.0-9A-Z^_`|a-z~]+$/;
@@ -71868,7 +71880,7 @@ var require_server = __commonJS({
     var engine_io_parser_1 = require_cjs();
     var objectFromEntries_1 = require_objectFromEntries();
     var debug = (0, debug_1.default)("engine");
-    var kResponseHeaders = Symbol("responseHeaders");
+    var kResponseHeaders = /* @__PURE__ */ Symbol("responseHeaders");
     function parseSessionId(data) {
       try {
         const parsed = JSON.parse(data);
@@ -73551,7 +73563,7 @@ var require_userver = __commonJS({
 var require_engine_io = __commonJS({
   "node_modules/engine.io/build/engine.io.js"(exports2) {
     "use strict";
-    var __createBinding = exports2 && exports2.__createBinding || (Object.create ? function(o2, m, k, k2) {
+    var __createBinding = exports2 && exports2.__createBinding || (Object.create ? (function(o2, m, k, k2) {
       if (k2 === void 0) k2 = k;
       var desc = Object.getOwnPropertyDescriptor(m, k);
       if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
@@ -73560,16 +73572,16 @@ var require_engine_io = __commonJS({
         } };
       }
       Object.defineProperty(o2, k2, desc);
-    } : function(o2, m, k, k2) {
+    }) : (function(o2, m, k, k2) {
       if (k2 === void 0) k2 = k;
       o2[k2] = m[k];
-    });
-    var __setModuleDefault = exports2 && exports2.__setModuleDefault || (Object.create ? function(o2, v) {
+    }));
+    var __setModuleDefault = exports2 && exports2.__setModuleDefault || (Object.create ? (function(o2, v) {
       Object.defineProperty(o2, "default", { enumerable: true, value: v });
-    } : function(o2, v) {
+    }) : function(o2, v) {
       o2["default"] = v;
     });
-    var __importStar = exports2 && exports2.__importStar || /* @__PURE__ */ function() {
+    var __importStar = exports2 && exports2.__importStar || /* @__PURE__ */ (function() {
       var ownKeys = function(o2) {
         ownKeys = Object.getOwnPropertyNames || function(o3) {
           var ar = [];
@@ -73587,7 +73599,7 @@ var require_engine_io = __commonJS({
         __setModuleDefault(result, mod);
         return result;
       };
-    }();
+    })();
     var __importDefault = exports2 && exports2.__importDefault || function(mod) {
       return mod && mod.__esModule ? mod : { "default": mod };
     };
@@ -77021,9 +77033,13 @@ var require_cluster_adapter = __commonJS({
             this.nsp._onServerSideEmit([...packet, callback]);
             break;
           }
+          // @ts-ignore
           case MessageType2.BROADCAST_CLIENT_COUNT:
+          // @ts-ignore
           case MessageType2.BROADCAST_ACK:
+          // @ts-ignore
           case MessageType2.FETCH_SOCKETS_RESPONSE:
+          // @ts-ignore
           case MessageType2.SERVER_SIDE_EMIT_RESPONSE:
             this.onResponse(message);
             break;
@@ -77833,7 +77849,7 @@ var require_package = __commonJS({
 var require_dist5 = __commonJS({
   "node_modules/socket.io/dist/index.js"(exports2, module2) {
     "use strict";
-    var __createBinding = exports2 && exports2.__createBinding || (Object.create ? function(o2, m, k, k2) {
+    var __createBinding = exports2 && exports2.__createBinding || (Object.create ? (function(o2, m, k, k2) {
       if (k2 === void 0) k2 = k;
       var desc = Object.getOwnPropertyDescriptor(m, k);
       if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
@@ -77842,16 +77858,16 @@ var require_dist5 = __commonJS({
         } };
       }
       Object.defineProperty(o2, k2, desc);
-    } : function(o2, m, k, k2) {
+    }) : (function(o2, m, k, k2) {
       if (k2 === void 0) k2 = k;
       o2[k2] = m[k];
-    });
-    var __setModuleDefault = exports2 && exports2.__setModuleDefault || (Object.create ? function(o2, v) {
+    }));
+    var __setModuleDefault = exports2 && exports2.__setModuleDefault || (Object.create ? (function(o2, v) {
       Object.defineProperty(o2, "default", { enumerable: true, value: v });
-    } : function(o2, v) {
+    }) : function(o2, v) {
       o2["default"] = v;
     });
-    var __importStar = exports2 && exports2.__importStar || /* @__PURE__ */ function() {
+    var __importStar = exports2 && exports2.__importStar || /* @__PURE__ */ (function() {
       var ownKeys = function(o2) {
         ownKeys = Object.getOwnPropertyNames || function(o3) {
           var ar = [];
@@ -77869,7 +77885,7 @@ var require_dist5 = __commonJS({
         __setModuleDefault(result, mod);
         return result;
       };
-    }();
+    })();
     var __importDefault = exports2 && exports2.__importDefault || function(mod) {
       return mod && mod.__esModule ? mod : { "default": mod };
     };
@@ -81018,7 +81034,7 @@ var require_axios = __commonJS({
       });
       return byteStringHeaders;
     }
-    var $internals2 = Symbol("internals");
+    var $internals2 = /* @__PURE__ */ Symbol("internals");
     function normalizeHeader2(header) {
       return header && String(header).trim().toLowerCase();
     }
@@ -82228,7 +82244,7 @@ var require_axios = __commonJS({
         }
       });
     }
-    var kInternals2 = Symbol("internals");
+    var kInternals2 = /* @__PURE__ */ Symbol("internals");
     var AxiosTransformStream2 = class extends stream5.Transform {
       constructor(options) {
         options = utils$1.toFlatObject(options, {
@@ -82426,13 +82442,13 @@ var require_axios = __commonJS({
         computedHeaders["Content-Length"] = contentLength;
       }
       headersHandler && headersHandler(computedHeaders);
-      return stream5.Readable.from(async function* () {
+      return stream5.Readable.from((async function* () {
         for (const part of parts) {
           yield boundaryBytes;
           yield* part.encode();
         }
         yield footerBytes;
-      }());
+      })());
     };
     var ZlibHeaderTransformStream2 = class extends stream5.Transform {
       __transform(chunk2, encoding, callback) {
@@ -82959,9 +82975,9 @@ var require_axios = __commonJS({
       https: httpsFollow2
     } = followRedirects2;
     var isHttps2 = /https:?/;
-    var kAxiosSocketListener2 = Symbol("axios.http.socketListener");
-    var kAxiosCurrentReq2 = Symbol("axios.http.currentReq");
-    var kAxiosInstalledTunnel2 = Symbol("axios.http.installedTunnel");
+    var kAxiosSocketListener2 = /* @__PURE__ */ Symbol("axios.http.socketListener");
+    var kAxiosCurrentReq2 = /* @__PURE__ */ Symbol("axios.http.currentReq");
+    var kAxiosInstalledTunnel2 = /* @__PURE__ */ Symbol("axios.http.installedTunnel");
     var tunnelingAgentCache2 = /* @__PURE__ */ new Map();
     var tunnelingAgentCacheUser2 = /* @__PURE__ */ new WeakMap();
     var NODE_NATIVE_ENV_PROXY_SUPPORT2 = {
@@ -83596,6 +83612,7 @@ var require_axios = __commonJS({
               delete res.headers["content-encoding"];
             }
             switch ((res.headers["content-encoding"] || "").toLowerCase()) {
+              /*eslint default-case:0*/
               case "gzip":
               case "x-gzip":
               case "compress":
@@ -86397,11 +86414,11 @@ var require_agent2 = __commonJS({
     var http23 = require("http2");
     var QuickLRU = require_quick_lru();
     var delayAsyncDestroy = require_delay_async_destroy();
-    var kCurrentStreamCount = Symbol("currentStreamCount");
-    var kRequest = Symbol("request");
-    var kOriginSet = Symbol("cachedOriginSet");
-    var kGracefullyClosing = Symbol("gracefullyClosing");
-    var kLength = Symbol("length");
+    var kCurrentStreamCount = /* @__PURE__ */ Symbol("currentStreamCount");
+    var kRequest = /* @__PURE__ */ Symbol("request");
+    var kOriginSet = /* @__PURE__ */ Symbol("cachedOriginSet");
+    var kGracefullyClosing = /* @__PURE__ */ Symbol("gracefullyClosing");
+    var kLength = /* @__PURE__ */ Symbol("length");
     var nameKeys = [
       // Not an Agent option actually
       "createConnection",
@@ -87221,13 +87238,13 @@ var require_client_request = __commonJS({
       HTTP2_HEADER_AUTHORITY,
       HTTP2_METHOD_CONNECT
     } = http23.constants;
-    var kHeaders = Symbol("headers");
-    var kOrigin = Symbol("origin");
-    var kSession = Symbol("session");
-    var kOptions = Symbol("options");
-    var kFlushedHeaders = Symbol("flushedHeaders");
-    var kJobs = Symbol("jobs");
-    var kPendingAgentPromise = Symbol("pendingAgentPromise");
+    var kHeaders = /* @__PURE__ */ Symbol("headers");
+    var kOrigin = /* @__PURE__ */ Symbol("origin");
+    var kSession = /* @__PURE__ */ Symbol("session");
+    var kOptions = /* @__PURE__ */ Symbol("options");
+    var kFlushedHeaders = /* @__PURE__ */ Symbol("flushedHeaders");
+    var kJobs = /* @__PURE__ */ Symbol("jobs");
+    var kPendingAgentPromise = /* @__PURE__ */ Symbol("pendingAgentPromise");
     var ClientRequest = class extends Writable {
       constructor(input, options, callback) {
         super({
@@ -88184,8 +88201,8 @@ var require_source = __commonJS({
 });
 
 // src/server/index.ts
-var server_exports = {};
-__export(server_exports, {
+var index_exports = {};
+__export(index_exports, {
   APP_VERSION: () => APP_VERSION,
   GITHUB_REPO: () => GITHUB_REPO,
   calculateScore: () => calculateScore,
@@ -88194,7 +88211,7 @@ __export(server_exports, {
   parseCoordinates: () => parseCoordinates,
   resolveLocation: () => resolveLocation
 });
-module.exports = __toCommonJS(server_exports);
+module.exports = __toCommonJS(index_exports);
 var import_express = __toESM(require_express2());
 var import_http4 = __toESM(require("http"));
 
@@ -88206,6 +88223,7 @@ var { Server, Namespace, Socket } = import_dist.default;
 var import_cors = __toESM(require_lib4());
 var import_path2 = __toESM(require("path"));
 var import_fs = __toESM(require("fs"));
+var import_os = __toESM(require("os"));
 var import_child_process = require("child_process");
 
 // src/main/utils/useYouTubeChat.ts
@@ -88791,7 +88809,7 @@ function toByteStringHeaderObject(headers) {
 }
 
 // node_modules/axios/lib/core/AxiosHeaders.js
-var $internals = Symbol("internals");
+var $internals = /* @__PURE__ */ Symbol("internals");
 function normalizeHeader(header) {
   return header && String(header).trim().toLowerCase();
 }
@@ -90116,7 +90134,7 @@ function setFormDataHeaders(headers, formHeaders, policy) {
 
 // node_modules/axios/lib/helpers/AxiosTransformStream.js
 var import_stream = __toESM(require("stream"), 1);
-var kInternals = Symbol("internals");
+var kInternals = /* @__PURE__ */ Symbol("internals");
 var AxiosTransformStream = class extends import_stream.default.Transform {
   constructor(options) {
     options = utils_default.toFlatObject(
@@ -90333,13 +90351,13 @@ var formDataToStream = (form, headersHandler, options) => {
   }
   headersHandler && headersHandler(computedHeaders);
   return import_stream2.Readable.from(
-    async function* () {
+    (async function* () {
       for (const part of parts) {
         yield boundaryBytes;
         yield* part.encode();
       }
       yield footerBytes;
-    }()
+    })()
   );
 };
 var formDataToStream_default = formDataToStream;
@@ -90898,9 +90916,9 @@ var ACCEPT_ENCODING_WITH_ZSTD = ACCEPT_ENCODING + (isZstdSupported ? ", zstd" : 
 var scheduleProgress = typeof process !== "undefined" && process.nextTick ? process.nextTick.bind(process) : utils_default.asap;
 var { http: httpFollow, https: httpsFollow } = import_follow_redirects.default;
 var isHttps = /https:?/;
-var kAxiosSocketListener = Symbol("axios.http.socketListener");
-var kAxiosCurrentReq = Symbol("axios.http.currentReq");
-var kAxiosInstalledTunnel = Symbol("axios.http.installedTunnel");
+var kAxiosSocketListener = /* @__PURE__ */ Symbol("axios.http.socketListener");
+var kAxiosCurrentReq = /* @__PURE__ */ Symbol("axios.http.currentReq");
+var kAxiosInstalledTunnel = /* @__PURE__ */ Symbol("axios.http.installedTunnel");
 var tunnelingAgentCache = /* @__PURE__ */ new Map();
 var tunnelingAgentCacheUser = /* @__PURE__ */ new WeakMap();
 var NODE_NATIVE_ENV_PROXY_SUPPORT = {
@@ -91607,6 +91625,7 @@ var http_default = isHttpAdapterSupported && function httpAdapter(config) {
           delete res.headers["content-encoding"];
         }
         switch ((res.headers["content-encoding"] || "").toLowerCase()) {
+          /*eslint default-case:0*/
           case "gzip":
           case "x-gzip":
           case "compress":
@@ -95222,6 +95241,7 @@ var BinaryReader = class {
         while (this.buf[this.pos++] & 128) {
         }
         break;
+      // @ts-ignore TS7029: Fallthrough case in switch -- ignore instead of expect-error for compiler settings without noFallthroughCasesInSwitch: true
       case WireType.Bit64:
         this.pos += 4;
       case WireType.Bit32:
@@ -96248,7 +96268,7 @@ var TimerDetailAuditInfo = {
     return message;
   }
 };
-var ActionButtonType = /* @__PURE__ */ function(ActionButtonType2) {
+var ActionButtonType = /* @__PURE__ */ (function(ActionButtonType2) {
   ActionButtonType2[ActionButtonType2["UNKNOWN"] = 0] = "UNKNOWN";
   ActionButtonType2[ActionButtonType2["FOLLOW"] = 1] = "FOLLOW";
   ActionButtonType2[ActionButtonType2["SET_GOAL"] = 2] = "SET_GOAL";
@@ -96270,15 +96290,15 @@ var ActionButtonType = /* @__PURE__ */ function(ActionButtonType2) {
   ActionButtonType2[ActionButtonType2["INVITE_ON_MIC"] = 18] = "INVITE_ON_MIC";
   ActionButtonType2[ActionButtonType2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return ActionButtonType2;
-}({});
-var AffiliatedInfoStickerShowScene = /* @__PURE__ */ function(AffiliatedInfoStickerShowScene2) {
+})({});
+var AffiliatedInfoStickerShowScene = /* @__PURE__ */ (function(AffiliatedInfoStickerShowScene2) {
   AffiliatedInfoStickerShowScene2[AffiliatedInfoStickerShowScene2["NORMAL"] = 0] = "NORMAL";
   AffiliatedInfoStickerShowScene2[AffiliatedInfoStickerShowScene2["SETTLING"] = 1] = "SETTLING";
   AffiliatedInfoStickerShowScene2[AffiliatedInfoStickerShowScene2["SETTLED"] = 2] = "SETTLED";
   AffiliatedInfoStickerShowScene2[AffiliatedInfoStickerShowScene2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return AffiliatedInfoStickerShowScene2;
-}({});
-var AuditStatus = /* @__PURE__ */ function(AuditStatus2) {
+})({});
+var AuditStatus = /* @__PURE__ */ (function(AuditStatus2) {
   AuditStatus2[AuditStatus2["AUDIT_STATUS_UNKNOWN"] = 0] = "AUDIT_STATUS_UNKNOWN";
   AuditStatus2[AuditStatus2["PASS"] = 1] = "PASS";
   AuditStatus2[AuditStatus2["FAILED"] = 2] = "FAILED";
@@ -96286,14 +96306,14 @@ var AuditStatus = /* @__PURE__ */ function(AuditStatus2) {
   AuditStatus2[AuditStatus2["FORBIDDEN"] = 4] = "FORBIDDEN";
   AuditStatus2[AuditStatus2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return AuditStatus2;
-}({});
-var AuditTaskType = /* @__PURE__ */ function(AuditTaskType2) {
+})({});
+var AuditTaskType = /* @__PURE__ */ (function(AuditTaskType2) {
   AuditTaskType2[AuditTaskType2["DEFAULT"] = 0] = "DEFAULT";
   AuditTaskType2[AuditTaskType2["APPEAL"] = 1] = "APPEAL";
   AuditTaskType2[AuditTaskType2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return AuditTaskType2;
-}({});
-var BadgeDisplayType = /* @__PURE__ */ function(BadgeDisplayType2) {
+})({});
+var BadgeDisplayType = /* @__PURE__ */ (function(BadgeDisplayType2) {
   BadgeDisplayType2[BadgeDisplayType2["BADGE_DISPLAY_TYPE_UNKNOWN"] = 0] = "BADGE_DISPLAY_TYPE_UNKNOWN";
   BadgeDisplayType2[BadgeDisplayType2["IMAGE"] = 1] = "IMAGE";
   BadgeDisplayType2[BadgeDisplayType2["TEXT"] = 2] = "TEXT";
@@ -96301,14 +96321,14 @@ var BadgeDisplayType = /* @__PURE__ */ function(BadgeDisplayType2) {
   BadgeDisplayType2[BadgeDisplayType2["COMBINE"] = 4] = "COMBINE";
   BadgeDisplayType2[BadgeDisplayType2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return BadgeDisplayType2;
-}({});
-var BadgeExhibitionType = /* @__PURE__ */ function(BadgeExhibitionType2) {
+})({});
+var BadgeExhibitionType = /* @__PURE__ */ (function(BadgeExhibitionType2) {
   BadgeExhibitionType2[BadgeExhibitionType2["BADGE"] = 0] = "BADGE";
   BadgeExhibitionType2[BadgeExhibitionType2["IDENTITY_LABEL"] = 1] = "IDENTITY_LABEL";
   BadgeExhibitionType2[BadgeExhibitionType2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return BadgeExhibitionType2;
-}({});
-var BadgePriorityType = /* @__PURE__ */ function(BadgePriorityType2) {
+})({});
+var BadgePriorityType = /* @__PURE__ */ (function(BadgePriorityType2) {
   BadgePriorityType2[BadgePriorityType2["BADGE_PRIORITY_TYPE_UNKNOWN"] = 0] = "BADGE_PRIORITY_TYPE_UNKNOWN";
   BadgePriorityType2[BadgePriorityType2["STRONG_RELATION"] = 10] = "STRONG_RELATION";
   BadgePriorityType2[BadgePriorityType2["PLATFORM"] = 20] = "PLATFORM";
@@ -96317,8 +96337,8 @@ var BadgePriorityType = /* @__PURE__ */ function(BadgePriorityType2) {
   BadgePriorityType2[BadgePriorityType2["RANK_LIST"] = 50] = "RANK_LIST";
   BadgePriorityType2[BadgePriorityType2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return BadgePriorityType2;
-}({});
-var BadgeSceneType = /* @__PURE__ */ function(BadgeSceneType2) {
+})({});
+var BadgeSceneType = /* @__PURE__ */ (function(BadgeSceneType2) {
   BadgeSceneType2[BadgeSceneType2["BADGE_SCENE_TYPE_UNKNOWN"] = 0] = "BADGE_SCENE_TYPE_UNKNOWN";
   BadgeSceneType2[BadgeSceneType2["ADMIN"] = 1] = "ADMIN";
   BadgeSceneType2[BadgeSceneType2["FIRST_RECHARGE"] = 2] = "FIRST_RECHARGE";
@@ -96336,15 +96356,15 @@ var BadgeSceneType = /* @__PURE__ */ function(BadgeSceneType2) {
   BadgeSceneType2[BadgeSceneType2["ENIGMA"] = 14] = "ENIGMA";
   BadgeSceneType2[BadgeSceneType2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return BadgeSceneType2;
-}({});
-var BadgeTextPosition = /* @__PURE__ */ function(BadgeTextPosition2) {
+})({});
+var BadgeTextPosition = /* @__PURE__ */ (function(BadgeTextPosition2) {
   BadgeTextPosition2[BadgeTextPosition2["BADGE_TEXT_POSITION_UNKNOWN"] = 0] = "BADGE_TEXT_POSITION_UNKNOWN";
   BadgeTextPosition2[BadgeTextPosition2["RIGHT"] = 1] = "RIGHT";
   BadgeTextPosition2[BadgeTextPosition2["BELOW"] = 2] = "BELOW";
   BadgeTextPosition2[BadgeTextPosition2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return BadgeTextPosition2;
-}({});
-var BattleABTestType = /* @__PURE__ */ function(BattleABTestType2) {
+})({});
+var BattleABTestType = /* @__PURE__ */ (function(BattleABTestType2) {
   BattleABTestType2[BattleABTestType2["UNKNOWN_AB_TEST_TYPE"] = 0] = "UNKNOWN_AB_TEST_TYPE";
   BattleABTestType2[BattleABTestType2["MEANWHILE_INVITE"] = 1] = "MEANWHILE_INVITE";
   BattleABTestType2[BattleABTestType2["SPECIFIED_GIFT"] = 2] = "SPECIFIED_GIFT";
@@ -96359,8 +96379,8 @@ var BattleABTestType = /* @__PURE__ */ function(BattleABTestType2) {
   BattleABTestType2[BattleABTestType2["MATCH_ICE_SHOWDOWN"] = 11] = "MATCH_ICE_SHOWDOWN";
   BattleABTestType2[BattleABTestType2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return BattleABTestType2;
-}({});
-var BattleInviteType = /* @__PURE__ */ function(BattleInviteType2) {
+})({});
+var BattleInviteType = /* @__PURE__ */ (function(BattleInviteType2) {
   BattleInviteType2[BattleInviteType2["BATTLE_INVITE_TYPE_NORMAL"] = 0] = "BATTLE_INVITE_TYPE_NORMAL";
   BattleInviteType2[BattleInviteType2["AGAIN"] = 1] = "AGAIN";
   BattleInviteType2[BattleInviteType2["TEAM_PAIR_INVITE_R"] = 2] = "TEAM_PAIR_INVITE_R";
@@ -96368,21 +96388,21 @@ var BattleInviteType = /* @__PURE__ */ function(BattleInviteType2) {
   BattleInviteType2[BattleInviteType2["TEAM_PAIR_QUICK_RECOMMEND_SOLO_INVITEE"] = 4] = "TEAM_PAIR_QUICK_RECOMMEND_SOLO_INVITEE";
   BattleInviteType2[BattleInviteType2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return BattleInviteType2;
-}({});
-var BattleResultResult = /* @__PURE__ */ function(BattleResultResult2) {
+})({});
+var BattleResultResult = /* @__PURE__ */ (function(BattleResultResult2) {
   BattleResultResult2[BattleResultResult2["WIN"] = 0] = "WIN";
   BattleResultResult2[BattleResultResult2["LOSE"] = 1] = "LOSE";
   BattleResultResult2[BattleResultResult2["DRAW"] = 2] = "DRAW";
   BattleResultResult2[BattleResultResult2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return BattleResultResult2;
-}({});
-var BattleScene = /* @__PURE__ */ function(BattleScene2) {
+})({});
+var BattleScene = /* @__PURE__ */ (function(BattleScene2) {
   BattleScene2[BattleScene2["BATTLE_SCENE_NORMAL"] = 0] = "BATTLE_SCENE_NORMAL";
   BattleScene2[BattleScene2["TEAM_PAIR"] = 1] = "TEAM_PAIR";
   BattleScene2[BattleScene2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return BattleScene2;
-}({});
-var BattleSettingsBattleStatus = /* @__PURE__ */ function(BattleSettingsBattleStatus2) {
+})({});
+var BattleSettingsBattleStatus = /* @__PURE__ */ (function(BattleSettingsBattleStatus2) {
   BattleSettingsBattleStatus2[BattleSettingsBattleStatus2["BATTLE_NOT_STARTED"] = 0] = "BATTLE_NOT_STARTED";
   BattleSettingsBattleStatus2[BattleSettingsBattleStatus2["BATTLE_STARTED"] = 1] = "BATTLE_STARTED";
   BattleSettingsBattleStatus2[BattleSettingsBattleStatus2["BATTLE_FINISHED"] = 2] = "BATTLE_FINISHED";
@@ -96390,8 +96410,8 @@ var BattleSettingsBattleStatus = /* @__PURE__ */ function(BattleSettingsBattleSt
   BattleSettingsBattleStatus2[BattleSettingsBattleStatus2["BATTLE_PUNISH_FINISHED"] = 4] = "BATTLE_PUNISH_FINISHED";
   BattleSettingsBattleStatus2[BattleSettingsBattleStatus2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return BattleSettingsBattleStatus2;
-}({});
-var BattleType = /* @__PURE__ */ function(BattleType2) {
+})({});
+var BattleType = /* @__PURE__ */ (function(BattleType2) {
   BattleType2[BattleType2["UNKNOWN_BATTLE_TYPE"] = 0] = "UNKNOWN_BATTLE_TYPE";
   BattleType2[BattleType2["NORMAL_BATTLE"] = 1] = "NORMAL_BATTLE";
   BattleType2[BattleType2["TEAM_BATTLE"] = 2] = "TEAM_BATTLE";
@@ -96403,8 +96423,8 @@ var BattleType = /* @__PURE__ */ function(BattleType2) {
   BattleType2[BattleType2["GROUP_RANK_LIST"] = 54] = "GROUP_RANK_LIST";
   BattleType2[BattleType2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return BattleType2;
-}({});
-var ClassType = /* @__PURE__ */ function(ClassType2) {
+})({});
+var ClassType = /* @__PURE__ */ (function(ClassType2) {
   ClassType2[ClassType2["NONE"] = 0] = "NONE";
   ClassType2[ClassType2["D_5"] = 100] = "D_5";
   ClassType2[ClassType2["D_4"] = 200] = "D_4";
@@ -96429,15 +96449,15 @@ var ClassType = /* @__PURE__ */ function(ClassType2) {
   ClassType2[ClassType2["S"] = 2100] = "S";
   ClassType2[ClassType2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return ClassType2;
-}({});
-var CoHostPermissoinType = /* @__PURE__ */ function(CoHostPermissoinType2) {
+})({});
+var CoHostPermissoinType = /* @__PURE__ */ (function(CoHostPermissoinType2) {
   CoHostPermissoinType2[CoHostPermissoinType2["NO_PERM"] = 0] = "NO_PERM";
   CoHostPermissoinType2[CoHostPermissoinType2["COHOST_PERM"] = 1] = "COHOST_PERM";
   CoHostPermissoinType2[CoHostPermissoinType2["MULTI_HOST_PERM"] = 2] = "MULTI_HOST_PERM";
   CoHostPermissoinType2[CoHostPermissoinType2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return CoHostPermissoinType2;
-}({});
-var CohostABTestType = /* @__PURE__ */ function(CohostABTestType2) {
+})({});
+var CohostABTestType = /* @__PURE__ */ (function(CohostABTestType2) {
   CohostABTestType2[CohostABTestType2["COHOST_AB_TEST_TYPE_UNKNOWN"] = 0] = "COHOST_AB_TEST_TYPE_UNKNOWN";
   CohostABTestType2[CohostABTestType2["LINK_TIME_OUT_STRATEGY"] = 1] = "LINK_TIME_OUT_STRATEGY";
   CohostABTestType2[CohostABTestType2["COHOST_RESERVATION"] = 2] = "COHOST_RESERVATION";
@@ -96445,28 +96465,28 @@ var CohostABTestType = /* @__PURE__ */ function(CohostABTestType2) {
   CohostABTestType2[CohostABTestType2["COHOST_INVITATION_TEXT"] = 4] = "COHOST_INVITATION_TEXT";
   CohostABTestType2[CohostABTestType2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return CohostABTestType2;
-}({});
-var CohostLayoutMode = /* @__PURE__ */ function(CohostLayoutMode2) {
+})({});
+var CohostLayoutMode = /* @__PURE__ */ (function(CohostLayoutMode2) {
   CohostLayoutMode2[CohostLayoutMode2["COHOST_LAYOUT_MODE_NORMAL"] = 0] = "COHOST_LAYOUT_MODE_NORMAL";
   CohostLayoutMode2[CohostLayoutMode2["SCREEN_SHARE"] = 1] = "SCREEN_SHARE";
   CohostLayoutMode2[CohostLayoutMode2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return CohostLayoutMode2;
-}({});
-var CohostNudgeInfo = /* @__PURE__ */ function(CohostNudgeInfo2) {
+})({});
+var CohostNudgeInfo = /* @__PURE__ */ (function(CohostNudgeInfo2) {
   CohostNudgeInfo2[CohostNudgeInfo2["COHOST_NUDGE_INFO_NONE"] = 0] = "COHOST_NUDGE_INFO_NONE";
   CohostNudgeInfo2[CohostNudgeInfo2["YOUR_NUDGE"] = 1] = "YOUR_NUDGE";
   CohostNudgeInfo2[CohostNudgeInfo2["NUDGED_YOU"] = 2] = "NUDGED_YOU";
   CohostNudgeInfo2[CohostNudgeInfo2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return CohostNudgeInfo2;
-}({});
-var ContentSource = /* @__PURE__ */ function(ContentSource2) {
+})({});
+var ContentSource = /* @__PURE__ */ (function(ContentSource2) {
   ContentSource2[ContentSource2["CONTENT_SOURCE_UNKNOWN"] = 0] = "CONTENT_SOURCE_UNKNOWN";
   ContentSource2[ContentSource2["CONTENT_SOURCE_NORMAL"] = 1] = "CONTENT_SOURCE_NORMAL";
   ContentSource2[ContentSource2["CAMERA"] = 2] = "CAMERA";
   ContentSource2[ContentSource2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return ContentSource2;
-}({});
-var DetailBlockReason = /* @__PURE__ */ function(DetailBlockReason2) {
+})({});
+var DetailBlockReason = /* @__PURE__ */ (function(DetailBlockReason2) {
   DetailBlockReason2[DetailBlockReason2["BLOCK_REASON_NONE"] = 0] = "BLOCK_REASON_NONE";
   DetailBlockReason2[DetailBlockReason2["IN_LINKMIC"] = 100] = "IN_LINKMIC";
   DetailBlockReason2[DetailBlockReason2["MULTI_HOST_FULL"] = 101] = "MULTI_HOST_FULL";
@@ -96524,8 +96544,8 @@ var DetailBlockReason = /* @__PURE__ */ function(DetailBlockReason2) {
   DetailBlockReason2[DetailBlockReason2["ROOM_FILTER_ERROR"] = 401] = "ROOM_FILTER_ERROR";
   DetailBlockReason2[DetailBlockReason2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return DetailBlockReason2;
-}({});
-var DisplayControlHorizontalOnclickTriggerType = /* @__PURE__ */ function(DisplayControlHorizontalOnclickTriggerType2) {
+})({});
+var DisplayControlHorizontalOnclickTriggerType = /* @__PURE__ */ (function(DisplayControlHorizontalOnclickTriggerType2) {
   DisplayControlHorizontalOnclickTriggerType2[DisplayControlHorizontalOnclickTriggerType2["ONCLICK_TRIGGER_TYPE_UNKNOWN"] = 0] = "ONCLICK_TRIGGER_TYPE_UNKNOWN";
   DisplayControlHorizontalOnclickTriggerType2[DisplayControlHorizontalOnclickTriggerType2["ONCLICK_TRIGGER_TYPE_LEFT"] = 1] = "ONCLICK_TRIGGER_TYPE_LEFT";
   DisplayControlHorizontalOnclickTriggerType2[DisplayControlHorizontalOnclickTriggerType2["ONCLICK_TRIGGER_TYPE_MIDDLE"] = 2] = "ONCLICK_TRIGGER_TYPE_MIDDLE";
@@ -96533,43 +96553,43 @@ var DisplayControlHorizontalOnclickTriggerType = /* @__PURE__ */ function(Displa
   DisplayControlHorizontalOnclickTriggerType2[DisplayControlHorizontalOnclickTriggerType2["ONCLICK_TRIGGER_TYPE_ALL_AREA"] = 4] = "ONCLICK_TRIGGER_TYPE_ALL_AREA";
   DisplayControlHorizontalOnclickTriggerType2[DisplayControlHorizontalOnclickTriggerType2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return DisplayControlHorizontalOnclickTriggerType2;
-}({});
-var DisplayStatus = /* @__PURE__ */ function(DisplayStatus2) {
+})({});
+var DisplayStatus = /* @__PURE__ */ (function(DisplayStatus2) {
   DisplayStatus2[DisplayStatus2["DISPLAY_STATUS_NORMAL"] = 0] = "DISPLAY_STATUS_NORMAL";
   DisplayStatus2[DisplayStatus2["SHADOW"] = 1] = "SHADOW";
   DisplayStatus2[DisplayStatus2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return DisplayStatus2;
-}({});
-var EmotePrivateType = /* @__PURE__ */ function(EmotePrivateType2) {
+})({});
+var EmotePrivateType = /* @__PURE__ */ (function(EmotePrivateType2) {
   EmotePrivateType2[EmotePrivateType2["EMOTE_PRIVATE_TYPE_NORMAL"] = 0] = "EMOTE_PRIVATE_TYPE_NORMAL";
   EmotePrivateType2[EmotePrivateType2["SUB_WAVE"] = 1] = "SUB_WAVE";
   EmotePrivateType2[EmotePrivateType2["GUESSING"] = 101] = "GUESSING";
   EmotePrivateType2[EmotePrivateType2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return EmotePrivateType2;
-}({});
-var EmoteScene = /* @__PURE__ */ function(EmoteScene2) {
+})({});
+var EmoteScene = /* @__PURE__ */ (function(EmoteScene2) {
   EmoteScene2[EmoteScene2["SUBSCRIPTION"] = 0] = "SUBSCRIPTION";
   EmoteScene2[EmoteScene2["GAME"] = 1] = "GAME";
   EmoteScene2[EmoteScene2["FANS_CLUB"] = 2] = "FANS_CLUB";
   EmoteScene2[EmoteScene2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return EmoteScene2;
-}({});
-var EmoteType = /* @__PURE__ */ function(EmoteType2) {
+})({});
+var EmoteType = /* @__PURE__ */ (function(EmoteType2) {
   EmoteType2[EmoteType2["EMOTE_TYPE_NORMAL"] = 0] = "EMOTE_TYPE_NORMAL";
   EmoteType2[EmoteType2["WITH_STICKER"] = 1] = "WITH_STICKER";
   EmoteType2[EmoteType2["EMOTE_TYPE_FANS"] = 2] = "EMOTE_TYPE_FANS";
   EmoteType2[EmoteType2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return EmoteType2;
-}({});
-var EntranceGroupType = /* @__PURE__ */ function(EntranceGroupType2) {
+})({});
+var EntranceGroupType = /* @__PURE__ */ (function(EntranceGroupType2) {
   EntranceGroupType2[EntranceGroupType2["ENTRANCE_GROUP_TYPE_DEFAULT"] = 0] = "ENTRANCE_GROUP_TYPE_DEFAULT";
   EntranceGroupType2[EntranceGroupType2["GIFT"] = 1] = "GIFT";
   EntranceGroupType2[EntranceGroupType2["E_COMMERCE"] = 2] = "E_COMMERCE";
   EntranceGroupType2[EntranceGroupType2["ENTRANCE_GROUP_TYPE_GAME"] = 3] = "ENTRANCE_GROUP_TYPE_GAME";
   EntranceGroupType2[EntranceGroupType2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return EntranceGroupType2;
-}({});
-var EnvelopeBusinessType = /* @__PURE__ */ function(EnvelopeBusinessType2) {
+})({});
+var EnvelopeBusinessType = /* @__PURE__ */ (function(EnvelopeBusinessType2) {
   EnvelopeBusinessType2[EnvelopeBusinessType2["BUSINESS_TYPE_UNKNOWN"] = 0] = "BUSINESS_TYPE_UNKNOWN";
   EnvelopeBusinessType2[EnvelopeBusinessType2["BUSINESS_TYPE_USER_DIAMOND"] = 1] = "BUSINESS_TYPE_USER_DIAMOND";
   EnvelopeBusinessType2[EnvelopeBusinessType2["BUSINESS_TYPE_PLATFORM_DIAMOND"] = 2] = "BUSINESS_TYPE_PLATFORM_DIAMOND";
@@ -96587,30 +96607,30 @@ var EnvelopeBusinessType = /* @__PURE__ */ function(EnvelopeBusinessType2) {
   EnvelopeBusinessType2[EnvelopeBusinessType2["SUPER_FAN_BOX"] = 19] = "SUPER_FAN_BOX";
   EnvelopeBusinessType2[EnvelopeBusinessType2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return EnvelopeBusinessType2;
-}({});
-var EnvelopeDisplay = /* @__PURE__ */ function(EnvelopeDisplay2) {
+})({});
+var EnvelopeDisplay = /* @__PURE__ */ (function(EnvelopeDisplay2) {
   EnvelopeDisplay2[EnvelopeDisplay2["ENVELOPE_DISPLAY_UNKNOWN"] = 0] = "ENVELOPE_DISPLAY_UNKNOWN";
   EnvelopeDisplay2[EnvelopeDisplay2["NEW"] = 1] = "NEW";
   EnvelopeDisplay2[EnvelopeDisplay2["HIDE"] = 2] = "HIDE";
   EnvelopeDisplay2[EnvelopeDisplay2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return EnvelopeDisplay2;
-}({});
-var EnvelopeFollowShowStatus = /* @__PURE__ */ function(EnvelopeFollowShowStatus2) {
+})({});
+var EnvelopeFollowShowStatus = /* @__PURE__ */ (function(EnvelopeFollowShowStatus2) {
   EnvelopeFollowShowStatus2[EnvelopeFollowShowStatus2["ENVELOPE_FOLLOW_SHOW_UNKNOWN"] = 0] = "ENVELOPE_FOLLOW_SHOW_UNKNOWN";
   EnvelopeFollowShowStatus2[EnvelopeFollowShowStatus2["ENVELOPE_FOLLOW_SHOW"] = 1] = "ENVELOPE_FOLLOW_SHOW";
   EnvelopeFollowShowStatus2[EnvelopeFollowShowStatus2["ENVELOPE_FOLLOW_NOT_SHOW"] = 2] = "ENVELOPE_FOLLOW_NOT_SHOW";
   EnvelopeFollowShowStatus2[EnvelopeFollowShowStatus2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return EnvelopeFollowShowStatus2;
-}({});
-var GamepadTaskType = /* @__PURE__ */ function(GamepadTaskType2) {
+})({});
+var GamepadTaskType = /* @__PURE__ */ (function(GamepadTaskType2) {
   GamepadTaskType2[GamepadTaskType2["PARTNERSHIP"] = 0] = "PARTNERSHIP";
   GamepadTaskType2[GamepadTaskType2["PUBLISHER"] = 1] = "PUBLISHER";
   GamepadTaskType2[GamepadTaskType2["EVENT"] = 2] = "EVENT";
   GamepadTaskType2[GamepadTaskType2["ORG"] = 3] = "ORG";
   GamepadTaskType2[GamepadTaskType2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return GamepadTaskType2;
-}({});
-var GiftPanelBeaconBubbleType = /* @__PURE__ */ function(GiftPanelBeaconBubbleType2) {
+})({});
+var GiftPanelBeaconBubbleType = /* @__PURE__ */ (function(GiftPanelBeaconBubbleType2) {
   GiftPanelBeaconBubbleType2[GiftPanelBeaconBubbleType2["GIFT_PANEL_BEACON_BUBBLE_TYPE_UNKNOWN"] = 0] = "GIFT_PANEL_BEACON_BUBBLE_TYPE_UNKNOWN";
   GiftPanelBeaconBubbleType2[GiftPanelBeaconBubbleType2["GIFT_PANEL_BEACON_BUBBLE_TYPE_DEFAULT"] = 1] = "GIFT_PANEL_BEACON_BUBBLE_TYPE_DEFAULT";
   GiftPanelBeaconBubbleType2[GiftPanelBeaconBubbleType2["LYNX_DEFAULT"] = 2] = "LYNX_DEFAULT";
@@ -96621,8 +96641,8 @@ var GiftPanelBeaconBubbleType = /* @__PURE__ */ function(GiftPanelBeaconBubbleTy
   GiftPanelBeaconBubbleType2[GiftPanelBeaconBubbleType2["VIEWER_PICKS"] = 7] = "VIEWER_PICKS";
   GiftPanelBeaconBubbleType2[GiftPanelBeaconBubbleType2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return GiftPanelBeaconBubbleType2;
-}({});
-var GiftPermissionType = /* @__PURE__ */ function(GiftPermissionType2) {
+})({});
+var GiftPermissionType = /* @__PURE__ */ (function(GiftPermissionType2) {
   GiftPermissionType2[GiftPermissionType2["UNKNOWN_TYPE"] = 0] = "UNKNOWN_TYPE";
   GiftPermissionType2[GiftPermissionType2["NO_GIFT_PERMISSION"] = 1] = "NO_GIFT_PERMISSION";
   GiftPermissionType2[GiftPermissionType2["ANCHOR_CLOSE"] = 2] = "ANCHOR_CLOSE";
@@ -96630,27 +96650,27 @@ var GiftPermissionType = /* @__PURE__ */ function(GiftPermissionType2) {
   GiftPermissionType2[GiftPermissionType2["ANCHOR_BANNED"] = 4] = "ANCHOR_BANNED";
   GiftPermissionType2[GiftPermissionType2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return GiftPermissionType2;
-}({});
-var GiftShowType = /* @__PURE__ */ function(GiftShowType2) {
+})({});
+var GiftShowType = /* @__PURE__ */ (function(GiftShowType2) {
   GiftShowType2[GiftShowType2["GIFT_SHOW_DEFAULT"] = 0] = "GIFT_SHOW_DEFAULT";
   GiftShowType2[GiftShowType2["GIFT_SHOW_NAME"] = 1] = "GIFT_SHOW_NAME";
   GiftShowType2[GiftShowType2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return GiftShowType2;
-}({});
-var GiftStructSchemeGiftType = /* @__PURE__ */ function(GiftStructSchemeGiftType2) {
+})({});
+var GiftStructSchemeGiftType = /* @__PURE__ */ (function(GiftStructSchemeGiftType2) {
   GiftStructSchemeGiftType2[GiftStructSchemeGiftType2["SCHEME_GIFT_TYPE_NONE"] = 0] = "SCHEME_GIFT_TYPE_NONE";
   GiftStructSchemeGiftType2[GiftStructSchemeGiftType2["SCHEME_GIFT_TYPE_MAGIC"] = 1] = "SCHEME_GIFT_TYPE_MAGIC";
   GiftStructSchemeGiftType2[GiftStructSchemeGiftType2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return GiftStructSchemeGiftType2;
-}({});
-var GiftTrayStyle = /* @__PURE__ */ function(GiftTrayStyle2) {
+})({});
+var GiftTrayStyle = /* @__PURE__ */ (function(GiftTrayStyle2) {
   GiftTrayStyle2[GiftTrayStyle2["GIFT_TRAY_STYLE_DEFAULT"] = 0] = "GIFT_TRAY_STYLE_DEFAULT";
   GiftTrayStyle2[GiftTrayStyle2["GALLERY_REPURCHASE_FULL"] = 1] = "GALLERY_REPURCHASE_FULL";
   GiftTrayStyle2[GiftTrayStyle2["GALLERY_REPURCHASE_BACKGROUND"] = 2] = "GALLERY_REPURCHASE_BACKGROUND";
   GiftTrayStyle2[GiftTrayStyle2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return GiftTrayStyle2;
-}({});
-var GoalMessageSource = /* @__PURE__ */ function(GoalMessageSource2) {
+})({});
+var GoalMessageSource = /* @__PURE__ */ (function(GoalMessageSource2) {
   GoalMessageSource2[GoalMessageSource2["GOAL_MESSAGE_SOURCE_UNKNOWN"] = 0] = "GOAL_MESSAGE_SOURCE_UNKNOWN";
   GoalMessageSource2[GoalMessageSource2["COMMIT"] = 1] = "COMMIT";
   GoalMessageSource2[GoalMessageSource2["PROGRESS_UPDATE"] = 2] = "PROGRESS_UPDATE";
@@ -96661,8 +96681,8 @@ var GoalMessageSource = /* @__PURE__ */ function(GoalMessageSource2) {
   GoalMessageSource2[GoalMessageSource2["CHALLENGE_PROMPT"] = 7] = "CHALLENGE_PROMPT";
   GoalMessageSource2[GoalMessageSource2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return GoalMessageSource2;
-}({});
-var GuestMicCameraChangeScene = /* @__PURE__ */ function(GuestMicCameraChangeScene2) {
+})({});
+var GuestMicCameraChangeScene = /* @__PURE__ */ (function(GuestMicCameraChangeScene2) {
   GuestMicCameraChangeScene2[GuestMicCameraChangeScene2["CHANGE_SCENE_UNKNOWN"] = 0] = "CHANGE_SCENE_UNKNOWN";
   GuestMicCameraChangeScene2[GuestMicCameraChangeScene2["LIVE_SHOW_BY_ANCHOR_AUTO"] = 1] = "LIVE_SHOW_BY_ANCHOR_AUTO";
   GuestMicCameraChangeScene2[GuestMicCameraChangeScene2["LIVE_SHOW_BY_SERVER_NORMAL"] = 2] = "LIVE_SHOW_BY_SERVER_NORMAL";
@@ -96670,8 +96690,8 @@ var GuestMicCameraChangeScene = /* @__PURE__ */ function(GuestMicCameraChangeSce
   GuestMicCameraChangeScene2[GuestMicCameraChangeScene2["COHOST_WITH_GUEST"] = 4] = "COHOST_WITH_GUEST";
   GuestMicCameraChangeScene2[GuestMicCameraChangeScene2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return GuestMicCameraChangeScene2;
-}({});
-var GuestMicCameraManageOp = /* @__PURE__ */ function(GuestMicCameraManageOp2) {
+})({});
+var GuestMicCameraManageOp = /* @__PURE__ */ (function(GuestMicCameraManageOp2) {
   GuestMicCameraManageOp2[GuestMicCameraManageOp2["OPEN_MIC"] = 0] = "OPEN_MIC";
   GuestMicCameraManageOp2[GuestMicCameraManageOp2["OPEN_CAMERA"] = 1] = "OPEN_CAMERA";
   GuestMicCameraManageOp2[GuestMicCameraManageOp2["CLOSE_MIC"] = 2] = "CLOSE_MIC";
@@ -96679,27 +96699,27 @@ var GuestMicCameraManageOp = /* @__PURE__ */ function(GuestMicCameraManageOp2) {
   GuestMicCameraManageOp2[GuestMicCameraManageOp2["CLOSE_MIC_PUNISH"] = 4] = "CLOSE_MIC_PUNISH";
   GuestMicCameraManageOp2[GuestMicCameraManageOp2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return GuestMicCameraManageOp2;
-}({});
-var HashtagNamespace = /* @__PURE__ */ function(HashtagNamespace2) {
+})({});
+var HashtagNamespace = /* @__PURE__ */ (function(HashtagNamespace2) {
   HashtagNamespace2[HashtagNamespace2["GLOBAL"] = 0] = "GLOBAL";
   HashtagNamespace2[HashtagNamespace2["GAMING"] = 1] = "GAMING";
   HashtagNamespace2[HashtagNamespace2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return HashtagNamespace2;
-}({});
-var HorizontalPaddingRule = /* @__PURE__ */ function(HorizontalPaddingRule2) {
+})({});
+var HorizontalPaddingRule = /* @__PURE__ */ (function(HorizontalPaddingRule2) {
   HorizontalPaddingRule2[HorizontalPaddingRule2["USE_MIDDLE_AND_WIDTH"] = 0] = "USE_MIDDLE_AND_WIDTH";
   HorizontalPaddingRule2[HorizontalPaddingRule2["USE_LEFT_AND_MIDDLE_AND_RIGHT"] = 1] = "USE_LEFT_AND_MIDDLE_AND_RIGHT";
   HorizontalPaddingRule2[HorizontalPaddingRule2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return HorizontalPaddingRule2;
-}({});
-var IceShowdownSetting = /* @__PURE__ */ function(IceShowdownSetting2) {
+})({});
+var IceShowdownSetting = /* @__PURE__ */ (function(IceShowdownSetting2) {
   IceShowdownSetting2[IceShowdownSetting2["ICE_SHOWDOWN_OFF"] = 0] = "ICE_SHOWDOWN_OFF";
   IceShowdownSetting2[IceShowdownSetting2["ICE_SHOWDOWN_MANUAL"] = 1] = "ICE_SHOWDOWN_MANUAL";
   IceShowdownSetting2[IceShowdownSetting2["ICE_SHOWDOWN_SYSTEM"] = 2] = "ICE_SHOWDOWN_SYSTEM";
   IceShowdownSetting2[IceShowdownSetting2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return IceShowdownSetting2;
-}({});
-var LinkListStatus = /* @__PURE__ */ function(LinkListStatus2) {
+})({});
+var LinkListStatus = /* @__PURE__ */ (function(LinkListStatus2) {
   LinkListStatus2[LinkListStatus2["STATUS_UN_KOWN"] = 0] = "STATUS_UN_KOWN";
   LinkListStatus2[LinkListStatus2["STATUS_WAITING"] = 1] = "STATUS_WAITING";
   LinkListStatus2[LinkListStatus2["STATUS_LINKED"] = 2] = "STATUS_LINKED";
@@ -96707,8 +96727,8 @@ var LinkListStatus = /* @__PURE__ */ function(LinkListStatus2) {
   LinkListStatus2[LinkListStatus2["STATUS_WAITING_OR_LINKED"] = 4] = "STATUS_WAITING_OR_LINKED";
   LinkListStatus2[LinkListStatus2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return LinkListStatus2;
-}({});
-var LinkRoleType = /* @__PURE__ */ function(LinkRoleType2) {
+})({});
+var LinkRoleType = /* @__PURE__ */ (function(LinkRoleType2) {
   LinkRoleType2[LinkRoleType2["TYPE_ROLE_TYPE_UN_KOWN"] = 0] = "TYPE_ROLE_TYPE_UN_KOWN";
   LinkRoleType2[LinkRoleType2["TYPE_LEADER"] = 1] = "TYPE_LEADER";
   LinkRoleType2[LinkRoleType2["TYPE_PLAYER"] = 2] = "TYPE_PLAYER";
@@ -96716,48 +96736,48 @@ var LinkRoleType = /* @__PURE__ */ function(LinkRoleType2) {
   LinkRoleType2[LinkRoleType2["TYPE_APP_LIER"] = 4] = "TYPE_APP_LIER";
   LinkRoleType2[LinkRoleType2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return LinkRoleType2;
-}({});
-var LinkSilenceStatus = /* @__PURE__ */ function(LinkSilenceStatus2) {
+})({});
+var LinkSilenceStatus = /* @__PURE__ */ (function(LinkSilenceStatus2) {
   LinkSilenceStatus2[LinkSilenceStatus2["STATUS_UN_SILENCE"] = 0] = "STATUS_UN_SILENCE";
   LinkSilenceStatus2[LinkSilenceStatus2["STATUS_SILENCE_BY_SELF"] = 1] = "STATUS_SILENCE_BY_SELF";
   LinkSilenceStatus2[LinkSilenceStatus2["STATUS_SILENCE_BY_OWNER"] = 2] = "STATUS_SILENCE_BY_OWNER";
   LinkSilenceStatus2[LinkSilenceStatus2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return LinkSilenceStatus2;
-}({});
-var LinkType = /* @__PURE__ */ function(LinkType2) {
+})({});
+var LinkType = /* @__PURE__ */ (function(LinkType2) {
   LinkType2[LinkType2["TYPE_UNKNOWN"] = 0] = "TYPE_UNKNOWN";
   LinkType2[LinkType2["TYPE_VIDEO"] = 1] = "TYPE_VIDEO";
   LinkType2[LinkType2["TYPE_AUDIO"] = 2] = "TYPE_AUDIO";
   LinkType2[LinkType2["TYPE_VIRTUAL"] = 3] = "TYPE_VIRTUAL";
   LinkType2[LinkType2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return LinkType2;
-}({});
-var LinkUserType = /* @__PURE__ */ function(LinkUserType2) {
+})({});
+var LinkUserType = /* @__PURE__ */ (function(LinkUserType2) {
   LinkUserType2[LinkUserType2["LINK_USER_TYPE_DEFAULT"] = 0] = "LINK_USER_TYPE_DEFAULT";
   LinkUserType2[LinkUserType2["KARAOKE"] = 1] = "KARAOKE";
   LinkUserType2[LinkUserType2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return LinkUserType2;
-}({});
-var LinkmicApplierSortSetting = /* @__PURE__ */ function(LinkmicApplierSortSetting2) {
+})({});
+var LinkmicApplierSortSetting = /* @__PURE__ */ (function(LinkmicApplierSortSetting2) {
   LinkmicApplierSortSetting2[LinkmicApplierSortSetting2["LINKMIC_APP_LIER_SORT_SETTING_NONE"] = 0] = "LINKMIC_APP_LIER_SORT_SETTING_NONE";
   LinkmicApplierSortSetting2[LinkmicApplierSortSetting2["LINKMIC_APP_LIER_SORT_SETTING_BY_GIFT_SCORE"] = 1] = "LINKMIC_APP_LIER_SORT_SETTING_BY_GIFT_SCORE";
   LinkmicApplierSortSetting2[LinkmicApplierSortSetting2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return LinkmicApplierSortSetting2;
-}({});
-var LinkmicGiftExpressionStrategy = /* @__PURE__ */ function(LinkmicGiftExpressionStrategy2) {
+})({});
+var LinkmicGiftExpressionStrategy = /* @__PURE__ */ (function(LinkmicGiftExpressionStrategy2) {
   LinkmicGiftExpressionStrategy2[LinkmicGiftExpressionStrategy2["CONTROL_V1"] = 0] = "CONTROL_V1";
   LinkmicGiftExpressionStrategy2[LinkmicGiftExpressionStrategy2["EXPERIMENT_V1"] = 1] = "EXPERIMENT_V1";
   LinkmicGiftExpressionStrategy2[LinkmicGiftExpressionStrategy2["EXPERIMENT_V2"] = 2] = "EXPERIMENT_V2";
   LinkmicGiftExpressionStrategy2[LinkmicGiftExpressionStrategy2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return LinkmicGiftExpressionStrategy2;
-}({});
-var LinkmicMultiLiveEnum = /* @__PURE__ */ function(LinkmicMultiLiveEnum2) {
+})({});
+var LinkmicMultiLiveEnum = /* @__PURE__ */ (function(LinkmicMultiLiveEnum2) {
   LinkmicMultiLiveEnum2[LinkmicMultiLiveEnum2["LINKMIC_MULTI_LIVE_ENUM_DEFAULT"] = 0] = "LINKMIC_MULTI_LIVE_ENUM_DEFAULT";
   LinkmicMultiLiveEnum2[LinkmicMultiLiveEnum2["ANCHOR_USE_NEW_LAYOUT"] = 1] = "ANCHOR_USE_NEW_LAYOUT";
   LinkmicMultiLiveEnum2[LinkmicMultiLiveEnum2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return LinkmicMultiLiveEnum2;
-}({});
-var LinkmicPlayType = /* @__PURE__ */ function(LinkmicPlayType2) {
+})({});
+var LinkmicPlayType = /* @__PURE__ */ (function(LinkmicPlayType2) {
   LinkmicPlayType2[LinkmicPlayType2["PLAY_TYPE_INVITE"] = 0] = "PLAY_TYPE_INVITE";
   LinkmicPlayType2[LinkmicPlayType2["PLAY_TYPE_APPLY"] = 1] = "PLAY_TYPE_APPLY";
   LinkmicPlayType2[LinkmicPlayType2["PLAY_TYPE_RESERVE"] = 2] = "PLAY_TYPE_RESERVE";
@@ -96765,22 +96785,22 @@ var LinkmicPlayType = /* @__PURE__ */ function(LinkmicPlayType2) {
   LinkmicPlayType2[LinkmicPlayType2["PLAY_TYPE_OFFLINE"] = 4] = "PLAY_TYPE_OFFLINE";
   LinkmicPlayType2[LinkmicPlayType2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return LinkmicPlayType2;
-}({});
-var LinkmicReplyType = /* @__PURE__ */ function(LinkmicReplyType2) {
+})({});
+var LinkmicReplyType = /* @__PURE__ */ (function(LinkmicReplyType2) {
   LinkmicReplyType2[LinkmicReplyType2["RT_UNKNOWN"] = 0] = "RT_UNKNOWN";
   LinkmicReplyType2[LinkmicReplyType2["RT_AGREE"] = 1] = "RT_AGREE";
   LinkmicReplyType2[LinkmicReplyType2["RT_REJECT"] = 2] = "RT_REJECT";
   LinkmicReplyType2[LinkmicReplyType2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return LinkmicReplyType2;
-}({});
-var LinkmicShareRevenueSetting = /* @__PURE__ */ function(LinkmicShareRevenueSetting2) {
+})({});
+var LinkmicShareRevenueSetting = /* @__PURE__ */ (function(LinkmicShareRevenueSetting2) {
   LinkmicShareRevenueSetting2[LinkmicShareRevenueSetting2["LINKMIC_SHARE_REVENUE_NOT_SET"] = 0] = "LINKMIC_SHARE_REVENUE_NOT_SET";
   LinkmicShareRevenueSetting2[LinkmicShareRevenueSetting2["LINKMIC_SHARE_REVENUE_OPEN"] = 1] = "LINKMIC_SHARE_REVENUE_OPEN";
   LinkmicShareRevenueSetting2[LinkmicShareRevenueSetting2["LINKMIC_SHARE_REVENUE_CLOSE"] = 2] = "LINKMIC_SHARE_REVENUE_CLOSE";
   LinkmicShareRevenueSetting2[LinkmicShareRevenueSetting2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return LinkmicShareRevenueSetting2;
-}({});
-var LinkmicStatus = /* @__PURE__ */ function(LinkmicStatus2) {
+})({});
+var LinkmicStatus = /* @__PURE__ */ (function(LinkmicStatus2) {
   LinkmicStatus2[LinkmicStatus2["DISABLE"] = 0] = "DISABLE";
   LinkmicStatus2[LinkmicStatus2["ENABLE"] = 1] = "ENABLE";
   LinkmicStatus2[LinkmicStatus2["JUST_FOLLOWING"] = 2] = "JUST_FOLLOWING";
@@ -96788,8 +96808,8 @@ var LinkmicStatus = /* @__PURE__ */ function(LinkmicStatus2) {
   LinkmicStatus2[LinkmicStatus2["MULTI_LINKING_ONLY_FOLLOWING"] = 4] = "MULTI_LINKING_ONLY_FOLLOWING";
   LinkmicStatus2[LinkmicStatus2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return LinkmicStatus2;
-}({});
-var LinkmicUserSettingDisableVideoLinkmic = /* @__PURE__ */ function(LinkmicUserSettingDisableVideoLinkmic2) {
+})({});
+var LinkmicUserSettingDisableVideoLinkmic = /* @__PURE__ */ (function(LinkmicUserSettingDisableVideoLinkmic2) {
   LinkmicUserSettingDisableVideoLinkmic2[LinkmicUserSettingDisableVideoLinkmic2["UN_SET"] = 0] = "UN_SET";
   LinkmicUserSettingDisableVideoLinkmic2[LinkmicUserSettingDisableVideoLinkmic2["OPEN_AND_SHOW"] = 1] = "OPEN_AND_SHOW";
   LinkmicUserSettingDisableVideoLinkmic2[LinkmicUserSettingDisableVideoLinkmic2["CLOSE_AND_SHOW"] = 2] = "CLOSE_AND_SHOW";
@@ -96797,14 +96817,14 @@ var LinkmicUserSettingDisableVideoLinkmic = /* @__PURE__ */ function(LinkmicUser
   LinkmicUserSettingDisableVideoLinkmic2[LinkmicUserSettingDisableVideoLinkmic2["CLOSE_AND_HIDE"] = 4] = "CLOSE_AND_HIDE";
   LinkmicUserSettingDisableVideoLinkmic2[LinkmicUserSettingDisableVideoLinkmic2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return LinkmicUserSettingDisableVideoLinkmic2;
-}({});
-var LinkmicUserSettingLayout = /* @__PURE__ */ function(LinkmicUserSettingLayout2) {
+})({});
+var LinkmicUserSettingLayout = /* @__PURE__ */ (function(LinkmicUserSettingLayout2) {
   LinkmicUserSettingLayout2[LinkmicUserSettingLayout2["GRID"] = 0] = "GRID";
   LinkmicUserSettingLayout2[LinkmicUserSettingLayout2["FLOATING"] = 1] = "FLOATING";
   LinkmicUserSettingLayout2[LinkmicUserSettingLayout2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return LinkmicUserSettingLayout2;
-}({});
-var LinkmicUserSettingMultiGuestApplyAutoApprove = /* @__PURE__ */ function(LinkmicUserSettingMultiGuestApplyAutoApprove2) {
+})({});
+var LinkmicUserSettingMultiGuestApplyAutoApprove = /* @__PURE__ */ (function(LinkmicUserSettingMultiGuestApplyAutoApprove2) {
   LinkmicUserSettingMultiGuestApplyAutoApprove2[LinkmicUserSettingMultiGuestApplyAutoApprove2["NOT_SET"] = 0] = "NOT_SET";
   LinkmicUserSettingMultiGuestApplyAutoApprove2[LinkmicUserSettingMultiGuestApplyAutoApprove2["ALL_AUDIENCE"] = 1] = "ALL_AUDIENCE";
   LinkmicUserSettingMultiGuestApplyAutoApprove2[LinkmicUserSettingMultiGuestApplyAutoApprove2["ONLY_FOLLOWER"] = 2] = "ONLY_FOLLOWER";
@@ -96812,8 +96832,8 @@ var LinkmicUserSettingMultiGuestApplyAutoApprove = /* @__PURE__ */ function(Link
   LinkmicUserSettingMultiGuestApplyAutoApprove2[LinkmicUserSettingMultiGuestApplyAutoApprove2["ONLY_GIFT_ER"] = 4] = "ONLY_GIFT_ER";
   LinkmicUserSettingMultiGuestApplyAutoApprove2[LinkmicUserSettingMultiGuestApplyAutoApprove2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return LinkmicUserSettingMultiGuestApplyAutoApprove2;
-}({});
-var LinkmicUserSettingShowAction = /* @__PURE__ */ function(LinkmicUserSettingShowAction2) {
+})({});
+var LinkmicUserSettingShowAction = /* @__PURE__ */ (function(LinkmicUserSettingShowAction2) {
   LinkmicUserSettingShowAction2[LinkmicUserSettingShowAction2["CHECKED"] = 0] = "CHECKED";
   LinkmicUserSettingShowAction2[LinkmicUserSettingShowAction2["NOT_CHECKED"] = 1] = "NOT_CHECKED";
   LinkmicUserSettingShowAction2[LinkmicUserSettingShowAction2["LINKMIC_USER_SETTING_SHOW_ACTION_HIDE"] = 2] = "LINKMIC_USER_SETTING_SHOW_ACTION_HIDE";
@@ -96821,30 +96841,30 @@ var LinkmicUserSettingShowAction = /* @__PURE__ */ function(LinkmicUserSettingSh
   LinkmicUserSettingShowAction2[LinkmicUserSettingShowAction2["CLOSE"] = 4] = "CLOSE";
   LinkmicUserSettingShowAction2[LinkmicUserSettingShowAction2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return LinkmicUserSettingShowAction2;
-}({});
-var LinkmicUserStatus = /* @__PURE__ */ function(LinkmicUserStatus2) {
+})({});
+var LinkmicUserStatus = /* @__PURE__ */ (function(LinkmicUserStatus2) {
   LinkmicUserStatus2[LinkmicUserStatus2["USER_STATUS_NONE"] = 0] = "USER_STATUS_NONE";
   LinkmicUserStatus2[LinkmicUserStatus2["USER_STATUS_LINKED"] = 1] = "USER_STATUS_LINKED";
   LinkmicUserStatus2[LinkmicUserStatus2["USER_STATUS_APPLYING"] = 2] = "USER_STATUS_APPLYING";
   LinkmicUserStatus2[LinkmicUserStatus2["USER_STATUS_INVITING"] = 3] = "USER_STATUS_INVITING";
   LinkmicUserStatus2[LinkmicUserStatus2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return LinkmicUserStatus2;
-}({});
-var LiveEventInfoEventPayMethod = /* @__PURE__ */ function(LiveEventInfoEventPayMethod2) {
+})({});
+var LiveEventInfoEventPayMethod = /* @__PURE__ */ (function(LiveEventInfoEventPayMethod2) {
   LiveEventInfoEventPayMethod2[LiveEventInfoEventPayMethod2["EVENT_PAY_METHOD_INVALID"] = 0] = "EVENT_PAY_METHOD_INVALID";
   LiveEventInfoEventPayMethod2[LiveEventInfoEventPayMethod2["EVENT_PAY_METHOD_COINS"] = 1] = "EVENT_PAY_METHOD_COINS";
   LiveEventInfoEventPayMethod2[LiveEventInfoEventPayMethod2["EVENT_PAY_METHOD_CASH"] = 2] = "EVENT_PAY_METHOD_CASH";
   LiveEventInfoEventPayMethod2[LiveEventInfoEventPayMethod2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return LiveEventInfoEventPayMethod2;
-}({});
-var MatchGameplayOption = /* @__PURE__ */ function(MatchGameplayOption2) {
+})({});
+var MatchGameplayOption = /* @__PURE__ */ (function(MatchGameplayOption2) {
   MatchGameplayOption2[MatchGameplayOption2["MATCH_OPTION_UNKNOWN"] = 0] = "MATCH_OPTION_UNKNOWN";
   MatchGameplayOption2[MatchGameplayOption2["MATCH_OPTION_SPECIFIC_GIFT"] = 1] = "MATCH_OPTION_SPECIFIC_GIFT";
   MatchGameplayOption2[MatchGameplayOption2["MATCH_OPTION_ICE_SHOWDOWN"] = 2] = "MATCH_OPTION_ICE_SHOWDOWN";
   MatchGameplayOption2[MatchGameplayOption2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return MatchGameplayOption2;
-}({});
-var MatchInfoMultiplierType = /* @__PURE__ */ function(MatchInfoMultiplierType2) {
+})({});
+var MatchInfoMultiplierType = /* @__PURE__ */ (function(MatchInfoMultiplierType2) {
   MatchInfoMultiplierType2[MatchInfoMultiplierType2["UNSPECIFIED"] = 0] = "UNSPECIFIED";
   MatchInfoMultiplierType2[MatchInfoMultiplierType2["CRITICAL_STRIKE"] = 1] = "CRITICAL_STRIKE";
   MatchInfoMultiplierType2[MatchInfoMultiplierType2["TOP_2"] = 2] = "TOP_2";
@@ -96852,23 +96872,23 @@ var MatchInfoMultiplierType = /* @__PURE__ */ function(MatchInfoMultiplierType2)
   MatchInfoMultiplierType2[MatchInfoMultiplierType2["VAULT_GLOVE"] = 4] = "VAULT_GLOVE";
   MatchInfoMultiplierType2[MatchInfoMultiplierType2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return MatchInfoMultiplierType2;
-}({});
-var MultiGuestOutsideRoomInviteSource = /* @__PURE__ */ function(MultiGuestOutsideRoomInviteSource2) {
+})({});
+var MultiGuestOutsideRoomInviteSource = /* @__PURE__ */ (function(MultiGuestOutsideRoomInviteSource2) {
   MultiGuestOutsideRoomInviteSource2[MultiGuestOutsideRoomInviteSource2["OUTSIDE_ROOM_INVITE_SOURCE_UNKNOWN"] = 0] = "OUTSIDE_ROOM_INVITE_SOURCE_UNKNOWN";
   MultiGuestOutsideRoomInviteSource2[MultiGuestOutsideRoomInviteSource2["OUTSIDE_ROOM_INVITE_SOURCE_PANEL"] = 1] = "OUTSIDE_ROOM_INVITE_SOURCE_PANEL";
   MultiGuestOutsideRoomInviteSource2[MultiGuestOutsideRoomInviteSource2["OUTSIDE_ROOM_INVITE_SOURCE_CAPSULE"] = 2] = "OUTSIDE_ROOM_INVITE_SOURCE_CAPSULE";
   MultiGuestOutsideRoomInviteSource2[MultiGuestOutsideRoomInviteSource2["OUTSIDE_ROOM_INVITE_SOURCE_EMPTY_POSITION"] = 3] = "OUTSIDE_ROOM_INVITE_SOURCE_EMPTY_POSITION";
   MultiGuestOutsideRoomInviteSource2[MultiGuestOutsideRoomInviteSource2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return MultiGuestOutsideRoomInviteSource2;
-}({});
-var OptPairStatus = /* @__PURE__ */ function(OptPairStatus2) {
+})({});
+var OptPairStatus = /* @__PURE__ */ (function(OptPairStatus2) {
   OptPairStatus2[OptPairStatus2["OPT_PAIR_STATUS_UNKNOWN"] = 0] = "OPT_PAIR_STATUS_UNKNOWN";
   OptPairStatus2[OptPairStatus2["OFFLINE"] = 1] = "OFFLINE";
   OptPairStatus2[OptPairStatus2["FINISHED"] = 2] = "FINISHED";
   OptPairStatus2[OptPairStatus2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return OptPairStatus2;
-}({});
-var PerceptionDialogIconType = /* @__PURE__ */ function(PerceptionDialogIconType2) {
+})({});
+var PerceptionDialogIconType = /* @__PURE__ */ (function(PerceptionDialogIconType2) {
   PerceptionDialogIconType2[PerceptionDialogIconType2["ICON_TYPE_NONE"] = 0] = "ICON_TYPE_NONE";
   PerceptionDialogIconType2[PerceptionDialogIconType2["ICON_TYPE_WARNING"] = 1] = "ICON_TYPE_WARNING";
   PerceptionDialogIconType2[PerceptionDialogIconType2["ICON_TYPE_LINKMIC"] = 2] = "ICON_TYPE_LINKMIC";
@@ -96890,8 +96910,8 @@ var PerceptionDialogIconType = /* @__PURE__ */ function(PerceptionDialogIconType
   PerceptionDialogIconType2[PerceptionDialogIconType2["ICON_TYPE_COMMON"] = 18] = "ICON_TYPE_COMMON";
   PerceptionDialogIconType2[PerceptionDialogIconType2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return PerceptionDialogIconType2;
-}({});
-var PinCardType = /* @__PURE__ */ function(PinCardType2) {
+})({});
+var PinCardType = /* @__PURE__ */ (function(PinCardType2) {
   PinCardType2[PinCardType2["UNKNOWN_PIN_CARD_TYPE"] = 0] = "UNKNOWN_PIN_CARD_TYPE";
   PinCardType2[PinCardType2["CUSTOMIZED_BENEFIT_E_NUM"] = 1] = "CUSTOMIZED_BENEFIT_E_NUM";
   PinCardType2[PinCardType2["SUB_GOAL_E_NUM"] = 2] = "SUB_GOAL_E_NUM";
@@ -96901,23 +96921,23 @@ var PinCardType = /* @__PURE__ */ function(PinCardType2) {
   PinCardType2[PinCardType2["SMB_COURSE"] = 6] = "SMB_COURSE";
   PinCardType2[PinCardType2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return PinCardType2;
-}({});
-var PollAppealStatus = /* @__PURE__ */ function(PollAppealStatus2) {
+})({});
+var PollAppealStatus = /* @__PURE__ */ (function(PollAppealStatus2) {
   PollAppealStatus2[PollAppealStatus2["POLL_APPEAL_STATUS_UNKNOWN"] = 0] = "POLL_APPEAL_STATUS_UNKNOWN";
   PollAppealStatus2[PollAppealStatus2["POLL_APPEAL_STATUS_PASS"] = 1] = "POLL_APPEAL_STATUS_PASS";
   PollAppealStatus2[PollAppealStatus2["FAIL"] = 2] = "FAIL";
   PollAppealStatus2[PollAppealStatus2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return PollAppealStatus2;
-}({});
-var PollEndType = /* @__PURE__ */ function(PollEndType2) {
+})({});
+var PollEndType = /* @__PURE__ */ (function(PollEndType2) {
   PollEndType2[PollEndType2["POLL_END_BY_TIME"] = 0] = "POLL_END_BY_TIME";
   PollEndType2[PollEndType2["POLL_END_BY_OWNER"] = 1] = "POLL_END_BY_OWNER";
   PollEndType2[PollEndType2["POLL_END_BY_OTHER"] = 2] = "POLL_END_BY_OTHER";
   PollEndType2[PollEndType2["POLL_END_BY_ADMIN"] = 3] = "POLL_END_BY_ADMIN";
   PollEndType2[PollEndType2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return PollEndType2;
-}({});
-var PollKind = /* @__PURE__ */ function(PollKind2) {
+})({});
+var PollKind = /* @__PURE__ */ (function(PollKind2) {
   PollKind2[PollKind2["POLL_KIND_NORMAL"] = 0] = "POLL_KIND_NORMAL";
   PollKind2[PollKind2["POLL_KIND_GIFT"] = 1] = "POLL_KIND_GIFT";
   PollKind2[PollKind2["CUSTOMIZABLE"] = 2] = "CUSTOMIZABLE";
@@ -96926,23 +96946,23 @@ var PollKind = /* @__PURE__ */ function(PollKind2) {
   PollKind2[PollKind2["EMOTE"] = 5] = "EMOTE";
   PollKind2[PollKind2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return PollKind2;
-}({});
-var PollTemplateStatus = /* @__PURE__ */ function(PollTemplateStatus2) {
+})({});
+var PollTemplateStatus = /* @__PURE__ */ (function(PollTemplateStatus2) {
   PollTemplateStatus2[PollTemplateStatus2["TO_BE_REVIEWED"] = 0] = "TO_BE_REVIEWED";
   PollTemplateStatus2[PollTemplateStatus2["UNDER_REVIEW"] = 1] = "UNDER_REVIEW";
   PollTemplateStatus2[PollTemplateStatus2["REVIEWED"] = 2] = "REVIEWED";
   PollTemplateStatus2[PollTemplateStatus2["REFUSED"] = 3] = "REFUSED";
   PollTemplateStatus2[PollTemplateStatus2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return PollTemplateStatus2;
-}({});
-var Position = /* @__PURE__ */ function(Position2) {
+})({});
+var Position = /* @__PURE__ */ (function(Position2) {
   Position2[Position2["POSITION_UNKNOWN"] = 0] = "POSITION_UNKNOWN";
   Position2[Position2["LEFT"] = 1] = "LEFT";
   Position2[Position2["POSITION_RIGHT"] = 2] = "POSITION_RIGHT";
   Position2[Position2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return Position2;
-}({});
-var ProfitRankType = /* @__PURE__ */ function(ProfitRankType2) {
+})({});
+var ProfitRankType = /* @__PURE__ */ (function(ProfitRankType2) {
   ProfitRankType2[ProfitRankType2["TYPE_HOURLY_RANK"] = 0] = "TYPE_HOURLY_RANK";
   ProfitRankType2[ProfitRankType2["TYPE_WEEKLY_RANK"] = 1] = "TYPE_WEEKLY_RANK";
   ProfitRankType2[ProfitRankType2["TYPE_HOURLY_STAR_RANK"] = 2] = "TYPE_HOURLY_STAR_RANK";
@@ -96972,8 +96992,8 @@ var ProfitRankType = /* @__PURE__ */ function(ProfitRankType2) {
   ProfitRankType2[ProfitRankType2["TYPE_CAMPAIGN_LEAGUEMATCH_RANK"] = 101] = "TYPE_CAMPAIGN_LEAGUEMATCH_RANK";
   ProfitRankType2[ProfitRankType2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return ProfitRankType2;
-}({});
-var PunishTypeId = /* @__PURE__ */ function(PunishTypeId2) {
+})({});
+var PunishTypeId = /* @__PURE__ */ (function(PunishTypeId2) {
   PunishTypeId2[PunishTypeId2["PUNISH_TYPE_IDUN_KNOWN"] = 0] = "PUNISH_TYPE_IDUN_KNOWN";
   PunishTypeId2[PunishTypeId2["BAN_LINKMIC"] = 9] = "BAN_LINKMIC";
   PunishTypeId2[PunishTypeId2["BAN_GAME_PARTNERSHIP"] = 25] = "BAN_GAME_PARTNERSHIP";
@@ -96986,28 +97006,28 @@ var PunishTypeId = /* @__PURE__ */ function(PunishTypeId2) {
   PunishTypeId2[PunishTypeId2["LIVE_CONSOLE_BAN"] = 76] = "LIVE_CONSOLE_BAN";
   PunishTypeId2[PunishTypeId2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return PunishTypeId2;
-}({});
-var ReserveReplyStatus = /* @__PURE__ */ function(ReserveReplyStatus2) {
+})({});
+var ReserveReplyStatus = /* @__PURE__ */ (function(ReserveReplyStatus2) {
   ReserveReplyStatus2[ReserveReplyStatus2["RESERVE_REPLY_STATUS_UNKNOWN"] = 0] = "RESERVE_REPLY_STATUS_UNKNOWN";
   ReserveReplyStatus2[ReserveReplyStatus2["WAIT_FORME"] = 1] = "WAIT_FORME";
   ReserveReplyStatus2[ReserveReplyStatus2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return ReserveReplyStatus2;
-}({});
-var RewardCondition = /* @__PURE__ */ function(RewardCondition2) {
+})({});
+var RewardCondition = /* @__PURE__ */ (function(RewardCondition2) {
   RewardCondition2[RewardCondition2["REWARD_CONDITION_SUBSCRIPTION"] = 0] = "REWARD_CONDITION_SUBSCRIPTION";
   RewardCondition2[RewardCondition2["SUB_WAVE_CUSTOM"] = 1] = "SUB_WAVE_CUSTOM";
   RewardCondition2[RewardCondition2["REWARD_CONDITION_FANS_CLUB"] = 2] = "REWARD_CONDITION_FANS_CLUB";
   RewardCondition2[RewardCondition2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return RewardCondition2;
-}({});
-var RivalExtraInfoAnchorLayer = /* @__PURE__ */ function(RivalExtraInfoAnchorLayer2) {
+})({});
+var RivalExtraInfoAnchorLayer = /* @__PURE__ */ (function(RivalExtraInfoAnchorLayer2) {
   RivalExtraInfoAnchorLayer2[RivalExtraInfoAnchorLayer2["ANCHOR_LAYER_UNKNOWN"] = 0] = "ANCHOR_LAYER_UNKNOWN";
   RivalExtraInfoAnchorLayer2[RivalExtraInfoAnchorLayer2["ANCHOR_LAYER_TOP"] = 1] = "ANCHOR_LAYER_TOP";
   RivalExtraInfoAnchorLayer2[RivalExtraInfoAnchorLayer2["ANCHOR_LAYER_SMALL"] = 2] = "ANCHOR_LAYER_SMALL";
   RivalExtraInfoAnchorLayer2[RivalExtraInfoAnchorLayer2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return RivalExtraInfoAnchorLayer2;
-}({});
-var RivalExtraInfoBattleInfoBattleInfoType = /* @__PURE__ */ function(RivalExtraInfoBattleInfoBattleInfoType2) {
+})({});
+var RivalExtraInfoBattleInfoBattleInfoType = /* @__PURE__ */ (function(RivalExtraInfoBattleInfoBattleInfoType2) {
   RivalExtraInfoBattleInfoBattleInfoType2[RivalExtraInfoBattleInfoBattleInfoType2["BATTLE_INFO_TYPE_NONE"] = 0] = "BATTLE_INFO_TYPE_NONE";
   RivalExtraInfoBattleInfoBattleInfoType2[RivalExtraInfoBattleInfoBattleInfoType2["BATTLE_INFO_TYPE_AVERAGE_SCORE"] = 1] = "BATTLE_INFO_TYPE_AVERAGE_SCORE";
   RivalExtraInfoBattleInfoBattleInfoType2[RivalExtraInfoBattleInfoBattleInfoType2["BATTLE_INFO_TYPE_MAX_SCORE"] = 2] = "BATTLE_INFO_TYPE_MAX_SCORE";
@@ -97015,8 +97035,8 @@ var RivalExtraInfoBattleInfoBattleInfoType = /* @__PURE__ */ function(RivalExtra
   RivalExtraInfoBattleInfoBattleInfoType2[RivalExtraInfoBattleInfoBattleInfoType2["BATTLE_INFO_TYPE_WIN_STREAK"] = 4] = "BATTLE_INFO_TYPE_WIN_STREAK";
   RivalExtraInfoBattleInfoBattleInfoType2[RivalExtraInfoBattleInfoBattleInfoType2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return RivalExtraInfoBattleInfoBattleInfoType2;
-}({});
-var RivalExtraInfoInviteBlockReason = /* @__PURE__ */ function(RivalExtraInfoInviteBlockReason2) {
+})({});
+var RivalExtraInfoInviteBlockReason = /* @__PURE__ */ (function(RivalExtraInfoInviteBlockReason2) {
   RivalExtraInfoInviteBlockReason2[RivalExtraInfoInviteBlockReason2["RIVAL_EXTRA_INFO_INVITE_BLOCK_REASON_NONE"] = 0] = "RIVAL_EXTRA_INFO_INVITE_BLOCK_REASON_NONE";
   RivalExtraInfoInviteBlockReason2[RivalExtraInfoInviteBlockReason2["IS_LINKING"] = 1] = "IS_LINKING";
   RivalExtraInfoInviteBlockReason2[RivalExtraInfoInviteBlockReason2["INVITATION_DENIED"] = 2] = "INVITATION_DENIED";
@@ -97029,8 +97049,8 @@ var RivalExtraInfoInviteBlockReason = /* @__PURE__ */ function(RivalExtraInfoInv
   RivalExtraInfoInviteBlockReason2[RivalExtraInfoInviteBlockReason2["RIVAL_EXTRA_INFO_INVITE_BLOCK_REASON_REGIONAL_BLOCK"] = 9] = "RIVAL_EXTRA_INFO_INVITE_BLOCK_REASON_REGIONAL_BLOCK";
   RivalExtraInfoInviteBlockReason2[RivalExtraInfoInviteBlockReason2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return RivalExtraInfoInviteBlockReason2;
-}({});
-var RivalExtraInfoTextType = /* @__PURE__ */ function(RivalExtraInfoTextType2) {
+})({});
+var RivalExtraInfoTextType = /* @__PURE__ */ (function(RivalExtraInfoTextType2) {
   RivalExtraInfoTextType2[RivalExtraInfoTextType2["TEXT_TYPE_UNKNOWN"] = 0] = "TEXT_TYPE_UNKNOWN";
   RivalExtraInfoTextType2[RivalExtraInfoTextType2["CURRO_OMF_AN_TICKET"] = 1] = "CURRO_OMF_AN_TICKET";
   RivalExtraInfoTextType2[RivalExtraInfoTextType2["TOTAL_DIAMOND_COUNT"] = 2] = "TOTAL_DIAMOND_COUNT";
@@ -97038,15 +97058,15 @@ var RivalExtraInfoTextType = /* @__PURE__ */ function(RivalExtraInfoTextType2) {
   RivalExtraInfoTextType2[RivalExtraInfoTextType2["DISTANCE_CITY"] = 4] = "DISTANCE_CITY";
   RivalExtraInfoTextType2[RivalExtraInfoTextType2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return RivalExtraInfoTextType2;
-}({});
-var SOVLockInfoType = /* @__PURE__ */ function(SOVLockInfoType2) {
+})({});
+var SOVLockInfoType = /* @__PURE__ */ (function(SOVLockInfoType2) {
   SOVLockInfoType2[SOVLockInfoType2["SOV_LOCK_INFO_TYPE_NONE"] = 0] = "SOV_LOCK_INFO_TYPE_NONE";
   SOVLockInfoType2[SOVLockInfoType2["LOCK"] = 1] = "LOCK";
   SOVLockInfoType2[SOVLockInfoType2["PREVIEW"] = 2] = "PREVIEW";
   SOVLockInfoType2[SOVLockInfoType2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return SOVLockInfoType2;
-}({});
-var SOVMaskInfoType = /* @__PURE__ */ function(SOVMaskInfoType2) {
+})({});
+var SOVMaskInfoType = /* @__PURE__ */ (function(SOVMaskInfoType2) {
   SOVMaskInfoType2[SOVMaskInfoType2["SOV_MASK_INFO_TYPE_NONE"] = 0] = "SOV_MASK_INFO_TYPE_NONE";
   SOVMaskInfoType2[SOVMaskInfoType2["SENSITIVE"] = 1] = "SENSITIVE";
   SOVMaskInfoType2[SOVMaskInfoType2["VIOLATION"] = 2] = "VIOLATION";
@@ -97054,37 +97074,37 @@ var SOVMaskInfoType = /* @__PURE__ */ function(SOVMaskInfoType2) {
   SOVMaskInfoType2[SOVMaskInfoType2["UNAVAILABLE"] = 4] = "UNAVAILABLE";
   SOVMaskInfoType2[SOVMaskInfoType2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return SOVMaskInfoType2;
-}({});
-var SOVStatus = /* @__PURE__ */ function(SOVStatus2) {
+})({});
+var SOVStatus = /* @__PURE__ */ (function(SOVStatus2) {
   SOVStatus2[SOVStatus2["SOV_STATUS_UNKNOWN"] = 0] = "SOV_STATUS_UNKNOWN";
   SOVStatus2[SOVStatus2["ON"] = 1] = "ON";
   SOVStatus2[SOVStatus2["OFF"] = 2] = "OFF";
   SOVStatus2[SOVStatus2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return SOVStatus2;
-}({});
-var SubPinCardTextTextType = /* @__PURE__ */ function(SubPinCardTextTextType2) {
+})({});
+var SubPinCardTextTextType = /* @__PURE__ */ (function(SubPinCardTextTextType2) {
   SubPinCardTextTextType2[SubPinCardTextTextType2["SUB_PIN_CARD_TEXT_TEXT_TYPE_TEXT_TYPE_UNKNOWN"] = 0] = "SUB_PIN_CARD_TEXT_TEXT_TYPE_TEXT_TYPE_UNKNOWN";
   SubPinCardTextTextType2[SubPinCardTextTextType2["TEXT_TYPE_ORIGINAL"] = 1] = "TEXT_TYPE_ORIGINAL";
   SubPinCardTextTextType2[SubPinCardTextTextType2["TEXT_TYPE_STARLING_KEY"] = 2] = "TEXT_TYPE_STARLING_KEY";
   SubPinCardTextTextType2[SubPinCardTextTextType2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return SubPinCardTextTextType2;
-}({});
-var SubPinCardTextTextType_2 = /* @__PURE__ */ function(SubPinCardTextTextType_22) {
+})({});
+var SubPinCardTextTextType_2 = /* @__PURE__ */ (function(SubPinCardTextTextType_22) {
   SubPinCardTextTextType_22[SubPinCardTextTextType_22["UNKNOWN_TEXT_TYPE"] = 0] = "UNKNOWN_TEXT_TYPE";
   SubPinCardTextTextType_22[SubPinCardTextTextType_22["ORIGINAL_TEXT"] = 1] = "ORIGINAL_TEXT";
   SubPinCardTextTextType_22[SubPinCardTextTextType_22["STARLING_KEY"] = 2] = "STARLING_KEY";
   SubPinCardTextTextType_22[SubPinCardTextTextType_22["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return SubPinCardTextTextType_22;
-}({});
-var SubSplitPeriod = /* @__PURE__ */ function(SubSplitPeriod2) {
+})({});
+var SubSplitPeriod = /* @__PURE__ */ (function(SubSplitPeriod2) {
   SubSplitPeriod2[SubSplitPeriod2["SUB_SPLIT_PERIOD_UNKNOWN"] = 0] = "SUB_SPLIT_PERIOD_UNKNOWN";
   SubSplitPeriod2[SubSplitPeriod2["ANNOUNCEMENT"] = 1] = "ANNOUNCEMENT";
   SubSplitPeriod2[SubSplitPeriod2["TRANSITION"] = 2] = "TRANSITION";
   SubSplitPeriod2[SubSplitPeriod2["OFFICIAL"] = 3] = "OFFICIAL";
   SubSplitPeriod2[SubSplitPeriod2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return SubSplitPeriod2;
-}({});
-var TagType = /* @__PURE__ */ function(TagType2) {
+})({});
+var TagType = /* @__PURE__ */ (function(TagType2) {
   TagType2[TagType2["CREATOR_CRM_TAG_TYPE_UNKNOWN"] = 0] = "CREATOR_CRM_TAG_TYPE_UNKNOWN";
   TagType2[TagType2["CREATOR_CRM_TAG_TYPE_USER_GRADE"] = 1] = "CREATOR_CRM_TAG_TYPE_USER_GRADE";
   TagType2[TagType2["CREATOR_CRM_TAG_TYPE_FANS_LEVEL"] = 2] = "CREATOR_CRM_TAG_TYPE_FANS_LEVEL";
@@ -97136,8 +97156,8 @@ var TagType = /* @__PURE__ */ function(TagType2) {
   TagType2[TagType2["FANS_HIGHLIGHT"] = 100] = "FANS_HIGHLIGHT";
   TagType2[TagType2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return TagType2;
-}({});
-var TagV2TagClassification = /* @__PURE__ */ function(TagV2TagClassification2) {
+})({});
+var TagV2TagClassification = /* @__PURE__ */ (function(TagV2TagClassification2) {
   TagV2TagClassification2[TagV2TagClassification2["TAG_V2_TAG_CLASSIFICATION_UNKNOWN"] = 0] = "TAG_V2_TAG_CLASSIFICATION_UNKNOWN";
   TagV2TagClassification2[TagV2TagClassification2["COHOST_HISTORY"] = 1] = "COHOST_HISTORY";
   TagV2TagClassification2[TagV2TagClassification2["FIRST_DEGREE_RELATION"] = 2] = "FIRST_DEGREE_RELATION";
@@ -97146,14 +97166,14 @@ var TagV2TagClassification = /* @__PURE__ */ function(TagV2TagClassification2) {
   TagV2TagClassification2[TagV2TagClassification2["SIMILAR_INTERESTS"] = 5] = "SIMILAR_INTERESTS";
   TagV2TagClassification2[TagV2TagClassification2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return TagV2TagClassification2;
-}({});
-var TimerDetailAntidirtStatus = /* @__PURE__ */ function(TimerDetailAntidirtStatus2) {
+})({});
+var TimerDetailAntidirtStatus = /* @__PURE__ */ (function(TimerDetailAntidirtStatus2) {
   TimerDetailAntidirtStatus2[TimerDetailAntidirtStatus2["TIMER_DETAIL_ANTIDIRT_STATUS_PASS"] = 0] = "TIMER_DETAIL_ANTIDIRT_STATUS_PASS";
   TimerDetailAntidirtStatus2[TimerDetailAntidirtStatus2["TIMER_DETAIL_ANTIDIRT_STATUS_FAILED"] = 1] = "TIMER_DETAIL_ANTIDIRT_STATUS_FAILED";
   TimerDetailAntidirtStatus2[TimerDetailAntidirtStatus2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return TimerDetailAntidirtStatus2;
-}({});
-var TimerDetailAuditStatus = /* @__PURE__ */ function(TimerDetailAuditStatus2) {
+})({});
+var TimerDetailAuditStatus = /* @__PURE__ */ (function(TimerDetailAuditStatus2) {
   TimerDetailAuditStatus2[TimerDetailAuditStatus2["TIMER_DETAIL_AUDIT_STATUS_AUDIT_STATUS_UNKNOWN"] = 0] = "TIMER_DETAIL_AUDIT_STATUS_AUDIT_STATUS_UNKNOWN";
   TimerDetailAuditStatus2[TimerDetailAuditStatus2["AUDIT_STATUS_PASS"] = 1] = "AUDIT_STATUS_PASS";
   TimerDetailAuditStatus2[TimerDetailAuditStatus2["AUDIT_STATUS_FAILED"] = 2] = "AUDIT_STATUS_FAILED";
@@ -97161,14 +97181,14 @@ var TimerDetailAuditStatus = /* @__PURE__ */ function(TimerDetailAuditStatus2) {
   TimerDetailAuditStatus2[TimerDetailAuditStatus2["AUDIT_STATUS_FORBIDDEN"] = 4] = "AUDIT_STATUS_FORBIDDEN";
   TimerDetailAuditStatus2[TimerDetailAuditStatus2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return TimerDetailAuditStatus2;
-}({});
-var TimerDetailAuditTaskType = /* @__PURE__ */ function(TimerDetailAuditTaskType2) {
+})({});
+var TimerDetailAuditTaskType = /* @__PURE__ */ (function(TimerDetailAuditTaskType2) {
   TimerDetailAuditTaskType2[TimerDetailAuditTaskType2["AUDIT_TASK_TYPE_DEFAULT"] = 0] = "AUDIT_TASK_TYPE_DEFAULT";
   TimerDetailAuditTaskType2[TimerDetailAuditTaskType2["AUDIT_TASK_TYPE_APPEAL"] = 1] = "AUDIT_TASK_TYPE_APPEAL";
   TimerDetailAuditTaskType2[TimerDetailAuditTaskType2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return TimerDetailAuditTaskType2;
-}({});
-var TimerStatus = /* @__PURE__ */ function(TimerStatus2) {
+})({});
+var TimerStatus = /* @__PURE__ */ (function(TimerStatus2) {
   TimerStatus2[TimerStatus2["NOT_STARTED"] = 0] = "NOT_STARTED";
   TimerStatus2[TimerStatus2["RUNNING"] = 1] = "RUNNING";
   TimerStatus2[TimerStatus2["PAUSED"] = 2] = "PAUSED";
@@ -97176,37 +97196,37 @@ var TimerStatus = /* @__PURE__ */ function(TimerStatus2) {
   TimerStatus2[TimerStatus2["TIMER_STATUS_FINISHED"] = 4] = "TIMER_STATUS_FINISHED";
   TimerStatus2[TimerStatus2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return TimerStatus2;
-}({});
-var TopicActionType = /* @__PURE__ */ function(TopicActionType2) {
+})({});
+var TopicActionType = /* @__PURE__ */ (function(TopicActionType2) {
   TopicActionType2[TopicActionType2["TOPIC_ACTION_TYPE_UNKNOWN"] = 0] = "TOPIC_ACTION_TYPE_UNKNOWN";
   TopicActionType2[TopicActionType2["TOPIC_ACTION_TYPE_FOLLOW"] = 1] = "TOPIC_ACTION_TYPE_FOLLOW";
   TopicActionType2[TopicActionType2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return TopicActionType2;
-}({});
-var UserEmoteUploadSource = /* @__PURE__ */ function(UserEmoteUploadSource2) {
+})({});
+var UserEmoteUploadSource = /* @__PURE__ */ (function(UserEmoteUploadSource2) {
   UserEmoteUploadSource2[UserEmoteUploadSource2["EMOTE_UPLOAD_SOURCE_ANCHOR"] = 0] = "EMOTE_UPLOAD_SOURCE_ANCHOR";
   UserEmoteUploadSource2[UserEmoteUploadSource2["EMOTE_UPLOAD_SOURCE_SUBSCRIBER"] = 1] = "EMOTE_UPLOAD_SOURCE_SUBSCRIBER";
   UserEmoteUploadSource2[UserEmoteUploadSource2["EMOTE_UPLOAD_SOURCE_MODERATOR"] = 2] = "EMOTE_UPLOAD_SOURCE_MODERATOR";
   UserEmoteUploadSource2[UserEmoteUploadSource2["EMOTE_UPLOAD_SOURCE_AI"] = 3] = "EMOTE_UPLOAD_SOURCE_AI";
   UserEmoteUploadSource2[UserEmoteUploadSource2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return UserEmoteUploadSource2;
-}({});
-var UserEcommerceEntranceCreatorType = /* @__PURE__ */ function(UserEcommerceEntranceCreatorType2) {
+})({});
+var UserEcommerceEntranceCreatorType = /* @__PURE__ */ (function(UserEcommerceEntranceCreatorType2) {
   UserEcommerceEntranceCreatorType2[UserEcommerceEntranceCreatorType2["UNDEFINED"] = 0] = "UNDEFINED";
   UserEcommerceEntranceCreatorType2[UserEcommerceEntranceCreatorType2["USER_ECOMMERCE_ENTRANCE_CREATOR_TYPE_OFFICIAL"] = 1] = "USER_ECOMMERCE_ENTRANCE_CREATOR_TYPE_OFFICIAL";
   UserEcommerceEntranceCreatorType2[UserEcommerceEntranceCreatorType2["MARKET"] = 2] = "MARKET";
   UserEcommerceEntranceCreatorType2[UserEcommerceEntranceCreatorType2["USER_ECOMMERCE_ENTRANCE_CREATOR_TYPE_NORMAL"] = 3] = "USER_ECOMMERCE_ENTRANCE_CREATOR_TYPE_NORMAL";
   UserEcommerceEntranceCreatorType2[UserEcommerceEntranceCreatorType2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return UserEcommerceEntranceCreatorType2;
-}({});
-var UserEcommerceEntranceEntranceType = /* @__PURE__ */ function(UserEcommerceEntranceEntranceType2) {
+})({});
+var UserEcommerceEntranceEntranceType = /* @__PURE__ */ (function(UserEcommerceEntranceEntranceType2) {
   UserEcommerceEntranceEntranceType2[UserEcommerceEntranceEntranceType2["PROFILE"] = 0] = "PROFILE";
   UserEcommerceEntranceEntranceType2[UserEcommerceEntranceEntranceType2["SHOWCASE"] = 1] = "SHOWCASE";
   UserEcommerceEntranceEntranceType2[UserEcommerceEntranceEntranceType2["SHOP"] = 2] = "SHOP";
   UserEcommerceEntranceEntranceType2[UserEcommerceEntranceEntranceType2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return UserEcommerceEntranceEntranceType2;
-}({});
-var UserEcommerceEntranceSellingPointLiveSellingPointType = /* @__PURE__ */ function(UserEcommerceEntranceSellingPointLiveSellingPointType2) {
+})({});
+var UserEcommerceEntranceSellingPointLiveSellingPointType = /* @__PURE__ */ (function(UserEcommerceEntranceSellingPointLiveSellingPointType2) {
   UserEcommerceEntranceSellingPointLiveSellingPointType2[UserEcommerceEntranceSellingPointLiveSellingPointType2["USER_ECOMMERCE_ENTRANCE_SELLING_POINT_LIVE_SELLING_POINT_TYPE_UNDEFINED"] = 0] = "USER_ECOMMERCE_ENTRANCE_SELLING_POINT_LIVE_SELLING_POINT_TYPE_UNDEFINED";
   UserEcommerceEntranceSellingPointLiveSellingPointType2[UserEcommerceEntranceSellingPointLiveSellingPointType2["QUALITY"] = 1] = "QUALITY";
   UserEcommerceEntranceSellingPointLiveSellingPointType2[UserEcommerceEntranceSellingPointLiveSellingPointType2["SOLD"] = 2] = "SOLD";
@@ -97216,8 +97236,8 @@ var UserEcommerceEntranceSellingPointLiveSellingPointType = /* @__PURE__ */ func
   UserEcommerceEntranceSellingPointLiveSellingPointType2[UserEcommerceEntranceSellingPointLiveSellingPointType2["TRUST_POSITIVE_REVIEW_RATE"] = 6] = "TRUST_POSITIVE_REVIEW_RATE";
   UserEcommerceEntranceSellingPointLiveSellingPointType2[UserEcommerceEntranceSellingPointLiveSellingPointType2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return UserEcommerceEntranceSellingPointLiveSellingPointType2;
-}({});
-var UserEcommerceEntranceShopEntranceInfoStoreLabelShopIdentityLabelType = /* @__PURE__ */ function(UserEcommerceEntranceShopEntranceInfoStoreLabelShopIdentityLabelType2) {
+})({});
+var UserEcommerceEntranceShopEntranceInfoStoreLabelShopIdentityLabelType = /* @__PURE__ */ (function(UserEcommerceEntranceShopEntranceInfoStoreLabelShopIdentityLabelType2) {
   UserEcommerceEntranceShopEntranceInfoStoreLabelShopIdentityLabelType2[UserEcommerceEntranceShopEntranceInfoStoreLabelShopIdentityLabelType2["USER_ECOMMERCE_ENTRANCE_SHOP_ENTRANCE_INFO_STORE_LABEL_SHOP_IDENTITY_LABEL_TYPE_UNKNOWN"] = 0] = "USER_ECOMMERCE_ENTRANCE_SHOP_ENTRANCE_INFO_STORE_LABEL_SHOP_IDENTITY_LABEL_TYPE_UNKNOWN";
   UserEcommerceEntranceShopEntranceInfoStoreLabelShopIdentityLabelType2[UserEcommerceEntranceShopEntranceInfoStoreLabelShopIdentityLabelType2["TOP_BRAND"] = 1] = "TOP_BRAND";
   UserEcommerceEntranceShopEntranceInfoStoreLabelShopIdentityLabelType2[UserEcommerceEntranceShopEntranceInfoStoreLabelShopIdentityLabelType2["OFFICIAL_SHOP"] = 2] = "OFFICIAL_SHOP";
@@ -97230,8 +97250,8 @@ var UserEcommerceEntranceShopEntranceInfoStoreLabelShopIdentityLabelType = /* @_
   UserEcommerceEntranceShopEntranceInfoStoreLabelShopIdentityLabelType2[UserEcommerceEntranceShopEntranceInfoStoreLabelShopIdentityLabelType2["NORMAL_BLUE_V"] = 1e3] = "NORMAL_BLUE_V";
   UserEcommerceEntranceShopEntranceInfoStoreLabelShopIdentityLabelType2[UserEcommerceEntranceShopEntranceInfoStoreLabelShopIdentityLabelType2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return UserEcommerceEntranceShopEntranceInfoStoreLabelShopIdentityLabelType2;
-}({});
-var UserEcommerceEntranceShopEntranceInfoStoreLabelStoreBrandLabelType = /* @__PURE__ */ function(UserEcommerceEntranceShopEntranceInfoStoreLabelStoreBrandLabelType2) {
+})({});
+var UserEcommerceEntranceShopEntranceInfoStoreLabelStoreBrandLabelType = /* @__PURE__ */ (function(UserEcommerceEntranceShopEntranceInfoStoreLabelStoreBrandLabelType2) {
   UserEcommerceEntranceShopEntranceInfoStoreLabelStoreBrandLabelType2[UserEcommerceEntranceShopEntranceInfoStoreLabelStoreBrandLabelType2["USER_ECOMMERCE_ENTRANCE_SHOP_ENTRANCE_INFO_STORE_LABEL_STORE_BRAND_LABEL_TYPE_NONE"] = 0] = "USER_ECOMMERCE_ENTRANCE_SHOP_ENTRANCE_INFO_STORE_LABEL_STORE_BRAND_LABEL_TYPE_NONE";
   UserEcommerceEntranceShopEntranceInfoStoreLabelStoreBrandLabelType2[UserEcommerceEntranceShopEntranceInfoStoreLabelStoreBrandLabelType2["USER_ECOMMERCE_ENTRANCE_SHOP_ENTRANCE_INFO_STORE_LABEL_STORE_BRAND_LABEL_TYPE_OFFICIAL"] = 1] = "USER_ECOMMERCE_ENTRANCE_SHOP_ENTRANCE_INFO_STORE_LABEL_STORE_BRAND_LABEL_TYPE_OFFICIAL";
   UserEcommerceEntranceShopEntranceInfoStoreLabelStoreBrandLabelType2[UserEcommerceEntranceShopEntranceInfoStoreLabelStoreBrandLabelType2["AUTHORIZED"] = 2] = "AUTHORIZED";
@@ -97240,21 +97260,21 @@ var UserEcommerceEntranceShopEntranceInfoStoreLabelStoreBrandLabelType = /* @__P
   UserEcommerceEntranceShopEntranceInfoStoreLabelStoreBrandLabelType2[UserEcommerceEntranceShopEntranceInfoStoreLabelStoreBrandLabelType2["STORE_BRAND_LABEL_TYPE_MALL"] = 5] = "STORE_BRAND_LABEL_TYPE_MALL";
   UserEcommerceEntranceShopEntranceInfoStoreLabelStoreBrandLabelType2[UserEcommerceEntranceShopEntranceInfoStoreLabelStoreBrandLabelType2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return UserEcommerceEntranceShopEntranceInfoStoreLabelStoreBrandLabelType2;
-}({});
-var UserEcommerceEntranceViewVersion = /* @__PURE__ */ function(UserEcommerceEntranceViewVersion2) {
+})({});
+var UserEcommerceEntranceViewVersion = /* @__PURE__ */ (function(UserEcommerceEntranceViewVersion2) {
   UserEcommerceEntranceViewVersion2[UserEcommerceEntranceViewVersion2["VIEW_VERSION_UNKNOWN"] = 0] = "VIEW_VERSION_UNKNOWN";
   UserEcommerceEntranceViewVersion2[UserEcommerceEntranceViewVersion2["VIEW_VERSION_STAR_SHOP"] = 1] = "VIEW_VERSION_STAR_SHOP";
   UserEcommerceEntranceViewVersion2[UserEcommerceEntranceViewVersion2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return UserEcommerceEntranceViewVersion2;
-}({});
-var UserFansClubFansClubDataUserFansClubStatus = /* @__PURE__ */ function(UserFansClubFansClubDataUserFansClubStatus2) {
+})({});
+var UserFansClubFansClubDataUserFansClubStatus = /* @__PURE__ */ (function(UserFansClubFansClubDataUserFansClubStatus2) {
   UserFansClubFansClubDataUserFansClubStatus2[UserFansClubFansClubDataUserFansClubStatus2["NOT_JOINED"] = 0] = "NOT_JOINED";
   UserFansClubFansClubDataUserFansClubStatus2[UserFansClubFansClubDataUserFansClubStatus2["ACTIVE"] = 1] = "ACTIVE";
   UserFansClubFansClubDataUserFansClubStatus2[UserFansClubFansClubDataUserFansClubStatus2["INACTIVE"] = 2] = "INACTIVE";
   UserFansClubFansClubDataUserFansClubStatus2[UserFansClubFansClubDataUserFansClubStatus2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return UserFansClubFansClubDataUserFansClubStatus2;
-}({});
-var UserSubscribeInfoPayStatus = /* @__PURE__ */ function(UserSubscribeInfoPayStatus2) {
+})({});
+var UserSubscribeInfoPayStatus = /* @__PURE__ */ (function(UserSubscribeInfoPayStatus2) {
   UserSubscribeInfoPayStatus2[UserSubscribeInfoPayStatus2["SUB_STATUS_UNKNOWN"] = 0] = "SUB_STATUS_UNKNOWN";
   UserSubscribeInfoPayStatus2[UserSubscribeInfoPayStatus2["SUB_STATUS_ONE_TIME"] = 1] = "SUB_STATUS_ONE_TIME";
   UserSubscribeInfoPayStatus2[UserSubscribeInfoPayStatus2["SUB_STATUS_AUTO_DEDUCTION"] = 2] = "SUB_STATUS_AUTO_DEDUCTION";
@@ -97262,13 +97282,13 @@ var UserSubscribeInfoPayStatus = /* @__PURE__ */ function(UserSubscribeInfoPaySt
   UserSubscribeInfoPayStatus2[UserSubscribeInfoPayStatus2["SUB_STATUS_REVOKE"] = 4] = "SUB_STATUS_REVOKE";
   UserSubscribeInfoPayStatus2[UserSubscribeInfoPayStatus2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return UserSubscribeInfoPayStatus2;
-}({});
-var VerticalPaddingRule = /* @__PURE__ */ function(VerticalPaddingRule2) {
+})({});
+var VerticalPaddingRule = /* @__PURE__ */ (function(VerticalPaddingRule2) {
   VerticalPaddingRule2[VerticalPaddingRule2["USE_DEFAULT"] = 0] = "USE_DEFAULT";
   VerticalPaddingRule2[VerticalPaddingRule2["USE_TOP_AND_BOTTOM"] = 1] = "USE_TOP_AND_BOTTOM";
   VerticalPaddingRule2[VerticalPaddingRule2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return VerticalPaddingRule2;
-}({});
+})({});
 function createBaseDiffInfo() {
   return {
     diffUrl: void 0,
@@ -107607,29 +107627,29 @@ var Player = {
     return message;
   }
 };
-var AgreeStatus = /* @__PURE__ */ function(AgreeStatus2) {
+var AgreeStatus = /* @__PURE__ */ (function(AgreeStatus2) {
   AgreeStatus2[AgreeStatus2["AGREE_UNKNOWN"] = 0] = "AGREE_UNKNOWN";
   AgreeStatus2[AgreeStatus2["AGREE"] = 1] = "AGREE";
   AgreeStatus2[AgreeStatus2["REJECT"] = 2] = "REJECT";
   AgreeStatus2[AgreeStatus2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return AgreeStatus2;
-}({});
-var ContentPositionType = /* @__PURE__ */ function(ContentPositionType2) {
+})({});
+var ContentPositionType = /* @__PURE__ */ (function(ContentPositionType2) {
   ContentPositionType2[ContentPositionType2["UNKNOWN"] = 0] = "UNKNOWN";
   ContentPositionType2[ContentPositionType2["STREAM"] = 1] = "STREAM";
   ContentPositionType2[ContentPositionType2["LIVE_STUDIO_STREAM_PORTRAIT"] = 2] = "LIVE_STUDIO_STREAM_PORTRAIT";
   ContentPositionType2[ContentPositionType2["LIVE_STUDIO_STREAM_LANDSCAPE"] = 3] = "LIVE_STUDIO_STREAM_LANDSCAPE";
   ContentPositionType2[ContentPositionType2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return ContentPositionType2;
-}({});
-var GroupStatus = /* @__PURE__ */ function(GroupStatus2) {
+})({});
+var GroupStatus = /* @__PURE__ */ (function(GroupStatus2) {
   GroupStatus2[GroupStatus2["GROUP_STATUS_UNKNOWN"] = 0] = "GROUP_STATUS_UNKNOWN";
   GroupStatus2[GroupStatus2["WAITING"] = 1] = "WAITING";
   GroupStatus2[GroupStatus2["LINKED"] = 3] = "LINKED";
   GroupStatus2[GroupStatus2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return GroupStatus2;
-}({});
-var JoinType = /* @__PURE__ */ function(JoinType2) {
+})({});
+var JoinType = /* @__PURE__ */ (function(JoinType2) {
   JoinType2[JoinType2["JOIN_TYPE_UNKNOWN"] = 0] = "JOIN_TYPE_UNKNOWN";
   JoinType2[JoinType2["CHANNEL_APPLY"] = 1] = "CHANNEL_APPLY";
   JoinType2[JoinType2["CHANNEL_INVITE"] = 2] = "CHANNEL_INVITE";
@@ -107640,8 +107660,8 @@ var JoinType = /* @__PURE__ */ function(JoinType2) {
   JoinType2[JoinType2["GROUP_OWNER_JOIN"] = 104] = "GROUP_OWNER_JOIN";
   JoinType2[JoinType2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return JoinType2;
-}({});
-var KickoutReason = /* @__PURE__ */ function(KickoutReason2) {
+})({});
+var KickoutReason = /* @__PURE__ */ (function(KickoutReason2) {
   KickoutReason2[KickoutReason2["KICK_OUT_REASON_UNKNOWN"] = 0] = "KICK_OUT_REASON_UNKNOWN";
   KickoutReason2[KickoutReason2["KICK_OUT_REASON_FIRST_FRAME_TIME_OUT"] = 1] = "KICK_OUT_REASON_FIRST_FRAME_TIME_OUT";
   KickoutReason2[KickoutReason2["KICK_OUT_REASON_BY_HOST"] = 2] = "KICK_OUT_REASON_BY_HOST";
@@ -107652,15 +107672,15 @@ var KickoutReason = /* @__PURE__ */ function(KickoutReason2) {
   KickoutReason2[KickoutReason2["KICK_OUT_REASON_ENIGMA_EXPIRE"] = 7] = "KICK_OUT_REASON_ENIGMA_EXPIRE";
   KickoutReason2[KickoutReason2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return KickoutReason2;
-}({});
-var LayoutEnlargeStatus = /* @__PURE__ */ function(LayoutEnlargeStatus2) {
+})({});
+var LayoutEnlargeStatus = /* @__PURE__ */ (function(LayoutEnlargeStatus2) {
   LayoutEnlargeStatus2[LayoutEnlargeStatus2["NONE"] = 0] = "NONE";
   LayoutEnlargeStatus2[LayoutEnlargeStatus2["SINGLE_ENLARGED"] = 1] = "SINGLE_ENLARGED";
   LayoutEnlargeStatus2[LayoutEnlargeStatus2["DOUBLE_ENLARGED"] = 2] = "DOUBLE_ENLARGED";
   LayoutEnlargeStatus2[LayoutEnlargeStatus2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return LayoutEnlargeStatus2;
-}({});
-var LayoutStyle = /* @__PURE__ */ function(LayoutStyle2) {
+})({});
+var LayoutStyle = /* @__PURE__ */ (function(LayoutStyle2) {
   LayoutStyle2[LayoutStyle2["UNDEFINED"] = 0] = "UNDEFINED";
   LayoutStyle2[LayoutStyle2["OVERLAPPING_FLOW"] = 1] = "OVERLAPPING_FLOW";
   LayoutStyle2[LayoutStyle2["OVERLAPPING_FIXED"] = 2] = "OVERLAPPING_FIXED";
@@ -107668,30 +107688,30 @@ var LayoutStyle = /* @__PURE__ */ function(LayoutStyle2) {
   LayoutStyle2[LayoutStyle2["GRID_FIXED"] = 4] = "GRID_FIXED";
   LayoutStyle2[LayoutStyle2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return LayoutStyle2;
-}({});
-var LinkMicUserAdminType = /* @__PURE__ */ function(LinkMicUserAdminType2) {
+})({});
+var LinkMicUserAdminType = /* @__PURE__ */ (function(LinkMicUserAdminType2) {
   LinkMicUserAdminType2[LinkMicUserAdminType2["UNDEFINED_TYPE"] = 0] = "UNDEFINED_TYPE";
   LinkMicUserAdminType2[LinkMicUserAdminType2["MANAGER_TYPE"] = 1] = "MANAGER_TYPE";
   LinkMicUserAdminType2[LinkMicUserAdminType2["HOST_TYPE"] = 2] = "HOST_TYPE";
   LinkMicUserAdminType2[LinkMicUserAdminType2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return LinkMicUserAdminType2;
-}({});
-var LinkerMode = /* @__PURE__ */ function(LinkerMode2) {
+})({});
+var LinkerMode = /* @__PURE__ */ (function(LinkerMode2) {
   LinkerMode2[LinkerMode2["LINKER_MODE_UNKNOWN"] = 0] = "LINKER_MODE_UNKNOWN";
   LinkerMode2[LinkerMode2["INNER"] = 1] = "INNER";
   LinkerMode2[LinkerMode2["CROSS"] = 2] = "CROSS";
   LinkerMode2[LinkerMode2["MIXED"] = 3] = "MIXED";
   LinkerMode2[LinkerMode2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return LinkerMode2;
-}({});
-var LinkerUserType = /* @__PURE__ */ function(LinkerUserType2) {
+})({});
+var LinkerUserType = /* @__PURE__ */ (function(LinkerUserType2) {
   LinkerUserType2[LinkerUserType2["LINKER_USER_TYPE_UNKNOWN"] = 0] = "LINKER_USER_TYPE_UNKNOWN";
   LinkerUserType2[LinkerUserType2["GUEST"] = 1] = "GUEST";
   LinkerUserType2[LinkerUserType2["HOST"] = 2] = "HOST";
   LinkerUserType2[LinkerUserType2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return LinkerUserType2;
-}({});
-var MediaState = /* @__PURE__ */ function(MediaState2) {
+})({});
+var MediaState = /* @__PURE__ */ (function(MediaState2) {
   MediaState2[MediaState2["MEDIA_UNDEFINED"] = 0] = "MEDIA_UNDEFINED";
   MediaState2[MediaState2["MEDIA_NORMAL"] = 1] = "MEDIA_NORMAL";
   MediaState2[MediaState2["MEDIA_MUTED"] = 2] = "MEDIA_MUTED";
@@ -107699,8 +107719,8 @@ var MediaState = /* @__PURE__ */ function(MediaState2) {
   MediaState2[MediaState2["MEDIA_MUTED_OCCUPIED"] = 4] = "MEDIA_MUTED_OCCUPIED";
   MediaState2[MediaState2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return MediaState2;
-}({});
-var NetworkState = /* @__PURE__ */ function(NetworkState2) {
+})({});
+var NetworkState = /* @__PURE__ */ (function(NetworkState2) {
   NetworkState2[NetworkState2["STATE_NETWORK_UNDEFINED"] = 0] = "STATE_NETWORK_UNDEFINED";
   NetworkState2[NetworkState2["STATE_NETWORK_EXCELLENT"] = 1] = "STATE_NETWORK_EXCELLENT";
   NetworkState2[NetworkState2["STATE_NETWORK_GOOD"] = 2] = "STATE_NETWORK_GOOD";
@@ -107710,23 +107730,23 @@ var NetworkState = /* @__PURE__ */ function(NetworkState2) {
   NetworkState2[NetworkState2["STATE_NETWORK_DOWN"] = 6] = "STATE_NETWORK_DOWN";
   NetworkState2[NetworkState2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return NetworkState2;
-}({});
-var OnlineUserState = /* @__PURE__ */ function(OnlineUserState2) {
+})({});
+var OnlineUserState = /* @__PURE__ */ (function(OnlineUserState2) {
   OnlineUserState2[OnlineUserState2["STATE_UNDEFINED"] = 0] = "STATE_UNDEFINED";
   OnlineUserState2[OnlineUserState2["STATE_NORMAL"] = 1] = "STATE_NORMAL";
   OnlineUserState2[OnlineUserState2["STATE_PAUSED"] = 2] = "STATE_PAUSED";
   OnlineUserState2[OnlineUserState2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return OnlineUserState2;
-}({});
-var PosIdentityType = /* @__PURE__ */ function(PosIdentityType2) {
+})({});
+var PosIdentityType = /* @__PURE__ */ (function(PosIdentityType2) {
   PosIdentityType2[PosIdentityType2["IDENTITY_EMPTY_SLOT"] = 0] = "IDENTITY_EMPTY_SLOT";
   PosIdentityType2[PosIdentityType2["IDENTITY_RTC_USER_ID"] = 1] = "IDENTITY_RTC_USER_ID";
   PosIdentityType2[PosIdentityType2["IDENTITY_RTC_STREAM_ID"] = 2] = "IDENTITY_RTC_STREAM_ID";
   PosIdentityType2[PosIdentityType2["IDENTITY_LIVE_USER_ID"] = 3] = "IDENTITY_LIVE_USER_ID";
   PosIdentityType2[PosIdentityType2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return PosIdentityType2;
-}({});
-var ReplyStatus = /* @__PURE__ */ function(ReplyStatus2) {
+})({});
+var ReplyStatus = /* @__PURE__ */ (function(ReplyStatus2) {
   ReplyStatus2[ReplyStatus2["REPLY_STATUS_UNKNOWN"] = 0] = "REPLY_STATUS_UNKNOWN";
   ReplyStatus2[ReplyStatus2["REPLY_STATUS_AGREE"] = 1] = "REPLY_STATUS_AGREE";
   ReplyStatus2[ReplyStatus2["REFUSE_PERSONALLY"] = 2] = "REFUSE_PERSONALLY";
@@ -107761,22 +107781,22 @@ var ReplyStatus = /* @__PURE__ */ function(ReplyStatus2) {
   ReplyStatus2[ReplyStatus2["REFUSE_IN_COHOST_WITH_GUEST"] = 31] = "REFUSE_IN_COHOST_WITH_GUEST";
   ReplyStatus2[ReplyStatus2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return ReplyStatus2;
-}({});
-var RtcConnectionState = /* @__PURE__ */ function(RtcConnectionState2) {
+})({});
+var RtcConnectionState = /* @__PURE__ */ (function(RtcConnectionState2) {
   RtcConnectionState2[RtcConnectionState2["STATE_RTC_UNDEFINED"] = 0] = "STATE_RTC_UNDEFINED";
   RtcConnectionState2[RtcConnectionState2["STATE_RTC_NORMAL"] = 1] = "STATE_RTC_NORMAL";
   RtcConnectionState2[RtcConnectionState2["STATE_RTC_DISCONNECT"] = 2] = "STATE_RTC_DISCONNECT";
   RtcConnectionState2[RtcConnectionState2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return RtcConnectionState2;
-}({});
-var Scene = /* @__PURE__ */ function(Scene2) {
+})({});
+var Scene = /* @__PURE__ */ (function(Scene2) {
   Scene2[Scene2["SCENE_UNKNOWN"] = 0] = "SCENE_UNKNOWN";
   Scene2[Scene2["CO_HOST"] = 2] = "CO_HOST";
   Scene2[Scene2["MULTI_LIVE"] = 4] = "MULTI_LIVE";
   Scene2[Scene2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return Scene2;
-}({});
-var SourceType = /* @__PURE__ */ function(SourceType2) {
+})({});
+var SourceType = /* @__PURE__ */ (function(SourceType2) {
   SourceType2[SourceType2["SOURCE_TYPE_UNKNOWN"] = 0] = "SOURCE_TYPE_UNKNOWN";
   SourceType2[SourceType2["FRIEND_LIST"] = 1] = "FRIEND_LIST";
   SourceType2[SourceType2["RECOMMEND_LIST"] = 2] = "RECOMMEND_LIST";
@@ -107837,8 +107857,8 @@ var SourceType = /* @__PURE__ */ function(SourceType2) {
   SourceType2[SourceType2["CCPK_QUICK_RE_COMMAND"] = 63] = "CCPK_QUICK_RE_COMMAND";
   SourceType2[SourceType2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return SourceType2;
-}({});
-var StateType = /* @__PURE__ */ function(StateType2) {
+})({});
+var StateType = /* @__PURE__ */ (function(StateType2) {
   StateType2[StateType2["STATE_INVALID"] = 0] = "STATE_INVALID";
   StateType2[StateType2["STATE_LAYOUT"] = 1] = "STATE_LAYOUT";
   StateType2[StateType2["STATE_ONLINE_USER_STATE"] = 2] = "STATE_ONLINE_USER_STATE";
@@ -107853,7 +107873,7 @@ var StateType = /* @__PURE__ */ function(StateType2) {
   StateType2[StateType2["STATE_REQ_BATCH_CHANGE"] = 100] = "STATE_REQ_BATCH_CHANGE";
   StateType2[StateType2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return StateType2;
-}({});
+})({});
 function createBaseAnchorLayoutSetting() {
   return {
     latestLayoutStyle: 0,
@@ -111836,7 +111856,7 @@ var ProtoMessageFetchResult_RouteParamsEntry = {
     return message;
   }
 };
-var BarrageMessageBarrageType = /* @__PURE__ */ function(BarrageMessageBarrageType2) {
+var BarrageMessageBarrageType = /* @__PURE__ */ (function(BarrageMessageBarrageType2) {
   BarrageMessageBarrageType2[BarrageMessageBarrageType2["UNKNOWN"] = 0] = "UNKNOWN";
   BarrageMessageBarrageType2[BarrageMessageBarrageType2["E_COM_ORDERING"] = 1] = "E_COM_ORDERING";
   BarrageMessageBarrageType2[BarrageMessageBarrageType2["E_COM_BUYING"] = 2] = "E_COM_BUYING";
@@ -111856,27 +111876,27 @@ var BarrageMessageBarrageType = /* @__PURE__ */ function(BarrageMessageBarrageTy
   BarrageMessageBarrageType2[BarrageMessageBarrageType2["COMMON_BARRAGE"] = 100] = "COMMON_BARRAGE";
   BarrageMessageBarrageType2[BarrageMessageBarrageType2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return BarrageMessageBarrageType2;
-}({});
-var BarrageMessageIconDisplayType = /* @__PURE__ */ function(BarrageMessageIconDisplayType2) {
+})({});
+var BarrageMessageIconDisplayType = /* @__PURE__ */ (function(BarrageMessageIconDisplayType2) {
   BarrageMessageIconDisplayType2[BarrageMessageIconDisplayType2["ICON_DISPLAY_TYPE_IMAGE"] = 0] = "ICON_DISPLAY_TYPE_IMAGE";
   BarrageMessageIconDisplayType2[BarrageMessageIconDisplayType2["ICON_DISPLAY_TYPE_BADGE"] = 1] = "ICON_DISPLAY_TYPE_BADGE";
   BarrageMessageIconDisplayType2[BarrageMessageIconDisplayType2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return BarrageMessageIconDisplayType2;
-}({});
-var BarrageMessageRenderType = /* @__PURE__ */ function(BarrageMessageRenderType2) {
+})({});
+var BarrageMessageRenderType = /* @__PURE__ */ (function(BarrageMessageRenderType2) {
   BarrageMessageRenderType2[BarrageMessageRenderType2["RENDER_TYPE_NATIVE"] = 0] = "RENDER_TYPE_NATIVE";
   BarrageMessageRenderType2[BarrageMessageRenderType2["RENDER_TYPE_HYBRID"] = 1] = "RENDER_TYPE_HYBRID";
   BarrageMessageRenderType2[BarrageMessageRenderType2["RENDER_TYPE_ALPHA"] = 2] = "RENDER_TYPE_ALPHA";
   BarrageMessageRenderType2[BarrageMessageRenderType2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return BarrageMessageRenderType2;
-}({});
-var BarrageMessageShowType = /* @__PURE__ */ function(BarrageMessageShowType2) {
+})({});
+var BarrageMessageShowType = /* @__PURE__ */ (function(BarrageMessageShowType2) {
   BarrageMessageShowType2[BarrageMessageShowType2["SHOW_TYPE_NORMAL"] = 0] = "SHOW_TYPE_NORMAL";
   BarrageMessageShowType2[BarrageMessageShowType2["SHOW_TYPE_FADE_IN_OUT"] = 1] = "SHOW_TYPE_FADE_IN_OUT";
   BarrageMessageShowType2[BarrageMessageShowType2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return BarrageMessageShowType2;
-}({});
-var BattleCardMsgType = /* @__PURE__ */ function(BattleCardMsgType2) {
+})({});
+var BattleCardMsgType = /* @__PURE__ */ (function(BattleCardMsgType2) {
   BattleCardMsgType2[BattleCardMsgType2["UNKNOWN_CARD_ACTION"] = 0] = "UNKNOWN_CARD_ACTION";
   BattleCardMsgType2[BattleCardMsgType2["CARD_OBTAIN_GUIDE"] = 1] = "CARD_OBTAIN_GUIDE";
   BattleCardMsgType2[BattleCardMsgType2["USE_CRITICAL_STRIKE_CARD"] = 2] = "USE_CRITICAL_STRIKE_CARD";
@@ -111892,29 +111912,29 @@ var BattleCardMsgType = /* @__PURE__ */ function(BattleCardMsgType2) {
   BattleCardMsgType2[BattleCardMsgType2["USE_VAULT_GLOVE_CARD"] = 12] = "USE_VAULT_GLOVE_CARD";
   BattleCardMsgType2[BattleCardMsgType2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return BattleCardMsgType2;
-}({});
-var BattleRewardSettleRewardStatus = /* @__PURE__ */ function(BattleRewardSettleRewardStatus2) {
+})({});
+var BattleRewardSettleRewardStatus = /* @__PURE__ */ (function(BattleRewardSettleRewardStatus2) {
   BattleRewardSettleRewardStatus2[BattleRewardSettleRewardStatus2["REWARD_STATUS_SUCCEED"] = 0] = "REWARD_STATUS_SUCCEED";
   BattleRewardSettleRewardStatus2[BattleRewardSettleRewardStatus2["REWARD_STATUS_FAILED"] = 1] = "REWARD_STATUS_FAILED";
   BattleRewardSettleRewardStatus2[BattleRewardSettleRewardStatus2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return BattleRewardSettleRewardStatus2;
-}({});
-var BattleTaskMessageType = /* @__PURE__ */ function(BattleTaskMessageType2) {
+})({});
+var BattleTaskMessageType = /* @__PURE__ */ (function(BattleTaskMessageType2) {
   BattleTaskMessageType2[BattleTaskMessageType2["START"] = 0] = "START";
   BattleTaskMessageType2[BattleTaskMessageType2["TASK_UPDATE"] = 1] = "TASK_UPDATE";
   BattleTaskMessageType2[BattleTaskMessageType2["TASK_SETTLE"] = 2] = "TASK_SETTLE";
   BattleTaskMessageType2[BattleTaskMessageType2["REWARD_SETTLE"] = 3] = "REWARD_SETTLE";
   BattleTaskMessageType2[BattleTaskMessageType2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return BattleTaskMessageType2;
-}({});
-var BattleTaskSettleResult = /* @__PURE__ */ function(BattleTaskSettleResult2) {
+})({});
+var BattleTaskSettleResult = /* @__PURE__ */ (function(BattleTaskSettleResult2) {
   BattleTaskSettleResult2[BattleTaskSettleResult2["SUCCEED"] = 0] = "SUCCEED";
   BattleTaskSettleResult2[BattleTaskSettleResult2["FAILED"] = 1] = "FAILED";
   BattleTaskSettleResult2[BattleTaskSettleResult2["BOTH_SUCCEED"] = 2] = "BOTH_SUCCEED";
   BattleTaskSettleResult2[BattleTaskSettleResult2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return BattleTaskSettleResult2;
-}({});
-var BizType = /* @__PURE__ */ function(BizType2) {
+})({});
+var BizType = /* @__PURE__ */ (function(BizType2) {
   BizType2[BizType2["DEFAULT"] = 0] = "DEFAULT";
   BizType2[BizType2["RETHINK_CHAT"] = 1] = "RETHINK_CHAT";
   BizType2[BizType2["RETHINK_QA"] = 2] = "RETHINK_QA";
@@ -111924,8 +111944,8 @@ var BizType = /* @__PURE__ */ function(BizType2) {
   BizType2[BizType2["PERCEPTION_CENTER"] = 6] = "PERCEPTION_CENTER";
   BizType2[BizType2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return BizType2;
-}({});
-var ContentInviteSource = /* @__PURE__ */ function(ContentInviteSource2) {
+})({});
+var ContentInviteSource = /* @__PURE__ */ (function(ContentInviteSource2) {
   ContentInviteSource2[ContentInviteSource2["INVITE_SOURCE_UNKNOWN"] = 0] = "INVITE_SOURCE_UNKNOWN";
   ContentInviteSource2[ContentInviteSource2["INVITE_SOURCE_PANEL_GO_LIVE"] = 1] = "INVITE_SOURCE_PANEL_GO_LIVE";
   ContentInviteSource2[ContentInviteSource2["INVITE_SOURCE_MUTUAL_NOTICE"] = 2] = "INVITE_SOURCE_MUTUAL_NOTICE";
@@ -111933,67 +111953,67 @@ var ContentInviteSource = /* @__PURE__ */ function(ContentInviteSource2) {
   ContentInviteSource2[ContentInviteSource2["INVITE_SOURCE_RESERVE"] = 4] = "INVITE_SOURCE_RESERVE";
   ContentInviteSource2[ContentInviteSource2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return ContentInviteSource2;
-}({});
-var DisplayStyle = /* @__PURE__ */ function(DisplayStyle2) {
+})({});
+var DisplayStyle = /* @__PURE__ */ (function(DisplayStyle2) {
   DisplayStyle2[DisplayStyle2["DISPLAY_STYLE_NORMAL"] = 0] = "DISPLAY_STYLE_NORMAL";
   DisplayStyle2[DisplayStyle2["STAY"] = 1] = "STAY";
   DisplayStyle2[DisplayStyle2["CHAT"] = 2] = "CHAT";
   DisplayStyle2[DisplayStyle2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return DisplayStyle2;
-}({});
-var ExhibitionType = /* @__PURE__ */ function(ExhibitionType2) {
+})({});
+var ExhibitionType = /* @__PURE__ */ (function(ExhibitionType2) {
   ExhibitionType2[ExhibitionType2["EXHIBITION_TYPE_DEFAULT"] = 0] = "EXHIBITION_TYPE_DEFAULT";
   ExhibitionType2[ExhibitionType2["FOLD"] = 1] = "FOLD";
   ExhibitionType2[ExhibitionType2["PUBLIC_SCREEN"] = 2] = "PUBLIC_SCREEN";
   ExhibitionType2[ExhibitionType2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return ExhibitionType2;
-}({});
-var GameActionType = /* @__PURE__ */ function(GameActionType2) {
+})({});
+var GameActionType = /* @__PURE__ */ (function(GameActionType2) {
   GameActionType2[GameActionType2["SHOW"] = 0] = "SHOW";
   GameActionType2[GameActionType2["JUMP"] = 1] = "JUMP";
   GameActionType2[GameActionType2["FOLLOW"] = 2] = "FOLLOW";
   GameActionType2[GameActionType2["COMMENT"] = 3] = "COMMENT";
   GameActionType2[GameActionType2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return GameActionType2;
-}({});
-var GameRankNotifyMessageMsgType = /* @__PURE__ */ function(GameRankNotifyMessageMsgType2) {
+})({});
+var GameRankNotifyMessageMsgType = /* @__PURE__ */ (function(GameRankNotifyMessageMsgType2) {
   GameRankNotifyMessageMsgType2[GameRankNotifyMessageMsgType2["MSG_TYPE_RANK_IN_OUT"] = 0] = "MSG_TYPE_RANK_IN_OUT";
   GameRankNotifyMessageMsgType2[GameRankNotifyMessageMsgType2["MSG_TYPE_RANK_CHANGE"] = 1] = "MSG_TYPE_RANK_CHANGE";
   GameRankNotifyMessageMsgType2[GameRankNotifyMessageMsgType2["MSG_TYPE_ANCHOR_ENCOURAGE"] = 2] = "MSG_TYPE_ANCHOR_ENCOURAGE";
   GameRankNotifyMessageMsgType2[GameRankNotifyMessageMsgType2["MSG_TYPE_UN_KNOW"] = 255] = "MSG_TYPE_UN_KNOW";
   GameRankNotifyMessageMsgType2[GameRankNotifyMessageMsgType2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return GameRankNotifyMessageMsgType2;
-}({});
-var GiftMessageIgnoreConfig = /* @__PURE__ */ function(GiftMessageIgnoreConfig2) {
+})({});
+var GiftMessageIgnoreConfig = /* @__PURE__ */ (function(GiftMessageIgnoreConfig2) {
   GiftMessageIgnoreConfig2[GiftMessageIgnoreConfig2["NOT_IGNORE"] = 0] = "NOT_IGNORE";
   GiftMessageIgnoreConfig2[GiftMessageIgnoreConfig2["IGNORE_TRAY"] = 1] = "IGNORE_TRAY";
   GiftMessageIgnoreConfig2[GiftMessageIgnoreConfig2["IGNORE_PSM"] = 2] = "IGNORE_PSM";
   GiftMessageIgnoreConfig2[GiftMessageIgnoreConfig2["IGNORE_TRAY_AND_PSM"] = 3] = "IGNORE_TRAY_AND_PSM";
   GiftMessageIgnoreConfig2[GiftMessageIgnoreConfig2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return GiftMessageIgnoreConfig2;
-}({});
-var GiftMessageVersion = /* @__PURE__ */ function(GiftMessageVersion2) {
+})({});
+var GiftMessageVersion = /* @__PURE__ */ (function(GiftMessageVersion2) {
   GiftMessageVersion2[GiftMessageVersion2["NUM_0"] = 0] = "NUM_0";
   GiftMessageVersion2[GiftMessageVersion2["NUM_1"] = 1] = "NUM_1";
   GiftMessageVersion2[GiftMessageVersion2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return GiftMessageVersion2;
-}({});
-var GiftSource = /* @__PURE__ */ function(GiftSource2) {
+})({});
+var GiftSource = /* @__PURE__ */ (function(GiftSource2) {
   GiftSource2[GiftSource2["GIFT_SOURCE_UNKNOWN"] = 0] = "GIFT_SOURCE_UNKNOWN";
   GiftSource2[GiftSource2["PLATFORM"] = 1] = "PLATFORM";
   GiftSource2[GiftSource2["USER_BUY_RANDOM"] = 2] = "USER_BUY_RANDOM";
   GiftSource2[GiftSource2["USER_BUY_SPECIFIC"] = 3] = "USER_BUY_SPECIFIC";
   GiftSource2[GiftSource2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return GiftSource2;
-}({});
-var HitABStatus = /* @__PURE__ */ function(HitABStatus2) {
+})({});
+var HitABStatus = /* @__PURE__ */ (function(HitABStatus2) {
   HitABStatus2[HitABStatus2["NO_HIT"] = 0] = "NO_HIT";
   HitABStatus2[HitABStatus2["ENTER_FROM_EXTERNAL_LINK_NEW_TEXT"] = 1] = "ENTER_FROM_EXTERNAL_LINK_NEW_TEXT";
   HitABStatus2[HitABStatus2["ENTER_FROM_RE_POST_NEW_TEXT"] = 2] = "ENTER_FROM_RE_POST_NEW_TEXT";
   HitABStatus2[HitABStatus2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return HitABStatus2;
-}({});
-var JumpPage = /* @__PURE__ */ function(JumpPage2) {
+})({});
+var JumpPage = /* @__PURE__ */ (function(JumpPage2) {
   JumpPage2[JumpPage2["GIFT_GOAL_SOURCE"] = 0] = "GIFT_GOAL_SOURCE";
   JumpPage2[JumpPage2["GIFT_ALERT_SOURCE"] = 1] = "GIFT_ALERT_SOURCE";
   JumpPage2[JumpPage2["COHOST_SETTING"] = 2] = "COHOST_SETTING";
@@ -112023,8 +112043,8 @@ var JumpPage = /* @__PURE__ */ function(JumpPage2) {
   JumpPage2[JumpPage2["RANK_STICKER_SETTING"] = 26] = "RANK_STICKER_SETTING";
   JumpPage2[JumpPage2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return JumpPage2;
-}({});
-var LinkLayerMessageType = /* @__PURE__ */ function(LinkLayerMessageType2) {
+})({});
+var LinkLayerMessageType = /* @__PURE__ */ (function(LinkLayerMessageType2) {
   LinkLayerMessageType2[LinkLayerMessageType2["LINKER_UNKNOWN"] = 0] = "LINKER_UNKNOWN";
   LinkLayerMessageType2[LinkLayerMessageType2["LINKER_CREATE"] = 1] = "LINKER_CREATE";
   LinkLayerMessageType2[LinkLayerMessageType2["LINKER_INVITE"] = 2] = "LINKER_INVITE";
@@ -112046,8 +112066,8 @@ var LinkLayerMessageType = /* @__PURE__ */ function(LinkLayerMessageType2) {
   LinkLayerMessageType2[LinkLayerMessageType2["LINKER_GROUP_CHANGE"] = 18] = "LINKER_GROUP_CHANGE";
   LinkLayerMessageType2[LinkLayerMessageType2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return LinkLayerMessageType2;
-}({});
-var LinkMicArmiesTriggerReason = /* @__PURE__ */ function(LinkMicArmiesTriggerReason2) {
+})({});
+var LinkMicArmiesTriggerReason = /* @__PURE__ */ (function(LinkMicArmiesTriggerReason2) {
   LinkMicArmiesTriggerReason2[LinkMicArmiesTriggerReason2["LINK_MIC_ARMIES_TRIGGER_REASON_UNKNOWN"] = 0] = "LINK_MIC_ARMIES_TRIGGER_REASON_UNKNOWN";
   LinkMicArmiesTriggerReason2[LinkMicArmiesTriggerReason2["SCORE_UPDATE"] = 1] = "SCORE_UPDATE";
   LinkMicArmiesTriggerReason2[LinkMicArmiesTriggerReason2["BATTLE_END"] = 2] = "BATTLE_END";
@@ -112056,14 +112076,14 @@ var LinkMicArmiesTriggerReason = /* @__PURE__ */ function(LinkMicArmiesTriggerRe
   LinkMicArmiesTriggerReason2[LinkMicArmiesTriggerReason2["EFFECT_UPDATE"] = 5] = "EFFECT_UPDATE";
   LinkMicArmiesTriggerReason2[LinkMicArmiesTriggerReason2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return LinkMicArmiesTriggerReason2;
-}({});
-var LinkMicBattlePunishFinishReason = /* @__PURE__ */ function(LinkMicBattlePunishFinishReason2) {
+})({});
+var LinkMicBattlePunishFinishReason = /* @__PURE__ */ (function(LinkMicBattlePunishFinishReason2) {
   LinkMicBattlePunishFinishReason2[LinkMicBattlePunishFinishReason2["TIME_UP"] = 0] = "TIME_UP";
   LinkMicBattlePunishFinishReason2[LinkMicBattlePunishFinishReason2["CUT_SHORT"] = 1] = "CUT_SHORT";
   LinkMicBattlePunishFinishReason2[LinkMicBattlePunishFinishReason2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return LinkMicBattlePunishFinishReason2;
-}({});
-var LinkMicBattleBattleAction = /* @__PURE__ */ function(LinkMicBattleBattleAction2) {
+})({});
+var LinkMicBattleBattleAction = /* @__PURE__ */ (function(LinkMicBattleBattleAction2) {
   LinkMicBattleBattleAction2[LinkMicBattleBattleAction2["LINK_MIC_BATTLE_BATTLE_ACTION_UNKNOWN"] = 0] = "LINK_MIC_BATTLE_BATTLE_ACTION_UNKNOWN";
   LinkMicBattleBattleAction2[LinkMicBattleBattleAction2["INVITE"] = 1] = "INVITE";
   LinkMicBattleBattleAction2[LinkMicBattleBattleAction2["REJECT"] = 2] = "REJECT";
@@ -112078,14 +112098,14 @@ var LinkMicBattleBattleAction = /* @__PURE__ */ function(LinkMicBattleBattleActi
   LinkMicBattleBattleAction2[LinkMicBattleBattleAction2["LEAVE_LINKMIC"] = 11] = "LEAVE_LINKMIC";
   LinkMicBattleBattleAction2[LinkMicBattleBattleAction2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return LinkMicBattleBattleAction2;
-}({});
-var MessageDisplayStyle = /* @__PURE__ */ function(MessageDisplayStyle2) {
+})({});
+var MessageDisplayStyle = /* @__PURE__ */ (function(MessageDisplayStyle2) {
   MessageDisplayStyle2[MessageDisplayStyle2["MESSAGE_DISPLAY_STYLE_DEFAULT"] = 0] = "MESSAGE_DISPLAY_STYLE_DEFAULT";
   MessageDisplayStyle2[MessageDisplayStyle2["POPUP"] = 1] = "POPUP";
   MessageDisplayStyle2[MessageDisplayStyle2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return MessageDisplayStyle2;
-}({});
-var MessageType = /* @__PURE__ */ function(MessageType2) {
+})({});
+var MessageType = /* @__PURE__ */ (function(MessageType2) {
   MessageType2[MessageType2["SUB_SUCCESS"] = 0] = "SUB_SUCCESS";
   MessageType2[MessageType2["ANCHOR_REMINDER"] = 1] = "ANCHOR_REMINDER";
   MessageType2[MessageType2["ENTER_ROOM_EXPIRE_SOON"] = 2] = "ENTER_ROOM_EXPIRE_SOON";
@@ -112103,14 +112123,14 @@ var MessageType = /* @__PURE__ */ function(MessageType2) {
   MessageType2[MessageType2["SUB_MODERATOR_PIN_PERK"] = 14] = "SUB_MODERATOR_PIN_PERK";
   MessageType2[MessageType2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return MessageType2;
-}({});
-var MicIdxOperation = /* @__PURE__ */ function(MicIdxOperation2) {
+})({});
+var MicIdxOperation = /* @__PURE__ */ (function(MicIdxOperation2) {
   MicIdxOperation2[MicIdxOperation2["MIC_IDX_OP_ON"] = 0] = "MIC_IDX_OP_ON";
   MicIdxOperation2[MicIdxOperation2["MIC_IDX_OP_OFF"] = 1] = "MIC_IDX_OP_OFF";
   MicIdxOperation2[MicIdxOperation2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return MicIdxOperation2;
-}({});
-var OldSubscribeStatus = /* @__PURE__ */ function(OldSubscribeStatus2) {
+})({});
+var OldSubscribeStatus = /* @__PURE__ */ (function(OldSubscribeStatus2) {
   OldSubscribeStatus2[OldSubscribeStatus2["FIRST"] = 0] = "FIRST";
   OldSubscribeStatus2[OldSubscribeStatus2["RESUB"] = 1] = "RESUB";
   OldSubscribeStatus2[OldSubscribeStatus2["SUB_IN_GRACE_PERIOD"] = 2] = "SUB_IN_GRACE_PERIOD";
@@ -112118,8 +112138,8 @@ var OldSubscribeStatus = /* @__PURE__ */ function(OldSubscribeStatus2) {
   OldSubscribeStatus2[OldSubscribeStatus2["OLD_SUBSCRIBE_STATUS_DEFAULT"] = 100] = "OLD_SUBSCRIBE_STATUS_DEFAULT";
   OldSubscribeStatus2[OldSubscribeStatus2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return OldSubscribeStatus2;
-}({});
-var OpType = /* @__PURE__ */ function(OpType2) {
+})({});
+var OpType = /* @__PURE__ */ (function(OpType2) {
   OpType2[OpType2["OP_TYPE_DEFAULT"] = 0] = "OP_TYPE_DEFAULT";
   OpType2[OpType2["ADD"] = 1] = "ADD";
   OpType2[OpType2["REMOVE"] = 2] = "REMOVE";
@@ -112127,36 +112147,36 @@ var OpType = /* @__PURE__ */ function(OpType2) {
   OpType2[OpType2["BASIC_EFFECT"] = 4] = "BASIC_EFFECT";
   OpType2[OpType2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return OpType2;
-}({});
-var PartnershipDropsUpdateMessageChangeMode = /* @__PURE__ */ function(PartnershipDropsUpdateMessageChangeMode2) {
+})({});
+var PartnershipDropsUpdateMessageChangeMode = /* @__PURE__ */ (function(PartnershipDropsUpdateMessageChangeMode2) {
   PartnershipDropsUpdateMessageChangeMode2[PartnershipDropsUpdateMessageChangeMode2["CHANGE_MODE_SHOW"] = 0] = "CHANGE_MODE_SHOW";
   PartnershipDropsUpdateMessageChangeMode2[PartnershipDropsUpdateMessageChangeMode2["CHANGE_MODE_UPDATE"] = 1] = "CHANGE_MODE_UPDATE";
   PartnershipDropsUpdateMessageChangeMode2[PartnershipDropsUpdateMessageChangeMode2["CHANGE_MODE_CLOSE"] = 2] = "CHANGE_MODE_CLOSE";
   PartnershipDropsUpdateMessageChangeMode2[PartnershipDropsUpdateMessageChangeMode2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return PartnershipDropsUpdateMessageChangeMode2;
-}({});
-var PartnershipGameOfflineMessageOfflineGameInfoOfflineType = /* @__PURE__ */ function(PartnershipGameOfflineMessageOfflineGameInfoOfflineType2) {
+})({});
+var PartnershipGameOfflineMessageOfflineGameInfoOfflineType = /* @__PURE__ */ (function(PartnershipGameOfflineMessageOfflineGameInfoOfflineType2) {
   PartnershipGameOfflineMessageOfflineGameInfoOfflineType2[PartnershipGameOfflineMessageOfflineGameInfoOfflineType2["TASK_OFFLINE"] = 0] = "TASK_OFFLINE";
   PartnershipGameOfflineMessageOfflineGameInfoOfflineType2[PartnershipGameOfflineMessageOfflineGameInfoOfflineType2["EVENT_OFFLINE"] = 1] = "EVENT_OFFLINE";
   PartnershipGameOfflineMessageOfflineGameInfoOfflineType2[PartnershipGameOfflineMessageOfflineGameInfoOfflineType2["DROPS_OFFLINE"] = 2] = "DROPS_OFFLINE";
   PartnershipGameOfflineMessageOfflineGameInfoOfflineType2[PartnershipGameOfflineMessageOfflineGameInfoOfflineType2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return PartnershipGameOfflineMessageOfflineGameInfoOfflineType2;
-}({});
-var PinMessageActionType = /* @__PURE__ */ function(PinMessageActionType2) {
+})({});
+var PinMessageActionType = /* @__PURE__ */ (function(PinMessageActionType2) {
   PinMessageActionType2[PinMessageActionType2["UN_KOWN"] = 0] = "UN_KOWN";
   PinMessageActionType2[PinMessageActionType2["PIN"] = 1] = "PIN";
   PinMessageActionType2[PinMessageActionType2["PIN_CANCEL"] = 2] = "PIN_CANCEL";
   PinMessageActionType2[PinMessageActionType2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return PinMessageActionType2;
-}({});
-var PublicAreaMessageCommonCreatorSuccessInfoTopicDisplayLocation = /* @__PURE__ */ function(PublicAreaMessageCommonCreatorSuccessInfoTopicDisplayLocation2) {
+})({});
+var PublicAreaMessageCommonCreatorSuccessInfoTopicDisplayLocation = /* @__PURE__ */ (function(PublicAreaMessageCommonCreatorSuccessInfoTopicDisplayLocation2) {
   PublicAreaMessageCommonCreatorSuccessInfoTopicDisplayLocation2[PublicAreaMessageCommonCreatorSuccessInfoTopicDisplayLocation2["DISPLAY_LOCATION_FULL_SCREEN"] = 0] = "DISPLAY_LOCATION_FULL_SCREEN";
   PublicAreaMessageCommonCreatorSuccessInfoTopicDisplayLocation2[PublicAreaMessageCommonCreatorSuccessInfoTopicDisplayLocation2["DISPLAY_LOCATION_PUBLIC_SCREEN"] = 1] = "DISPLAY_LOCATION_PUBLIC_SCREEN";
   PublicAreaMessageCommonCreatorSuccessInfoTopicDisplayLocation2[PublicAreaMessageCommonCreatorSuccessInfoTopicDisplayLocation2["DISPLAY_LOCATION_BOTH"] = 2] = "DISPLAY_LOCATION_BOTH";
   PublicAreaMessageCommonCreatorSuccessInfoTopicDisplayLocation2[PublicAreaMessageCommonCreatorSuccessInfoTopicDisplayLocation2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return PublicAreaMessageCommonCreatorSuccessInfoTopicDisplayLocation2;
-}({});
-var PublicAreaMessageCommonPortraitInfoUserMetricsUserMetricsType = /* @__PURE__ */ function(PublicAreaMessageCommonPortraitInfoUserMetricsUserMetricsType2) {
+})({});
+var PublicAreaMessageCommonPortraitInfoUserMetricsUserMetricsType = /* @__PURE__ */ (function(PublicAreaMessageCommonPortraitInfoUserMetricsUserMetricsType2) {
   PublicAreaMessageCommonPortraitInfoUserMetricsUserMetricsType2[PublicAreaMessageCommonPortraitInfoUserMetricsUserMetricsType2["USER_METRICS_TYPE_UNKNOWN"] = 0] = "USER_METRICS_TYPE_UNKNOWN";
   PublicAreaMessageCommonPortraitInfoUserMetricsUserMetricsType2[PublicAreaMessageCommonPortraitInfoUserMetricsUserMetricsType2["USER_METRICS_TYPE_GRADE"] = 1] = "USER_METRICS_TYPE_GRADE";
   PublicAreaMessageCommonPortraitInfoUserMetricsUserMetricsType2[PublicAreaMessageCommonPortraitInfoUserMetricsUserMetricsType2["USER_METRICS_TYPE_SUBSCRIBE"] = 2] = "USER_METRICS_TYPE_SUBSCRIBE";
@@ -112166,8 +112186,8 @@ var PublicAreaMessageCommonPortraitInfoUserMetricsUserMetricsType = /* @__PURE__
   PublicAreaMessageCommonPortraitInfoUserMetricsUserMetricsType2[PublicAreaMessageCommonPortraitInfoUserMetricsUserMetricsType2["USER_METRICS_TYPE_GIFT"] = 6] = "USER_METRICS_TYPE_GIFT";
   PublicAreaMessageCommonPortraitInfoUserMetricsUserMetricsType2[PublicAreaMessageCommonPortraitInfoUserMetricsUserMetricsType2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return PublicAreaMessageCommonPortraitInfoUserMetricsUserMetricsType2;
-}({});
-var RankTextMessageRankTestMessageScene = /* @__PURE__ */ function(RankTextMessageRankTestMessageScene2) {
+})({});
+var RankTextMessageRankTestMessageScene = /* @__PURE__ */ (function(RankTextMessageRankTestMessageScene2) {
   RankTextMessageRankTestMessageScene2[RankTextMessageRankTestMessageScene2["RANK_TEXT_MESSAGE_RANK_TEST_MESSAGE_SCENE_UNKNOWN"] = 0] = "RANK_TEXT_MESSAGE_RANK_TEST_MESSAGE_SCENE_UNKNOWN";
   RankTextMessageRankTestMessageScene2[RankTextMessageRankTestMessageScene2["ONLINE_AUDIENCE_TOP_N_UPDATE_PUBLIC_SCREEN"] = 1] = "ONLINE_AUDIENCE_TOP_N_UPDATE_PUBLIC_SCREEN";
   RankTextMessageRankTestMessageScene2[RankTextMessageRankTestMessageScene2["MID_PEAK_MOTIVATION_PUBLIC_SCREEN_TOP"] = 2] = "MID_PEAK_MOTIVATION_PUBLIC_SCREEN_TOP";
@@ -112175,35 +112195,35 @@ var RankTextMessageRankTestMessageScene = /* @__PURE__ */ function(RankTextMessa
   RankTextMessageRankTestMessageScene2[RankTextMessageRankTestMessageScene2["TILE_REWARD_GUIDE"] = 4] = "TILE_REWARD_GUIDE";
   RankTextMessageRankTestMessageScene2[RankTextMessageRankTestMessageScene2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return RankTextMessageRankTestMessageScene2;
-}({});
-var ScoreType = /* @__PURE__ */ function(ScoreType2) {
+})({});
+var ScoreType = /* @__PURE__ */ (function(ScoreType2) {
   ScoreType2[ScoreType2["SCORE_TYPE_UNKNOWN"] = 0] = "SCORE_TYPE_UNKNOWN";
   ScoreType2[ScoreType2["ALL_FAN_TICKET"] = 1] = "ALL_FAN_TICKET";
   ScoreType2[ScoreType2["PLAY_SCORE"] = 2] = "PLAY_SCORE";
   ScoreType2[ScoreType2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return ScoreType2;
-}({});
-var ShowType = /* @__PURE__ */ function(ShowType2) {
+})({});
+var ShowType = /* @__PURE__ */ (function(ShowType2) {
   ShowType2[ShowType2["HOVER"] = 0] = "HOVER";
   ShowType2[ShowType2["PLUG"] = 1] = "PLUG";
   ShowType2[ShowType2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return ShowType2;
-}({});
-var SubPinEventMessageActionType = /* @__PURE__ */ function(SubPinEventMessageActionType2) {
+})({});
+var SubPinEventMessageActionType = /* @__PURE__ */ (function(SubPinEventMessageActionType2) {
   SubPinEventMessageActionType2[SubPinEventMessageActionType2["SUB_PIN_EVENT_MESSAGE_ACTION_TYPE_UNKNOWN"] = 0] = "SUB_PIN_EVENT_MESSAGE_ACTION_TYPE_UNKNOWN";
   SubPinEventMessageActionType2[SubPinEventMessageActionType2["SUB_PIN_EVENT_MESSAGE_ACTION_TYPE_PIN"] = 1] = "SUB_PIN_EVENT_MESSAGE_ACTION_TYPE_PIN";
   SubPinEventMessageActionType2[SubPinEventMessageActionType2["UNPIN"] = 2] = "UNPIN";
   SubPinEventMessageActionType2[SubPinEventMessageActionType2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return SubPinEventMessageActionType2;
-}({});
-var SubscribeType = /* @__PURE__ */ function(SubscribeType2) {
+})({});
+var SubscribeType = /* @__PURE__ */ (function(SubscribeType2) {
   SubscribeType2[SubscribeType2["ONCE"] = 0] = "ONCE";
   SubscribeType2[SubscribeType2["AUTO"] = 1] = "AUTO";
   SubscribeType2[SubscribeType2["SUBSCRIBE_TYPE_DEFAULT"] = 100] = "SUBSCRIBE_TYPE_DEFAULT";
   SubscribeType2[SubscribeType2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return SubscribeType2;
-}({});
-var SubscribingStatus = /* @__PURE__ */ function(SubscribingStatus2) {
+})({});
+var SubscribingStatus = /* @__PURE__ */ (function(SubscribingStatus2) {
   SubscribingStatus2[SubscribingStatus2["SUBSCRIBING_STATUS_UNKNOWN"] = 0] = "SUBSCRIBING_STATUS_UNKNOWN";
   SubscribingStatus2[SubscribingStatus2["SUBSCRIBING_STATUS_ONCE"] = 1] = "SUBSCRIBING_STATUS_ONCE";
   SubscribingStatus2[SubscribingStatus2["CIRCLE"] = 2] = "CIRCLE";
@@ -112213,20 +112233,20 @@ var SubscribingStatus = /* @__PURE__ */ function(SubscribingStatus2) {
   SubscribingStatus2[SubscribingStatus2["NOT_IN_GRACE_PERIOD"] = 6] = "NOT_IN_GRACE_PERIOD";
   SubscribingStatus2[SubscribingStatus2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return SubscribingStatus2;
-}({});
-var TextType = /* @__PURE__ */ function(TextType2) {
+})({});
+var TextType = /* @__PURE__ */ (function(TextType2) {
   TextType2[TextType2["DISPLAY_TEXT"] = 0] = "DISPLAY_TEXT";
   TextType2[TextType2["CONTENT"] = 1] = "CONTENT";
   TextType2[TextType2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return TextType2;
-}({});
-var UnionAnimationInfoType = /* @__PURE__ */ function(UnionAnimationInfoType2) {
+})({});
+var UnionAnimationInfoType = /* @__PURE__ */ (function(UnionAnimationInfoType2) {
   UnionAnimationInfoType2[UnionAnimationInfoType2["NO_UNION_ANIMATION"] = 0] = "NO_UNION_ANIMATION";
   UnionAnimationInfoType2[UnionAnimationInfoType2["LOOP"] = 1] = "LOOP";
   UnionAnimationInfoType2[UnionAnimationInfoType2["LOCK"] = 2] = "LOCK";
   UnionAnimationInfoType2[UnionAnimationInfoType2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return UnionAnimationInfoType2;
-}({});
+})({});
 function createBaseBizLayoutState() {
   return {
     multiGuestBizLayoutExtra: void 0,
@@ -115462,7 +115482,7 @@ var GiftTrayInfo = {
     return message;
   }
 };
-var PlayScene = /* @__PURE__ */ function(PlayScene2) {
+var PlayScene = /* @__PURE__ */ (function(PlayScene2) {
   PlayScene2[PlayScene2["UNKNOWN"] = 0] = "UNKNOWN";
   PlayScene2[PlayScene2["COUNTDOWN_FOR_ALL"] = 1] = "COUNTDOWN_FOR_ALL";
   PlayScene2[PlayScene2["COUNTDOWN_FOR_SINGLE"] = 2] = "COUNTDOWN_FOR_SINGLE";
@@ -115478,15 +115498,15 @@ var PlayScene = /* @__PURE__ */ function(PlayScene2) {
   PlayScene2[PlayScene2["GUEST_SHOWDOWN"] = 12] = "GUEST_SHOWDOWN";
   PlayScene2[PlayScene2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return PlayScene2;
-}({});
-var PlayUserTag = /* @__PURE__ */ function(PlayUserTag2) {
+})({});
+var PlayUserTag = /* @__PURE__ */ (function(PlayUserTag2) {
   PlayUserTag2[PlayUserTag2["PLAY_USER_TAG_UNKNOWN"] = 0] = "PLAY_USER_TAG_UNKNOWN";
   PlayUserTag2[PlayUserTag2["GUEST_SHOWDOWN_NORMAL"] = 1] = "GUEST_SHOWDOWN_NORMAL";
   PlayUserTag2[PlayUserTag2["GUEST_SHOWDOWN_WINNER"] = 2] = "GUEST_SHOWDOWN_WINNER";
   PlayUserTag2[PlayUserTag2["GUEST_SHOWDOWN_LOSER"] = 3] = "GUEST_SHOWDOWN_LOSER";
   PlayUserTag2[PlayUserTag2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return PlayUserTag2;
-}({});
+})({});
 function createBaseAtmosphereInfo() {
   return { tags: [] };
 }
@@ -136361,27 +136381,27 @@ var WebcastEnvelopeMessage = {
     return message;
   }
 };
-var MemberMessageAction = /* @__PURE__ */ function(MemberMessageAction2) {
+var MemberMessageAction = /* @__PURE__ */ (function(MemberMessageAction2) {
   MemberMessageAction2[MemberMessageAction2["MEMBER_MESSAGE_ACTION_UNKNOWN"] = 0] = "MEMBER_MESSAGE_ACTION_UNKNOWN";
   MemberMessageAction2[MemberMessageAction2["MEMBER_MESSAGE_ACTION_JOINED"] = 1] = "MEMBER_MESSAGE_ACTION_JOINED";
   MemberMessageAction2[MemberMessageAction2["MEMBER_MESSAGE_ACTION_SUBSCRIBED"] = 3] = "MEMBER_MESSAGE_ACTION_SUBSCRIBED";
   MemberMessageAction2[MemberMessageAction2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return MemberMessageAction2;
-}({});
-var CommentTag = /* @__PURE__ */ function(CommentTag2) {
+})({});
+var CommentTag = /* @__PURE__ */ (function(CommentTag2) {
   CommentTag2[CommentTag2["COMMENT_TAG_NORMAL"] = 0] = "COMMENT_TAG_NORMAL";
   CommentTag2[CommentTag2["COMMENT_TAG_CANDIDATE"] = 1] = "COMMENT_TAG_CANDIDATE";
   CommentTag2[CommentTag2["COMMENT_TAG_OVERAGE"] = 2] = "COMMENT_TAG_OVERAGE";
   CommentTag2[CommentTag2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return CommentTag2;
-}({});
-var MuteStatus = /* @__PURE__ */ function(MuteStatus2) {
+})({});
+var MuteStatus = /* @__PURE__ */ (function(MuteStatus2) {
   MuteStatus2[MuteStatus2["MUTE_STATUS_MUTE"] = 0] = "MUTE_STATUS_MUTE";
   MuteStatus2[MuteStatus2["MUTE_STATUS_UN_MUTE"] = 1] = "MUTE_STATUS_UN_MUTE";
   MuteStatus2[MuteStatus2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return MuteStatus2;
-}({});
-var ControlAction = /* @__PURE__ */ function(ControlAction2) {
+})({});
+var ControlAction = /* @__PURE__ */ (function(ControlAction2) {
   ControlAction2[ControlAction2["CONTROL_ACTION_FALLBACK_UNKNOWN"] = 0] = "CONTROL_ACTION_FALLBACK_UNKNOWN";
   ControlAction2[ControlAction2["CONTROL_ACTION_STREAM_PAUSED"] = 1] = "CONTROL_ACTION_STREAM_PAUSED";
   ControlAction2[ControlAction2["CONTROL_ACTION_STREAM_UNPAUSED"] = 2] = "CONTROL_ACTION_STREAM_UNPAUSED";
@@ -136389,7 +136409,7 @@ var ControlAction = /* @__PURE__ */ function(ControlAction2) {
   ControlAction2[ControlAction2["CONTROL_ACTION_STREAM_SUSPENDED"] = 4] = "CONTROL_ACTION_STREAM_SUSPENDED";
   ControlAction2[ControlAction2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return ControlAction2;
-}({});
+})({});
 function createBaseHeartBeatMessage() {
   return {
     roomId: "0",
@@ -138411,7 +138431,7 @@ var c = class {
     };
   }
 };
-var n = Symbol();
+var n = /* @__PURE__ */ Symbol();
 function i() {
   return this[n].next();
 }
@@ -140587,7 +140607,7 @@ function unhandle() {
 }
 
 // node_modules/tiktok-live-connector/node_modules/got/dist/source/core/timed-out.js
-var reentry = Symbol("reentry");
+var reentry = /* @__PURE__ */ Symbol("reentry");
 var noop3 = () => {
 };
 var TimeoutError2 = class extends Error {
@@ -140797,9 +140817,9 @@ var import_node_dns = require("node:dns");
 var import_node_util2 = require("node:util");
 var import_node_os = __toESM(require("node:os"), 1);
 var { Resolver: AsyncResolver } = import_node_dns.promises;
-var kCacheableLookupCreateConnection = Symbol("cacheableLookupCreateConnection");
-var kCacheableLookupInstance = Symbol("cacheableLookupInstance");
-var kExpires = Symbol("expires");
+var kCacheableLookupCreateConnection = /* @__PURE__ */ Symbol("cacheableLookupCreateConnection");
+var kCacheableLookupInstance = /* @__PURE__ */ Symbol("cacheableLookupInstance");
+var kExpires = /* @__PURE__ */ Symbol("expires");
 var supportsALL = typeof import_node_dns.ALL === "number";
 var verifyAgent = (agent) => {
   if (!(agent && typeof agent.createConnection === "function")) {
@@ -143152,7 +143172,7 @@ var Options = class _Options {
   toJSON() {
     return { ...this.#internals };
   }
-  [Symbol.for("nodejs.util.inspect.custom")](_depth, options) {
+  [/* @__PURE__ */ Symbol.for("nodejs.util.inspect.custom")](_depth, options) {
     return (0, import_node_util3.inspect)(this.#internals, options);
   }
   createNativeRequestOptions() {
@@ -144728,7 +144748,7 @@ var Request = class _Request extends import_node_stream4.Duplex {
     if (cacheableStore.has(cache)) {
       return;
     }
-    const cacheableRequest = new dist_default((requestOptions, handler) => {
+    const cacheableRequest = new dist_default(((requestOptions, handler) => {
       const wrappedHandler = handler ? (response) => {
         const { beforeCacheHooks, gotRequest } = requestOptions;
         if (!beforeCacheHooks || beforeCacheHooks.length === 0) {
@@ -144790,7 +144810,7 @@ var Request = class _Request extends import_node_stream4.Duplex {
         };
       }
       return result;
-    }, cache);
+    }), cache);
     cacheableStore.set(cache, cacheableRequest.request());
   }
   async _createCacheableRequest(url2, options) {
@@ -145412,7 +145432,7 @@ var create2 = (defaults3) => {
     };
     return iterateHandlers(request.options);
   };
-  const got2 = (url2, options, defaultOptions = defaults3.options) => makeRequest(url2, options, defaultOptions, false);
+  const got2 = ((url2, options, defaultOptions = defaults3.options) => makeRequest(url2, options, defaultOptions, false));
   got2.extend = (...instancesOrOptions) => {
     const options = new Options(void 0, void 0, defaults3.options);
     const handlers = [...defaults3.handlers];
@@ -145437,7 +145457,7 @@ var create2 = (defaults3) => {
       mutableDefaults: Boolean(mutableDefaults)
     });
   };
-  const paginateEach = async function* (url2, options) {
+  const paginateEach = (async function* (url2, options) {
     if (distribution_default.plainObject(url2)) {
       assertNoUrlInOptionsObject(url2);
     }
@@ -145559,14 +145579,14 @@ var create2 = (defaults3) => {
       }
       numberOfRequests++;
     }
-  };
+  });
   got2.paginate = paginateEach;
-  got2.paginate.all = async (url2, options) => Array.fromAsync(paginateEach(url2, options));
+  got2.paginate.all = (async (url2, options) => Array.fromAsync(paginateEach(url2, options)));
   got2.paginate.each = paginateEach;
-  got2.stream = (url2, options) => makeRequest(url2, options, defaults3.options, true);
+  got2.stream = ((url2, options) => makeRequest(url2, options, defaults3.options, true));
   for (const method of aliases) {
-    got2[method] = (url2, options) => got2(url2, { ...options, method });
-    got2.stream[method] = (url2, options) => makeRequest(url2, { ...options, method }, defaults3.options, true);
+    got2[method] = ((url2, options) => got2(url2, { ...options, method }));
+    got2.stream[method] = ((url2, options) => makeRequest(url2, { ...options, method }, defaults3.options, true));
   }
   if (!defaults3.mutableDefaults) {
     Object.freeze(defaults3.handlers);
@@ -155040,7 +155060,7 @@ var embeddedOverlayHtml = `<!DOCTYPE html>
 var embeddedUserscript = `// ==UserScript==
 // @name         AHUNG SERVER MabarBang YouTube 
 // @namespace    http://tampermonkey.net/
-// @version      2.5
+// @version      2.6
 // @description  Otomatis mengirim data ronde GeoGuessr ke Railway/Local, menampilkan Scoreboard Overlay & PIN tebakan penonton di peta GeoGuessr
 // @author       MabarBang
 // @match        *://*.geoguessr.com/*
@@ -155259,6 +155279,9 @@ var embeddedUserscript = `// ==UserScript==
 
   hookGoogleMaps();
 
+  // Maksimal pin yang dirender di layar peta untuk menjaga FPS browser tetap lancar
+  const MAX_MAP_PINS = 1000;
+
   function drawViewerPins(results, targetLocation) {
     if (!globalMap || !results || results.length === 0 || !showPinsEnabled) {
       return;
@@ -155273,9 +155296,16 @@ var embeddedUserscript = `// ==UserScript==
       scale: 2
     };
 
-    results.forEach((p, idx) => {
+    // Ambil maksimal 1.000 pin teratas, dan pastikan pin streamer tetap masuk jika ada
+    const displayList = results.slice(0, MAX_MAP_PINS);
+    const streamerPin = results.find((p) => p.userId === 'streamer' || p.isStreamer);
+    if (streamerPin && !displayList.some((p) => p.userId === 'streamer')) {
+      displayList.push(streamerPin);
+    }
+
+    displayList.forEach((p, idx) => {
       if (!p.position || typeof p.position.lat !== 'number' || typeof p.position.lng !== 'number') return;
-      const rank = idx + 1;
+      const rank = p.rank || (idx + 1);
       const markerContent = createCustomMarkerElement(p, rank);
 
       let marker = null;
@@ -156326,140 +156356,152 @@ var embeddedUserscript = `// ==UserScript==
       document.body.appendChild(modal);
     }
 
-    const currentMode = getServerMode();
+    const renderModalContent = () => {
+      const currentMode = getServerMode();
+      modal.innerHTML = \`
+        <div style="
+          background: #ffffff;
+          border: 3.5px solid #000;
+          border-radius: 24px;
+          box-shadow: 8px 8px 0px #000;
+          padding: 24px 26px;
+          max-width: 390px;
+          width: 90vw;
+          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+          color: #000;
+          animation: cgWidgetPopIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+        " onclick="event.stopPropagation()">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
+            <h3 style="font-size: 17px; font-weight: 900; margin: 0; display: flex; align-items: center; gap: 6px;">
+              <span>\u{1F310}</span> Pilih Server MabarBang
+            </h3>
+            <button id="cg-close-modal" style="
+              background: #ff5964;
+              color: #fff;
+              border: 2px solid #000;
+              border-radius: 50%;
+              width: 28px;
+              height: 28px;
+              cursor: pointer;
+              font-weight: 900;
+              box-shadow: 2px 2px 0px #000;
+            ">\u2715</button>
+          </div>
 
-    modal.innerHTML = \`
-      <div style="
-        background: #ffffff;
-        border: 3.5px solid #000;
-        border-radius: 24px;
-        box-shadow: 8px 8px 0px #000;
-        padding: 24px 26px;
-        max-width: 390px;
-        width: 90vw;
-        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-        color: #000;
-        animation: cgWidgetPopIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
-      " onclick="event.stopPropagation()">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
-          <h3 style="font-size: 17px; font-weight: 900; margin: 0; display: flex; align-items: center; gap: 6px;">
-            <span>\u{1F310}</span> Pilih Server MabarBang
-          </h3>
-          <button id="cg-close-modal" style="
-            background: #ff5964;
-            color: #fff;
-            border: 2px solid #000;
-            border-radius: 50%;
-            width: 28px;
-            height: 28px;
-            cursor: pointer;
-            font-weight: 900;
-            box-shadow: 2px 2px 0px #000;
-          ">\u2715</button>
+          <p style="font-size: 12px; color: #475569; font-weight: 700; margin-bottom: 16px;">
+            Pilih server untuk menghubungkan tebakan viewer YouTube ke GeoGuessr:
+          </p>
+
+          <div style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 14px;">
+            <!-- Tombol Local Server -->
+            <button id="cg-btn-local" style="
+              display: flex;
+              align-items: center;
+              justify-content: space-between;
+              background: \${currentMode === 'local' ? '#c8f560' : '#f8fafc'};
+              border: 2.5px solid #000;
+              border-radius: 14px;
+              padding: 12px 14px;
+              cursor: pointer;
+              box-shadow: \${currentMode === 'local' ? '4px 4px 0px #000' : '2px 2px 0px #000'};
+              text-align: left;
+              transition: all 0.15s ease;
+            ">
+              <div>
+                <div style="font-size: 14px; font-weight: 900; display: flex; align-items: center; gap: 6px;">
+                  <span>\u{1F4BB}</span> Local Server (PC Ini)
+                  \${currentMode === 'local' ? '<span style="background: #000; color: #fff; font-size: 9px; padding: 2px 6px; border-radius: 99px;">AKTIF</span>' : ''}
+                </div>
+                <div style="font-size: 11px; color: #475569; font-weight: 700; margin-top: 2px;">
+                  http://localhost:5050 (Standalone / Local)
+                </div>
+              </div>
+              <span style="font-size: 16px; font-weight: 900;">\${currentMode === 'local' ? '\u2713' : '\u2794'}</span>
+            </button>
+
+            <!-- Tombol Cloud Server -->
+            <button id="cg-btn-cloud" style="
+              display: flex;
+              align-items: center;
+              justify-content: space-between;
+              background: \${currentMode === 'cloud' ? '#ffe082' : '#f8fafc'};
+              border: 2.5px solid #000;
+              border-radius: 14px;
+              padding: 12px 14px;
+              cursor: pointer;
+              box-shadow: \${currentMode === 'cloud' ? '4px 4px 0px #000' : '2px 2px 0px #000'};
+              text-align: left;
+              transition: all 0.15s ease;
+            ">
+              <div>
+                <div style="font-size: 14px; font-weight: 900; display: flex; align-items: center; gap: 6px;">
+                  <span>\u2601\uFE0F</span> Cloud Server (Railway)
+                  \${currentMode === 'cloud' ? '<span style="background: #000; color: #fff; font-size: 9px; padding: 2px 6px; border-radius: 99px;">AKTIF</span>' : ''}
+                </div>
+                <div style="font-size: 11px; color: #475569; font-weight: 700; margin-top: 2px;">
+                  geoindo.up.railway.app
+                </div>
+              </div>
+              <span style="font-size: 16px; font-weight: 900;">\${currentMode === 'cloud' ? '\u2713' : '\u2794'}</span>
+            </button>
+
+            <!-- Tombol Custom Server -->
+            <button id="cg-btn-custom" style="
+              display: flex;
+              align-items: center;
+              justify-content: space-between;
+              background: \${currentMode === 'custom' ? '#70d6ff' : '#f8fafc'};
+              border: 2px solid #000;
+              border-radius: 12px;
+              padding: 10px 14px;
+              cursor: pointer;
+              box-shadow: \${currentMode === 'custom' ? '3px 3px 0px #000' : '2px 2px 0px #000'};
+              text-align: left;
+            ">
+              <div style="font-size: 12px; font-weight: 800;">
+                <span>\u2699\uFE0F</span> Custom URL Server...
+                \${currentMode === 'custom' ? '<span style="background: #000; color: #fff; font-size: 9px; padding: 2px 6px; border-radius: 99px; margin-left: 6px;">AKTIF</span>' : ''}
+              </div>
+              <span style="font-size: 13px;">\${currentMode === 'custom' ? '\u2713' : '\u270E'}</span>
+            </button>
+          </div>
         </div>
+      \`;
 
-        <p style="font-size: 12px; color: #475569; font-weight: 700; margin-bottom: 16px;">
-          Pilih server untuk menghubungkan tebakan viewer YouTube ke GeoGuessr:
-        </p>
+      document.getElementById('cg-close-modal').onclick = () => {
+        modal.style.display = 'none';
+      };
 
-        <div style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 14px;">
-          <!-- Tombol Local Server -->
-          <button id="cg-btn-local" style="
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            background: \${currentMode === 'local' ? '#c8f560' : '#f8fafc'};
-            border: 2.5px solid #000;
-            border-radius: 14px;
-            padding: 12px 14px;
-            cursor: pointer;
-            box-shadow: \${currentMode === 'local' ? '4px 4px 0px #000' : '2px 2px 0px #000'};
-            text-align: left;
-            transition: all 0.15s ease;
-          ">
-            <div>
-              <div style="font-size: 14px; font-weight: 900; display: flex; align-items: center; gap: 6px;">
-                <span>\u{1F4BB}</span> Local Server (PC Ini)
-                \${currentMode === 'local' ? '<span style="background: #000; color: #fff; font-size: 9px; padding: 2px 6px; border-radius: 99px;">AKTIF</span>' : ''}
-              </div>
-              <div style="font-size: 11px; color: #475569; font-weight: 700; margin-top: 2px;">
-                http://localhost:5050 (Standalone .exe)
-              </div>
-            </div>
-            <span style="font-size: 16px; font-weight: 900;">\u2794</span>
-          </button>
+      document.getElementById('cg-btn-local').onclick = () => {
+        setServerUrl(LOCAL_SERVER_URL, 'Local (5050)');
+        renderModalContent();
+        setTimeout(() => {
+          modal.style.display = 'none';
+        }, 220);
+      };
 
-          <!-- Tombol Cloud Server -->
-          <button id="cg-btn-cloud" style="
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            background: \${currentMode === 'cloud' ? '#ffe082' : '#f8fafc'};
-            border: 2.5px solid #000;
-            border-radius: 14px;
-            padding: 12px 14px;
-            cursor: pointer;
-            box-shadow: \${currentMode === 'cloud' ? '4px 4px 0px #000' : '2px 2px 0px #000'};
-            text-align: left;
-            transition: all 0.15s ease;
-          ">
-            <div>
-              <div style="font-size: 14px; font-weight: 900; display: flex; align-items: center; gap: 6px;">
-                <span>\u2601\uFE0F</span> Cloud Server (Railway)
-                \${currentMode === 'cloud' ? '<span style="background: #000; color: #fff; font-size: 9px; padding: 2px 6px; border-radius: 99px;">AKTIF</span>' : ''}
-              </div>
-              <div style="font-size: 11px; color: #475569; font-weight: 700; margin-top: 2px;">
-                geochat-production-f099.up.railway.app
-              </div>
-            </div>
-            <span style="font-size: 16px; font-weight: 900;">\u2794</span>
-          </button>
+      document.getElementById('cg-btn-cloud').onclick = () => {
+        setServerUrl(CLOUD_SERVER_URL, 'Cloud (Railway)');
+        renderModalContent();
+        setTimeout(() => {
+          modal.style.display = 'none';
+        }, 220);
+      };
 
-          <!-- Tombol Custom Server -->
-          <button id="cg-btn-custom" style="
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            background: \${currentMode === 'custom' ? '#70d6ff' : '#f8fafc'};
-            border: 2px solid #000;
-            border-radius: 12px;
-            padding: 10px 14px;
-            cursor: pointer;
-            box-shadow: \${currentMode === 'custom' ? '3px 3px 0px #000' : '2px 2px 0px #000'};
-            text-align: left;
-          ">
-            <div style="font-size: 12px; font-weight: 800;">
-              <span>\u2699\uFE0F</span> Custom URL Server...
-            </div>
-            <span style="font-size: 13px;">\u270E</span>
-          </button>
-        </div>
-      </div>
-    \`;
+      document.getElementById('cg-btn-custom').onclick = () => {
+        const customUrl = prompt('Masukkan URL Server Custom:', serverUrl);
+        if (customUrl && customUrl.trim()) {
+          setServerUrl(customUrl.trim(), 'Custom');
+          renderModalContent();
+          setTimeout(() => {
+            modal.style.display = 'none';
+          }, 220);
+        }
+      };
+    };
 
+    renderModalContent();
     modal.style.display = 'flex';
-
-    document.getElementById('cg-close-modal').onclick = () => {
-      modal.style.display = 'none';
-    };
-
-    document.getElementById('cg-btn-local').onclick = () => {
-      setServerUrl(LOCAL_SERVER_URL, 'Local (5050)');
-      modal.style.display = 'none';
-    };
-
-    document.getElementById('cg-btn-cloud').onclick = () => {
-      setServerUrl(CLOUD_SERVER_URL, 'Cloud (Railway)');
-      modal.style.display = 'none';
-    };
-
-    document.getElementById('cg-btn-custom').onclick = () => {
-      const customUrl = prompt('Masukkan URL Server Custom:', serverUrl);
-      if (customUrl && customUrl.trim()) {
-        setServerUrl(customUrl.trim(), 'Custom');
-      }
-      modal.style.display = 'none';
-    };
   }
 
   function updateBadgeStatus(connected) {
@@ -157211,6 +157253,52 @@ io2.on("connection", (socket) => {
 });
 var PORT = process.env.PORT || 5050;
 if (process.env.NODE_ENV !== "test") {
+  let printNeofetchBanner = function() {
+    const cpus = import_os.default.cpus() || [];
+    const rawCpu = cpus.length > 0 ? cpus[0].model.replace(/\s+/g, " ").trim() : "Unknown CPU";
+    const totalMemGB = (import_os.default.totalmem() / 1024 ** 3).toFixed(2);
+    const freeMemGB = (import_os.default.freemem() / 1024 ** 3).toFixed(2);
+    const usedMemGB = ((import_os.default.totalmem() - import_os.default.freemem()) / 1024 ** 3).toFixed(2);
+    const memPercent = ((import_os.default.totalmem() - import_os.default.freemem()) / import_os.default.totalmem() * 100).toFixed(1);
+    const uptimeSec = import_os.default.uptime();
+    const uptimeDays = Math.floor(uptimeSec / 86400);
+    const uptimeHours = Math.floor(uptimeSec % 86400 / 3600);
+    const uptimeMins = Math.floor(uptimeSec % 3600 / 60);
+    const uptimeStr = uptimeDays > 0 ? `${uptimeDays}d ${uptimeHours}h ${uptimeMins}m` : `${uptimeHours}h ${uptimeMins}m`;
+    let osName = import_os.default.type();
+    if (osName === "Windows_NT") osName = "Windows";
+    else if (osName === "Darwin") osName = "macOS";
+    const cCyan = "\x1B[36m";
+    const cYellow = "\x1B[33m";
+    const cGreen = "\x1B[32m";
+    const cMagenta = "\x1B[35m";
+    const cReset = "\x1B[0m";
+    const cBold = "\x1B[1m";
+    const cDim = "\x1B[2m";
+    const cBlue = "\x1B[38;2;122;162;255m";
+    const cBlue2 = "\x1B[38;2;140;153;253m";
+    const cBlue3 = "\x1B[38;2;149;148;252m";
+    const cBlue4 = "\x1B[38;2;158;144;251m";
+    const cPurple = "\x1B[38;2;167;139;250m";
+    const cLine = "\x1B[38;2;145;151;253m";
+    console.log(`
+${cBlue}\u2588\u2588\u2588\u2557   \u2588\u2588\u2588\u2557  \u2588\u2588\u2588\u2588\u2588\u2557  \u2588\u2588\u2588\u2588\u2588\u2588\u2557   \u2588\u2588\u2588\u2588\u2588\u2557  \u2588\u2588\u2588\u2588\u2588\u2588\u2557 ${cReset}
+${cBlue2}\u2588\u2588\u2588\u2588\u2557 \u2588\u2588\u2588\u2588\u2551 \u2588\u2588\u2554\u2550\u2550\u2588\u2588\u2557 \u2588\u2588\u2554\u2550\u2550\u2588\u2588\u2557 \u2588\u2588\u2554\u2550\u2550\u2588\u2588\u2557 \u2588\u2588\u2554\u2550\u2550\u2588\u2588\u2557${cReset}
+${cBlue2}\u2588\u2588\u2554\u2588\u2588\u2588\u2588\u2554\u2588\u2588\u2551 \u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2551 \u2588\u2588\u2588\u2588\u2588\u2588\u2554\u255D \u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2551 \u2588\u2588\u2588\u2588\u2588\u2588\u2554\u255D${cReset}
+${cBlue3}\u2588\u2588\u2551\u255A\u2588\u2588\u2554\u255D\u2588\u2588\u2551 \u2588\u2588\u2554\u2550\u2550\u2588\u2588\u2551 \u2588\u2588\u2554\u2550\u2550\u2588\u2588\u2557 \u2588\u2588\u2554\u2550\u2550\u2588\u2588\u2551 \u2588\u2588\u2554\u2550\u2550\u2588\u2588\u2557${cReset}
+${cBlue4}\u2588\u2588\u2551 \u255A\u2550\u255D \u2588\u2588\u2551 \u2588\u2588\u2551  \u2588\u2588\u2551 \u2588\u2588\u2588\u2588\u2588\u2588\u2554\u255D \u2588\u2588\u2551  \u2588\u2588\u2551 \u2588\u2588\u2551  \u2588\u2588\u2551${cReset}
+${cPurple}\u255A\u2550\u255D     \u255A\u2550\u255D \u255A\u2550\u255D  \u255A\u2550\u255D \u255A\u2550\u2550\u2550\u2550\u2550\u255D  \u255A\u2550\u255D  \u255A\u2550\u255D \u255A\u2550\u255D  \u255A\u2550\u255D${cReset}
+${cLine}\u2504\u2504\u2504\u2504\u2504\u2504\u2504\u2504\u2504\u2504\u2504\u2504\u2504\u2504\u2504\u2504\u2504\u2504\u2504\u2504\u2504\u2504\u2504\u2504\u2504\u2504\u2504\u2504\u2504\u2504\u2504\u2504\u2504\u2504\u2504\u2504\u2504\u2504\u2504\u2504\u2504\u2504\u2504\u2504\u2504\u2504\u2504\u2504\u2504\u2504\u2504\u2504${cReset}
+${cPurple}geoguessr interactive program${cReset}
+
+  ${cBold}${cCyan}OS${cReset}      : ${osName} ${import_os.default.release()} (${import_os.default.arch()})
+  ${cBold}${cCyan}Host${cReset}    : ${import_os.default.hostname()}
+  ${cBold}${cCyan}CPU${cReset}     : ${rawCpu} (${cpus.length} threads)
+  ${cBold}${cCyan}RAM${cReset}     : ${usedMemGB} GB / ${totalMemGB} GB ${cDim}(${memPercent}% used, ${freeMemGB} GB free)${cReset}
+  ${cBold}${cCyan}Uptime${cReset}  : ${uptimeStr}
+  ${cBold}${cCyan}Node.js${cReset} : ${process.version} (${process.platform})
+`);
+  };
   process.on("uncaughtException", (err) => {
     console.error("\n===============================================");
     console.error("\u274C TERJADI KESALAHAN PADA SERVER:");
@@ -157242,8 +157330,10 @@ Tekan tombol ENTER untuk keluar...`);
     setTimeout(() => {
     }, 864e5);
   });
+  ;
   (async () => {
-    console.log(`===============================================`);
+    printNeofetchBanner();
+    console.log(`================================================================================`);
     console.log(`\u26A1 MabarBang v${APP_VERSION} (kikobooo x arvana prod)`);
     console.log(`\u{1F50D} Memeriksa pembaruan di GitHub Releases...`);
     const update = await checkForAppUpdates();
@@ -157254,12 +157344,12 @@ Tekan tombol ENTER untuk keluar...`);
     } else {
       console.log(`\u2705 Aplikasi sudah menggunakan versi terbaru (v${APP_VERSION})`);
     }
-    console.log(`===============================================`);
+    console.log(`================================================================================`);
     server.listen(PORT, () => {
       console.log(`\u{1F680} MabarBang Server: Online (Port ${PORT})`);
       console.log(`\u{1F4F1} Streamer Dashboard : http://localhost:${PORT}/dashboard`);
-      console.log(`\u{1F4FA} OBS Studio Overlay: http://localhost:${PORT}/overlay`);
-      console.log(`===============================================`);
+      console.log(`\u{1F4FA} OBS Studio Overlay : http://localhost:${PORT}/overlay`);
+      console.log(`================================================================================`);
       if (!process.env.CI) {
         const url2 = `http://localhost:${PORT}/dashboard`;
         if (process.platform === "win32") {
@@ -157365,6 +157455,10 @@ content-type/dist/index.js:
    *)
 
 mime-db/index.js:
+mime-db/index.js:
+mime-db/index.js:
+mime-db/index.js:
+mime-db/index.js:
   (*!
    * mime-db
    * Copyright(c) 2014 Jonathan Ong
@@ -157372,6 +157466,10 @@ mime-db/index.js:
    * MIT Licensed
    *)
 
+mime-types/index.js:
+mime-types/index.js:
+mime-types/index.js:
+mime-types/index.js:
 mime-types/index.js:
   (*!
    * mime-types
@@ -157396,6 +157494,9 @@ type-is/index.js:
    *)
 
 body-parser/lib/read.js:
+body-parser/lib/types/raw.js:
+body-parser/lib/types/text.js:
+body-parser/index.js:
   (*!
    * body-parser
    * Copyright(c) 2014-2015 Douglas Christopher Wilson
@@ -157403,38 +157504,10 @@ body-parser/lib/read.js:
    *)
 
 body-parser/lib/types/json.js:
-  (*!
-   * body-parser
-   * Copyright(c) 2014 Jonathan Ong
-   * Copyright(c) 2014-2015 Douglas Christopher Wilson
-   * MIT Licensed
-   *)
-
-body-parser/lib/types/raw.js:
-  (*!
-   * body-parser
-   * Copyright(c) 2014-2015 Douglas Christopher Wilson
-   * MIT Licensed
-   *)
-
-body-parser/lib/types/text.js:
-  (*!
-   * body-parser
-   * Copyright(c) 2014-2015 Douglas Christopher Wilson
-   * MIT Licensed
-   *)
-
 body-parser/lib/types/urlencoded.js:
   (*!
    * body-parser
    * Copyright(c) 2014 Jonathan Ong
-   * Copyright(c) 2014-2015 Douglas Christopher Wilson
-   * MIT Licensed
-   *)
-
-body-parser/index.js:
-  (*!
-   * body-parser
    * Copyright(c) 2014-2015 Douglas Christopher Wilson
    * MIT Licensed
    *)
@@ -157471,6 +157544,10 @@ finalhandler/index.js:
    *)
 
 express/lib/view.js:
+express/lib/application.js:
+express/lib/request.js:
+express/lib/express.js:
+express/index.js:
   (*!
    * express
    * Copyright(c) 2009-2013 TJ Holowaychuk
@@ -157483,22 +157560,6 @@ etag/index.js:
   (*!
    * etag
    * Copyright(c) 2014-2016 Douglas Christopher Wilson
-   * MIT Licensed
-   *)
-
-mime-db/index.js:
-  (*!
-   * mime-db
-   * Copyright(c) 2014 Jonathan Ong
-   * Copyright(c) 2015-2022 Douglas Christopher Wilson
-   * MIT Licensed
-   *)
-
-mime-types/index.js:
-  (*!
-   * mime-types
-   * Copyright(c) 2014 Jonathan Ong
-   * Copyright(c) 2015 Douglas Christopher Wilson
    * MIT Licensed
    *)
 
@@ -157517,6 +157578,7 @@ proxy-addr/index.js:
    *)
 
 express/lib/utils.js:
+express/lib/response.js:
   (*!
    * express
    * Copyright(c) 2009-2013 TJ Holowaychuk
@@ -157525,35 +157587,12 @@ express/lib/utils.js:
    *)
 
 router/lib/layer.js:
-  (*!
-   * router
-   * Copyright(c) 2013 Roman Shtylman
-   * Copyright(c) 2014-2022 Douglas Christopher Wilson
-   * MIT Licensed
-   *)
-
 router/lib/route.js:
-  (*!
-   * router
-   * Copyright(c) 2013 Roman Shtylman
-   * Copyright(c) 2014-2022 Douglas Christopher Wilson
-   * MIT Licensed
-   *)
-
 router/index.js:
   (*!
    * router
    * Copyright(c) 2013 Roman Shtylman
    * Copyright(c) 2014-2022 Douglas Christopher Wilson
-   * MIT Licensed
-   *)
-
-express/lib/application.js:
-  (*!
-   * express
-   * Copyright(c) 2009-2013 TJ Holowaychuk
-   * Copyright(c) 2013 Roman Shtylman
-   * Copyright(c) 2014-2015 Douglas Christopher Wilson
    * MIT Licensed
    *)
 
@@ -157565,6 +157604,8 @@ negotiator/lib/accept.js:
    *)
 
 negotiator/index.js:
+negotiator/index.js:
+negotiator/index.js:
   (*!
    * negotiator
    * Copyright(c) 2012 Federico Romero
@@ -157573,22 +157614,8 @@ negotiator/index.js:
    * MIT Licensed
    *)
 
-mime-db/index.js:
-  (*!
-   * mime-db
-   * Copyright(c) 2014 Jonathan Ong
-   * Copyright(c) 2015-2022 Douglas Christopher Wilson
-   * MIT Licensed
-   *)
-
-mime-types/index.js:
-  (*!
-   * mime-types
-   * Copyright(c) 2014 Jonathan Ong
-   * Copyright(c) 2015 Douglas Christopher Wilson
-   * MIT Licensed
-   *)
-
+accepts/index.js:
+accepts/index.js:
 accepts/index.js:
   (*!
    * accepts
@@ -157613,15 +157640,6 @@ range-parser/index.js:
    * MIT Licensed
    *)
 
-express/lib/request.js:
-  (*!
-   * express
-   * Copyright(c) 2009-2013 TJ Holowaychuk
-   * Copyright(c) 2013 Roman Shtylman
-   * Copyright(c) 2014-2015 Douglas Christopher Wilson
-   * MIT Licensed
-   *)
-
 content-disposition/dist/index.js:
   (*!
    * content-disposition
@@ -157633,22 +157651,6 @@ cookie/index.js:
   (*!
    * cookie
    * Copyright(c) 2012-2014 Roman Shtylman
-   * Copyright(c) 2015 Douglas Christopher Wilson
-   * MIT Licensed
-   *)
-
-mime-db/index.js:
-  (*!
-   * mime-db
-   * Copyright(c) 2014 Jonathan Ong
-   * Copyright(c) 2015-2022 Douglas Christopher Wilson
-   * MIT Licensed
-   *)
-
-mime-types/index.js:
-  (*!
-   * mime-types
-   * Copyright(c) 2014 Jonathan Ong
    * Copyright(c) 2015 Douglas Christopher Wilson
    * MIT Licensed
    *)
@@ -157668,14 +157670,6 @@ vary/index.js:
    * MIT Licensed
    *)
 
-express/lib/response.js:
-  (*!
-   * express
-   * Copyright(c) 2009-2013 TJ Holowaychuk
-   * Copyright(c) 2014-2015 Douglas Christopher Wilson
-   * MIT Licensed
-   *)
-
 serve-static/index.js:
   (*!
    * serve-static
@@ -157685,58 +157679,8 @@ serve-static/index.js:
    * MIT Licensed
    *)
 
-express/lib/express.js:
-  (*!
-   * express
-   * Copyright(c) 2009-2013 TJ Holowaychuk
-   * Copyright(c) 2013 Roman Shtylman
-   * Copyright(c) 2014-2015 Douglas Christopher Wilson
-   * MIT Licensed
-   *)
-
-express/index.js:
-  (*!
-   * express
-   * Copyright(c) 2009-2013 TJ Holowaychuk
-   * Copyright(c) 2013 Roman Shtylman
-   * Copyright(c) 2014-2015 Douglas Christopher Wilson
-   * MIT Licensed
-   *)
-
-negotiator/index.js:
-  (*!
-   * negotiator
-   * Copyright(c) 2012 Federico Romero
-   * Copyright(c) 2012-2014 Isaac Z. Schlueter
-   * Copyright(c) 2015 Douglas Christopher Wilson
-   * MIT Licensed
-   *)
-
-mime-db/index.js:
-  (*!
-   * mime-db
-   * Copyright(c) 2014 Jonathan Ong
-   * Copyright(c) 2015-2022 Douglas Christopher Wilson
-   * MIT Licensed
-   *)
-
-mime-types/index.js:
-  (*!
-   * mime-types
-   * Copyright(c) 2014 Jonathan Ong
-   * Copyright(c) 2015 Douglas Christopher Wilson
-   * MIT Licensed
-   *)
-
-accepts/index.js:
-  (*!
-   * accepts
-   * Copyright(c) 2014 Jonathan Ong
-   * Copyright(c) 2015 Douglas Christopher Wilson
-   * MIT Licensed
-   *)
-
 engine.io/build/contrib/base64id.js:
+socket.io/dist/contrib/base64id.js:
   (*!
    * base64id v0.1.0
    *)
@@ -157744,34 +157688,12 @@ engine.io/build/contrib/base64id.js:
 engine.io/build/parser-v3/utf8.js:
   (*! https://mths.be/utf8js v2.1.2 by @mathias *)
 
-negotiator/index.js:
-  (*!
-   * negotiator
-   * Copyright(c) 2012 Federico Romero
-   * Copyright(c) 2012-2014 Isaac Z. Schlueter
-   * Copyright(c) 2015 Douglas Christopher Wilson
-   * MIT Licensed
-   *)
-
-accepts/index.js:
-  (*!
-   * accepts
-   * Copyright(c) 2014 Jonathan Ong
-   * Copyright(c) 2015 Douglas Christopher Wilson
-   * MIT Licensed
-   *)
-
 object-assign/index.js:
   (*
   object-assign
   (c) Sindre Sorhus
   @license MIT
   *)
-
-socket.io/dist/contrib/base64id.js:
-  (*!
-   * base64id v0.1.0
-   *)
 
 axios/dist/node/axios.cjs:
   (*! Axios v1.19.0 Copyright (c) 2026 Matt Zabriskie and contributors *)
