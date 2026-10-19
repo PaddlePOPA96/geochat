@@ -66,9 +66,15 @@ export default class TikTokBackend extends EventEmitter {
       const username = u.nickname || u.uniqueId || data.nickname || data.uniqueId || 'TikTokUser'
       const rawId = u.userId || u.uniqueId || data.userId || data.uniqueId || username
       const userId = `tt_${rawId}`
-      const avatar = u.profilePictureUrl || data.profilePictureUrl || ''
+      const avatar =
+        u.avatarThumb?.urlList?.[0] ||
+        u.avatarMedium?.urlList?.[0] ||
+        u.avatarLarge?.urlList?.[0] ||
+        u.profilePictureUrl ||
+        data.profilePictureUrl ||
+        ''
 
-      console.log(`[TikTok Live Chat] ${username}: "${comment}"`)
+      console.log(`[TikTok Live Chat] ${username}: "${comment}" (Avatar: ${avatar ? 'yes' : 'no'})`)
 
       if (!comment) return
 

@@ -184525,8 +184525,8 @@ var TikTokBackend = class extends import_events3.EventEmitter {
       const username = u2.nickname || u2.uniqueId || data.nickname || data.uniqueId || "TikTokUser";
       const rawId = u2.userId || u2.uniqueId || data.userId || data.uniqueId || username;
       const userId = `tt_${rawId}`;
-      const avatar = u2.profilePictureUrl || data.profilePictureUrl || "";
-      console.log(`[TikTok Live Chat] ${username}: "${comment}"`);
+      const avatar = u2.avatarThumb?.urlList?.[0] || u2.avatarMedium?.urlList?.[0] || u2.avatarLarge?.urlList?.[0] || u2.profilePictureUrl || data.profilePictureUrl || "";
+      console.log(`[TikTok Live Chat] ${username}: "${comment}" (Avatar: ${avatar ? "yes" : "no"})`);
       if (!comment) return;
       const userstate = {
         "user-id": userId,
