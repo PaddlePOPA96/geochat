@@ -121927,10 +121927,12 @@ var YouTubeBackend = class extends import_events.EventEmitter {
       this.liveId = targetVideoId;
       this.#liveChat.on("chat-update", (action) => {
         try {
-          const authorName = action.author?.name?.toString() || "YouTubeUser";
-          const authorId = action.author?.id?.toString() || action.author?.channel_id?.toString() || authorName;
-          const avatar = action.author?.thumbnails?.[0]?.url || "";
-          const messageText = action.message?.toString()?.trim() || "";
+          const item = action.item || action;
+          const authorObj = item.author || action.author;
+          const authorName = authorObj?.name?.toString() || "YouTubeUser";
+          const authorId = authorObj?.id?.toString() || authorObj?.channel_id?.toString() || authorName;
+          const avatar = authorObj?.thumbnails?.[0]?.url || "";
+          const messageText = item.message?.toString()?.trim() || action.message?.toString()?.trim() || "";
           if (!messageText) return;
           console.log(`[YouTube Live Chat] ${authorName}: "${messageText}"`);
           const userstate = {
@@ -121939,9 +121941,9 @@ var YouTubeBackend = class extends import_events.EventEmitter {
             username: authorName,
             avatar,
             badges: {
-              broadcaster: action.author?.is_owner ? "1" : void 0,
-              moderator: action.author?.is_moderator ? "1" : void 0,
-              subscriber: action.author?.is_sponsor ? "1" : void 0
+              broadcaster: authorObj?.is_owner ? "1" : void 0,
+              moderator: authorObj?.is_moderator ? "1" : void 0,
+              subscriber: authorObj?.is_sponsor ? "1" : void 0
             }
           };
           if (/^!g(\s|$)/i.test(messageText)) {

@@ -124,10 +124,12 @@ export default class YouTubeBackend extends EventEmitter {
       this.#liveChat.on('chat-update', (action: any) => {
         // Handle normal text message or superchat
         try {
-          const authorName = action.author?.name?.toString() || 'YouTubeUser'
-          const authorId = action.author?.id?.toString() || action.author?.channel_id?.toString() || authorName
-          const avatar = action.author?.thumbnails?.[0]?.url || ''
-          const messageText = action.message?.toString()?.trim() || ''
+          const item = action.item || action
+          const authorObj = item.author || action.author
+          const authorName = authorObj?.name?.toString() || 'YouTubeUser'
+          const authorId = authorObj?.id?.toString() || authorObj?.channel_id?.toString() || authorName
+          const avatar = authorObj?.thumbnails?.[0]?.url || ''
+          const messageText = item.message?.toString()?.trim() || action.message?.toString()?.trim() || ''
 
           if (!messageText) return
 
@@ -139,9 +141,9 @@ export default class YouTubeBackend extends EventEmitter {
             username: authorName,
             avatar: avatar,
             badges: {
-              broadcaster: action.author?.is_owner ? '1' : undefined,
-              moderator: action.author?.is_moderator ? '1' : undefined,
-              subscriber: action.author?.is_sponsor ? '1' : undefined
+              broadcaster: authorObj?.is_owner ? '1' : undefined,
+              moderator: authorObj?.is_moderator ? '1' : undefined,
+              subscriber: authorObj?.is_sponsor ? '1' : undefined
             }
           }
 
