@@ -836,6 +836,39 @@
         </div>
       </div>
 
+      <!-- GeoIndo Donation Stream Connect Card -->
+      <div class="card card-blue" style="grid-column: 1 / -1;">
+        <div class="card-header">
+          <div class="card-title">
+            <span>💸</span> GeoIndo Live Donation Stream (Tako / Saweria)
+          </div>
+          <span id="giBadge" class="badge-pill badge-disconnected">
+            <span class="badge-dot"></span> <span id="giBadgeText">Disconnected</span>
+          </span>
+        </div>
+
+        <p style="font-size: 13px; font-weight: 700; color: #1f2937;">
+          Masukkan Link Stream Donasi atau Stream UID (contoh: <code>https://www.geoindo.my.id/api/donations/stream?uid=60jJcJMPiASdRgNtRQU2xxj5iwC2</code>):
+        </p>
+
+        <div class="input-group">
+          <input type="text" id="geoindoInput" placeholder="Link stream atau UID GeoIndo">
+          <button id="btnConnectGi" class="btn btn-black" onclick="connectGeoIndo()">Connect</button>
+          <button id="btnDisconnectGi" class="btn btn-red" onclick="disconnectGeoIndo()" style="display: none;">Disconnect</button>
+        </div>
+
+        <div class="info-list">
+          <div class="info-item">
+            <span class="info-label">🎯 Active UID:</span>
+            <span class="info-val" id="activeGeoindoTarget">-</span>
+          </div>
+        </div>
+
+        <div id="giErrorBox" style="display: none; padding: 10px 14px; background: #fee2e2; border: 2.5px solid #000; border-radius: 12px; box-shadow: 2px 2px 0px #000; color: #991b1b; font-size: 12px; font-weight: 800;">
+          <span>⚠️ Gagal Connect GeoIndo:</span> <span id="giErrorText"></span>
+        </div>
+      </div>
+
       <!-- GeoGuessr Game Status Card -->
       <div class="card card-green" style="grid-column: 1 / -1;">
         <div class="card-header">
@@ -1010,6 +1043,41 @@
         }
       }
 
+      // Update GeoIndo Status
+      const giBadge = document.getElementById('giBadge');
+      const giBadgeText = document.getElementById('giBadgeText');
+      const btnConnectGi = document.getElementById('btnConnectGi');
+      const btnDisconnectGi = document.getElementById('btnDisconnectGi');
+      const activeGeoindoTarget = document.getElementById('activeGeoindoTarget');
+
+      if (giBadge && giBadgeText) {
+        giBadge.className = 'badge-pill badge-' + (currentState.geoindoStatus || 'disconnected');
+        giBadgeText.textContent = currentState.geoindoStatus || 'disconnected';
+      }
+
+      const giErrorBox = document.getElementById('giErrorBox');
+      const giErrorText = document.getElementById('giErrorText');
+      if (giErrorBox && giErrorText) {
+        if (currentState.geoindoStatus === 'error' && currentState.geoindoError) {
+          giErrorBox.style.display = 'block';
+          giErrorText.textContent = currentState.geoindoError;
+        } else {
+          giErrorBox.style.display = 'none';
+        }
+      }
+
+      if (btnConnectGi && btnDisconnectGi && activeGeoindoTarget) {
+        if (currentState.geoindoStatus === 'connected') {
+          btnConnectGi.style.display = 'none';
+          btnDisconnectGi.style.display = 'inline-flex';
+          activeGeoindoTarget.textContent = currentState.geoindoUid || '-';
+        } else {
+          btnConnectGi.style.display = 'inline-flex';
+          btnDisconnectGi.style.display = 'none';
+          activeGeoindoTarget.textContent = currentState.geoindoUid || '-';
+        }
+      }
+
       // Update Game Status
       document.getElementById('mapNameDisplay').textContent = currentState.mapName || 'GeoGuessr Map';
       document.getElementById('roundDisplay').textContent = `R${currentState.round} / 5`;
@@ -1065,13 +1133,17 @@
         const distance = currentView === 'round' ? `${item.distance} km` : `${Math.round(item.totalDistance)} km total`;
         const score = currentView === 'round' ? `${item.score.toLocaleString()} pts` : `${item.totalScore.toLocaleString()} pts`;
 
+        const isDonation = item.platform === 'geoindo' || item.platform === 'Tako' || (item.userId && item.userId.startsWith('geoindo_'));
+        const donTag = isDonation ? '<span style="background: #10b981; color: #fff; font-size: 10px; font-weight: 900; padding: 1px 6px; border-radius: 99px; border: 1.5px solid #000; margin-left: 6px;">💸 DONASI</span>' : '';
+
         html += `
-          <tr>
+          <tr style="${isDonation ? 'background: #f0fdf4;' : ''}">
             <td>${rankBadge}</td>
             <td>
               <div class="user-box">
                 ${avatar}
                 <strong style="font-size: 14px;">${escapeHtml(item.username)}</strong>
+                ${donTag}
               </div>
             </td>
             <td><span class="dist-tag">${distance}</span></td>
@@ -1126,6 +1198,29 @@
 
     async function disconnectTikTok() {
       await fetch('/api/tiktok/disconnect', { method: 'POST' });
+    }
+
+    async function connectGeoIndo() {
+      const input = document.getElementById('geoindoInput').value.trim();
+      if (!input) {
+        alert('Masukkan link stream donasi atau UID GeoIndo terlebih dahulu!');
+        return;
+      }
+      localStorage.setItem('cg_last_gi_target', input);
+      await fetch('/api/geoindo/connect', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ uid: input })
+      });
+    }
+
+    const savedGiTarget = localStorage.getItem('cg_last_gi_target') || 'https://www.geoindo.my.id/api/donations/stream?uid=60jJcJMPiASdRgNtRQU2xxj5iwC2';
+    if (savedGiTarget && document.getElementById('geoindoInput')) {
+      document.getElementById('geoindoInput').value = savedGiTarget;
+    }
+
+    async function disconnectGeoIndo() {
+      await fetch('/api/geoindo/disconnect', { method: 'POST' });
     }
 
     async function toggleGuesses() {

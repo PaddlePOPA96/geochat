@@ -8,6 +8,7 @@ import os from 'os'
 import { exec } from 'child_process'
 import YouTubeBackend from '../main/utils/useYouTubeChat'
 import TikTokBackend from '../main/utils/useTikTokChat'
+import GeoIndoBackend from '../main/utils/useGeoIndoChat'
 import { resolveLocation, parseCoordinates } from '../shared/geocoding'
 import { embeddedDashboardHtml, embeddedOverlayHtml, embeddedUserscript } from './embeddedTemplates'
 
@@ -105,6 +106,11 @@ class GameServerManager {
   tiktokUsername = ''
   tiktokStatus: 'disconnected' | 'connecting' | 'connected' | 'error' = 'disconnected'
   tiktokError = ''
+
+  geoindoBackend: GeoIndoBackend | null = null
+  geoindoUid = ''
+  geoindoStatus: 'disconnected' | 'connecting' | 'connected' | 'error' = 'disconnected'
+  geoindoError = ''
 
   token: string | null = null
   mapName = 'GeoGuessr Map'
@@ -321,6 +327,78 @@ class GameServerManager {
     this.broadcastState()
   }
 
+  connectGeoIndo(uidOrUrl: string) {
+    if (this.geoindoBackend) {
+      this.geoindoBackend.close()
+      this.geoindoBackend = null
+    }
+
+    let cleanUid = uidOrUrl.trim()
+    const urlMatch = cleanUid.match(/uid=([a-zA-Z0-9_-]+)/i)
+    if (urlMatch && urlMatch[1]) {
+      cleanUid = urlMatch[1]
+    }
+
+    this.geoindoUid = cleanUid
+    if (!this.geoindoUid) {
+      this.geoindoStatus = 'disconnected'
+      this.broadcastState()
+      return
+    }
+
+    this.geoindoStatus = 'connecting'
+    this.geoindoError = ''
+    this.broadcastState()
+
+    try {
+      this.geoindoBackend = new GeoIndoBackend({ uid: this.geoindoUid })
+
+      this.geoindoBackend.on('connected', (uid: string) => {
+        this.geoindoStatus = 'connected'
+        console.log(`[Server] GeoIndo Donation Stream connected for UID ${uid}`)
+        this.broadcastState()
+      })
+
+      this.geoindoBackend.on('disconnected', () => {
+        this.geoindoStatus = 'disconnected'
+        console.log(`[Server] GeoIndo Donation Stream disconnected`)
+        this.broadcastState()
+      })
+
+      this.geoindoBackend.on('error', (err: any) => {
+        this.geoindoStatus = 'error'
+        this.geoindoError = err?.message || String(err)
+        console.error(`[Server] GeoIndo Stream error:`, err)
+        this.broadcastState()
+      })
+
+      this.geoindoBackend.on('guess', (userstate, message) => {
+        this.handleChatGuess(userstate, message).catch((err) => {
+          console.error('[Server] Error handling GeoIndo donation guess:', err)
+        })
+      })
+
+      this.geoindoBackend.connect().catch((err) => {
+        this.geoindoStatus = 'error'
+        this.geoindoError = err?.message || String(err)
+        this.broadcastState()
+      })
+    } catch (err: any) {
+      this.geoindoStatus = 'error'
+      this.geoindoError = err?.message || String(err)
+      this.broadcastState()
+    }
+  }
+
+  disconnectGeoIndo() {
+    if (this.geoindoBackend) {
+      this.geoindoBackend.close()
+      this.geoindoBackend = null
+    }
+    this.geoindoStatus = 'disconnected'
+    this.broadcastState()
+  }
+
   async handleChatGuess(userstate: any, message: string) {
     if (!this.guessesOpen) {
       console.log(`[Guess Ignored] Guesses are closed: "${message}"`)
@@ -521,6 +599,9 @@ class GameServerManager {
       tiktokUsername: this.tiktokUsername,
       tiktokStatus: this.tiktokStatus,
       tiktokError: this.tiktokError,
+      geoindoUid: this.geoindoUid,
+      geoindoStatus: this.geoindoStatus,
+      geoindoError: this.geoindoError,
       token: this.token,
       mapName: this.mapName,
       round: this.round,
@@ -587,6 +668,22 @@ app.post('/api/tiktok/connect', (req, res) => {
 
 app.post('/api/tiktok/disconnect', (_req, res) => {
   manager.disconnectTikTok()
+  res.json({ success: true, state: manager.getState() })
+})
+
+// GeoIndo Donation Stream Connect
+app.post('/api/geoindo/connect', (req, res) => {
+  const { uid } = req.body
+  if (!uid) {
+    res.status(400).json({ error: 'uid is required' })
+    return
+  }
+  manager.connectGeoIndo(uid)
+  res.json({ success: true, state: manager.getState() })
+})
+
+app.post('/api/geoindo/disconnect', (_req, res) => {
+  manager.disconnectGeoIndo()
   res.json({ success: true, state: manager.getState() })
 })
 
@@ -727,7 +824,7 @@ app.get('/', (_req, res) => {
   res.redirect('/dashboard')
 })
 
-export const APP_VERSION = '3.1.8'
+export const APP_VERSION = '3.2.0'
 export const GITHUB_REPO = 'PaddlePOPA96/geochat'
 
 export interface UpdateInfo {

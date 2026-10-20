@@ -653,13 +653,16 @@
         else if (rank === 3) rankClass = 'rank-3';
 
         const avatar = p.avatar ? `<img class="player-avatar" src="${p.avatar}" alt="" />` : `<div class="player-avatar" style="display:flex;align-items:center;justify-content:center;font-size:10px;">👤</div>`;
+        const isDonation = p.platform === 'geoindo' || p.platform === 'Tako' || (p.userId && p.userId.startsWith('geoindo_'));
+        const donBadge = isDonation ? '<span style="background: #10b981; color: #fff; font-size: 8px; font-weight: 900; padding: 1px 4px; border-radius: 99px; border: 1px solid #000; margin-left: 4px;">💸</span>' : '';
 
         html += `
-          <div class="player-row">
+          <div class="player-row" style="${isDonation ? 'background: #f0fdf4;' : ''}">
             <div class="player-left">
               <span class="rank-pill ${rankClass}">${rank}</span>
               ${avatar}
               <span class="player-name">${escapeHtml(p.username)}</span>
+              ${donBadge}
             </div>
             <div class="player-right">
               <span class="player-score">${p.score.toLocaleString()}</span>

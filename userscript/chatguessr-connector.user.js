@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         AHUNG SERVER MabarBang YouTube 
 // @namespace    http://tampermonkey.net/
-// @version      2.7
+// @version      2.8.0
 // @description  Otomatis mengirim data ronde GeoGuessr ke Railway/Local, menampilkan Scoreboard Overlay & PIN tebakan penonton di peta GeoGuessr
 // @author       MabarBang
 // @match        *://*.geoguessr.com/*
@@ -290,6 +290,8 @@
       // Garis putus-putus ke jawaban benar
       if (targetLocation && typeof targetLocation.lat === 'number' && win.google?.maps?.Polyline) {
         try {
+          const isDonationGuess = p.platform === 'geoindo' || p.platform === 'Tako' || p.isDonation || (p.userId && p.userId.startsWith('geoindo_'));
+          const lineStrokeColor = isDonationGuess ? '#10b981' : (rank === 1 ? '#f59e0b' : '#38bdf8');
           const line = new win.google.maps.Polyline({
             path: [p.position, targetLocation],
             map: globalMap,
@@ -301,7 +303,7 @@
                 repeat: '8px'
               }
             ],
-            strokeColor: rank === 1 ? '#f59e0b' : '#38bdf8',
+            strokeColor: lineStrokeColor,
             geodesic: true
           });
           polylines.push(line);
@@ -341,17 +343,20 @@
       z-index: ${1000 - rank};
     `;
 
-    const rankColor =
-      rank === 1 ? '#ffd166' : rank === 2 ? '#70d6ff' : rank === 3 ? '#ff9ebb' : '#ffffff';
+    const isDonation = p.platform === 'geoindo' || p.platform === 'Tako' || p.isDonation || (p.userId && p.userId.startsWith('geoindo_'));
+
+    const rankColor = isDonation
+      ? '#10b981'
+      : (rank === 1 ? '#ffd166' : rank === 2 ? '#70d6ff' : rank === 3 ? '#ff9ebb' : '#ffffff');
 
     const avatarBox = document.createElement('div');
     avatarBox.style.cssText = `
-      width: 34px;
-      height: 34px;
+      width: ${isDonation ? '36px' : '34px'};
+      height: ${isDonation ? '36px' : '34px'};
       border-radius: 50%;
-      border: 2.5px solid #000;
-      box-shadow: 2.5px 2.5px 0px #000;
-      background: #ffffff;
+      border: ${isDonation ? '3px solid #000' : '2.5px solid #000'};
+      box-shadow: ${isDonation ? '3px 3px 0px #059669' : '2.5px 2.5px 0px #000'};
+      background: ${isDonation ? '#d1fae5' : '#ffffff'};
       overflow: hidden;
       display: flex;
       align-items: center;
@@ -365,8 +370,8 @@
       avatarBox.appendChild(img);
     } else {
       const txt = document.createElement('span');
-      txt.textContent = (p.username || '?')[0].toUpperCase();
-      txt.style.cssText = 'color: #000; font-size: 13px; font-weight: 900;';
+      txt.textContent = isDonation ? '💸' : (p.username || '?')[0].toUpperCase();
+      txt.style.cssText = `color: #000; font-size: ${isDonation ? '16px' : '13px'}; font-weight: 900;`;
       avatarBox.appendChild(txt);
     }
 
@@ -377,7 +382,7 @@
       top: -4px;
       right: -4px;
       background: ${rankColor};
-      color: #000;
+      color: ${isDonation ? '#ffffff' : '#000000'};
       font-size: 10px;
       font-weight: 900;
       width: 18px;
@@ -391,22 +396,48 @@
     `;
 
     const nameTag = document.createElement('span');
-    nameTag.textContent = p.username;
+    nameTag.textContent = (isDonation ? '💸 ' : '') + p.username;
     nameTag.style.cssText = `
       margin-top: 4px;
-      background: #ffffff;
-      color: #000;
+      background: ${isDonation ? '#ecfdf5' : '#ffffff'};
+      color: ${isDonation ? '#065f46' : '#000000'};
       font-size: 10px;
       font-weight: 800;
       padding: 2px 8px;
       border-radius: 9999px;
-      border: 2px solid #000;
+      border: 2px solid ${isDonation ? '#059669' : '#000000'};
       white-space: nowrap;
       box-shadow: 2px 2px 0px #000;
     `;
 
     el.appendChild(avatarBox);
     el.appendChild(rankBadge);
+
+    // Badge tanda donasi jika tebakan berasal dari donasi GeoIndo
+    if (isDonation) {
+      const donBadge = document.createElement('span');
+      donBadge.textContent = '★';
+      donBadge.title = 'Donasi GeoIndo / Tako';
+      donBadge.style.cssText = `
+        position: absolute;
+        top: -4px;
+        left: -4px;
+        background: #f59e0b;
+        color: #ffffff;
+        font-size: 11px;
+        font-weight: 900;
+        width: 18px;
+        height: 18px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border: 2px solid #000;
+        box-shadow: 1.5px 1.5px 0px #000;
+      `;
+      el.appendChild(donBadge);
+    }
+
     el.appendChild(nameTag);
 
     el.onmouseenter = () => {
@@ -1148,13 +1179,14 @@
       else if (rank === 3) rankClass = 'cg-rank-bronze';
 
       const isStreamer = p.isStreamer || p.userId === 'streamer';
+      const isDonation = p.platform === 'geoindo' || p.platform === 'Tako' || (p.userId && p.userId.startsWith('geoindo_'));
       const streamerRowStyle = isStreamer
         ? 'background: #fef08a !important; border-left: 4px solid #f59e0b !important; box-shadow: inset 0 0 0 1px rgba(245, 158, 11, 0.3); font-weight: 800;'
-        : '';
+        : (isDonation ? 'background: #f0fdf4 !important; border-left: 3.5px solid #10b981 !important;' : '');
       const streamerBadge = isStreamer
         ? '<span style="background: #f59e0b; color: #000; font-size: 9px; font-weight: 900; padding: 1px 6px; border-radius: 999px; border: 1px solid #000; margin-left: 4px; box-shadow: 1px 1px 0 #000;">STREAMER</span>'
-        : '';
-      const scoreColor = isStreamer ? '#b45309' : '#0284c7';
+        : (isDonation ? '<span style="background: #10b981; color: #fff; font-size: 9px; font-weight: 900; padding: 1px 5px; border-radius: 999px; border: 1px solid #000; margin-left: 4px;" title="Donasi GeoIndo">💸 DONASI</span>' : '');
+      const scoreColor = isStreamer ? '#b45309' : (isDonation ? '#047857' : '#0284c7');
 
       html += `
         <div class="cg-player-row" data-user-id="${p.userId}" style="${streamerRowStyle}" title="Klik untuk fokus pin di peta">

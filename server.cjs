@@ -34344,7 +34344,7 @@ var require_application = __commonJS({
     var finalhandler = require_finalhandler();
     var debug2 = require_src()("express:application");
     var View = require_view();
-    var http5 = require("node:http");
+    var http6 = require("node:http");
     var methods = require_utils3().methods;
     var compileETag = require_utils3().compileETag;
     var compileQueryParser = require_utils3().compileQueryParser;
@@ -34577,7 +34577,7 @@ var require_application = __commonJS({
       tryRender(view, renderOptions, done);
     };
     app2.listen = function listen() {
-      var server2 = http5.createServer(this);
+      var server2 = http6.createServer(this);
       var args = slice.call(arguments);
       if (typeof args[args.length - 1] === "function") {
         var done = args[args.length - 1] = once(args[args.length - 1]);
@@ -44793,12 +44793,12 @@ var require_request = __commonJS({
     var accepts = require_accepts();
     var isIP2 = require("node:net").isIP;
     var typeis = require_type_is();
-    var http5 = require("node:http");
+    var http6 = require("node:http");
     var fresh = require_fresh();
     var parseRange = require_range_parser();
     var parse3 = require_parseurl();
     var proxyaddr = require_proxy_addr();
-    var req = Object.create(http5.IncomingMessage.prototype);
+    var req = Object.create(http6.IncomingMessage.prototype);
     module2.exports = req;
     req.get = req.header = function header(name) {
       if (!name) {
@@ -55477,7 +55477,7 @@ var require_response = __commonJS({
     var deprecate = require_depd()("express");
     var encodeUrl = require_encodeurl();
     var escapeHtml = require_escape_html();
-    var http5 = require("node:http");
+    var http6 = require("node:http");
     var onFinished = require_on_finished();
     var mime = require_mime_types2();
     var path3 = require("node:path");
@@ -55494,7 +55494,7 @@ var require_response = __commonJS({
     var basename = path3.basename;
     var vary = require_vary();
     var { Buffer: Buffer5 } = require("node:buffer");
-    var res = Object.create(http5.ServerResponse.prototype);
+    var res = Object.create(http6.ServerResponse.prototype);
     module2.exports = res;
     res.status = function status(code) {
       if (!Number.isInteger(code)) {
@@ -56045,7 +56045,7 @@ var require_express = __commonJS({
   "node_modules/express/lib/express.js"(exports2, module2) {
     "use strict";
     var bodyParser = require_body_parser();
-    var EventEmitter7 = require("node:events").EventEmitter;
+    var EventEmitter8 = require("node:events").EventEmitter;
     var mixin = require_merge_descriptors();
     var proto = require_application();
     var Router = require_router();
@@ -56056,7 +56056,7 @@ var require_express = __commonJS({
       var app2 = function(req2, res2, next) {
         app2.handle(req2, res2, next);
       };
-      mixin(app2, EventEmitter7.prototype, false);
+      mixin(app2, EventEmitter8.prototype, false);
       mixin(app2, proto, false);
       app2.request = Object.create(req, {
         app: { configurable: true, enumerable: true, writable: true, value: app2 }
@@ -70093,9 +70093,9 @@ var require_extension = __commonJS({
 var require_websocket2 = __commonJS({
   "node_modules/ws/lib/websocket.js"(exports2, module2) {
     "use strict";
-    var EventEmitter7 = require("events");
-    var https3 = require("https");
-    var http5 = require("http");
+    var EventEmitter8 = require("events");
+    var https4 = require("https");
+    var http6 = require("http");
     var net2 = require("net");
     var tls = require("tls");
     var { randomBytes, createHash } = require("crypto");
@@ -70125,7 +70125,7 @@ var require_websocket2 = __commonJS({
     var protocolVersions = [8, 13];
     var readyStates = ["CONNECTING", "OPEN", "CLOSING", "CLOSED"];
     var subprotocolRegex = /^[!#$%&'*+\-.0-9A-Z^_`|a-z~]+$/;
-    var WebSocket2 = class _WebSocket extends EventEmitter7 {
+    var WebSocket2 = class _WebSocket extends EventEmitter8 {
       /**
        * Create a new `WebSocket`.
        *
@@ -70637,7 +70637,7 @@ var require_websocket2 = __commonJS({
       }
       const defaultPort = isSecure ? 443 : 80;
       const key = randomBytes(16).toString("base64");
-      const request = isSecure ? https3.request : http5.request;
+      const request = isSecure ? https4.request : http6.request;
       const protocolSet = /* @__PURE__ */ new Set();
       let perMessageDeflate;
       opts.createConnection = opts.createConnection || (isSecure ? tlsConnect : netConnect);
@@ -71132,8 +71132,8 @@ var require_subprotocol = __commonJS({
 var require_websocket_server = __commonJS({
   "node_modules/ws/lib/websocket-server.js"(exports2, module2) {
     "use strict";
-    var EventEmitter7 = require("events");
-    var http5 = require("http");
+    var EventEmitter8 = require("events");
+    var http6 = require("http");
     var { Duplex: Duplex2 } = require("stream");
     var { createHash } = require("crypto");
     var extension2 = require_extension();
@@ -71145,7 +71145,7 @@ var require_websocket_server = __commonJS({
     var RUNNING = 0;
     var CLOSING = 1;
     var CLOSED = 2;
-    var WebSocketServer2 = class extends EventEmitter7 {
+    var WebSocketServer2 = class extends EventEmitter8 {
       /**
        * Create a `WebSocketServer` instance.
        *
@@ -71214,8 +71214,8 @@ var require_websocket_server = __commonJS({
           );
         }
         if (options.port != null) {
-          this._server = http5.createServer((req, res) => {
-            const body = http5.STATUS_CODES[426];
+          this._server = http6.createServer((req, res) => {
+            const body = http6.STATUS_CODES[426];
             res.writeHead(426, {
               "Content-Length": body.length,
               "Content-Type": "text/plain"
@@ -71504,7 +71504,7 @@ var require_websocket_server = __commonJS({
       this.destroy();
     }
     function abortHandshake(socket, code, message, headers) {
-      message = message || http5.STATUS_CODES[code];
+      message = message || http6.STATUS_CODES[code];
       headers = {
         Connection: "close",
         "Content-Type": "text/html",
@@ -71513,7 +71513,7 @@ var require_websocket_server = __commonJS({
       };
       socket.once("finish", socket.destroy);
       socket.end(
-        `HTTP/1.1 ${code} ${http5.STATUS_CODES[code]}\r
+        `HTTP/1.1 ${code} ${http6.STATUS_CODES[code]}\r
 ` + Object.keys(headers).map((h2) => `${h2}: ${headers[h2]}`).join("\r\n") + "\r\n\r\n" + message
       );
     }
@@ -79392,7 +79392,7 @@ var require_agent = __commonJS({
   "node_modules/tiktok-live-connector/node_modules/http2-wrapper/source/agent.js"(exports2, module2) {
     "use strict";
     var { URL: URL3 } = require("url");
-    var EventEmitter7 = require("events");
+    var EventEmitter8 = require("events");
     var tls = require("tls");
     var http24 = require("http2");
     var QuickLRU = require_quick_lru();
@@ -79490,7 +79490,7 @@ var require_agent = __commonJS({
         session.close();
       }
     };
-    var Agent = class _Agent extends EventEmitter7 {
+    var Agent = class _Agent extends EventEmitter8 {
       constructor({ timeout = 0, maxSessions = Number.POSITIVE_INFINITY, maxEmptySessions = 10, maxCachedTlsSessions = 100 } = {}) {
         super();
         this.sessions = {};
@@ -80686,8 +80686,8 @@ var require_auto = __commonJS({
   "node_modules/tiktok-live-connector/node_modules/http2-wrapper/source/auto.js"(exports2, module2) {
     "use strict";
     var { URL: URL3, urlToHttpOptions } = require("url");
-    var http5 = require("http");
-    var https3 = require("https");
+    var http6 = require("http");
+    var https4 = require("https");
     var resolveALPN = require_resolve_alpn();
     var QuickLRU = require_quick_lru();
     var { Agent, globalAgent } = require_agent();
@@ -80778,7 +80778,7 @@ var require_auto = __commonJS({
       options.session = options.tlsSession;
       options.servername = options.servername || calculateServerName(options.headers && options.headers.host || options.host);
       options.port = options.port || (isHttps2 ? 443 : 80);
-      options._defaultAgent = isHttps2 ? https3.globalAgent : http5.globalAgent;
+      options._defaultAgent = isHttps2 ? https4.globalAgent : http6.globalAgent;
       const resolveProtocol = options.resolveProtocol || defaultResolveProtocol;
       let { agent } = options;
       if (agent !== void 0 && agent !== false && agent.constructor.name !== "Object") {
@@ -80807,13 +80807,13 @@ var require_auto = __commonJS({
           options.agent = agent;
         }
         if (agent === void 0) {
-          agent = isHttp2 ? globalAgent : https3.globalAgent;
+          agent = isHttp2 ? globalAgent : https4.globalAgent;
         }
         if (socket) {
           if (agent === false) {
             socket.destroy();
           } else {
-            const defaultCreateConnection = (isHttp2 ? Agent : https3.Agent).prototype.createConnection;
+            const defaultCreateConnection = (isHttp2 ? Agent : https4.Agent).prototype.createConnection;
             if (agent.createConnection === defaultCreateConnection) {
               if (isHttp2) {
                 options._reuseSocket = socket;
@@ -80843,7 +80843,7 @@ var require_auto = __commonJS({
         delete options.headers[":scheme"];
         delete options.headers[":path"];
       }
-      return delayAsyncDestroy(http5.request(options, callback));
+      return delayAsyncDestroy(http6.request(options, callback));
     };
     module2.exports.protocolCache = cache;
     module2.exports.resolveProtocol = defaultResolveProtocol;
@@ -80944,8 +80944,8 @@ var require_h1_over_h2 = __commonJS({
   "node_modules/tiktok-live-connector/node_modules/http2-wrapper/source/proxies/h1-over-h2.js"(exports2, module2) {
     "use strict";
     var tls = require("tls");
-    var http5 = require("http");
-    var https3 = require("https");
+    var http6 = require("http");
+    var https4 = require("https");
     var JSStreamSocket = require_js_stream_socket();
     var { globalAgent } = require_agent();
     var UnexpectedStatusCodeError = require_unexpected_status_code_error();
@@ -80969,7 +80969,7 @@ var require_h1_over_h2 = __commonJS({
               callback(new UnexpectedStatusCodeError(statusCode, ""));
               return;
             }
-            const encrypted = self2 instanceof https3.Agent;
+            const encrypted = self2 instanceof https4.Agent;
             if (raw && encrypted) {
               options.socket = stream5;
               const secureStream = tls.connect(options);
@@ -80993,7 +80993,7 @@ var require_h1_over_h2 = __commonJS({
         }
       })();
     };
-    var HttpOverHttp2 = class extends http5.Agent {
+    var HttpOverHttp2 = class extends http6.Agent {
       constructor(options) {
         super(options);
         initialize(this, options.proxyOptions);
@@ -81002,7 +81002,7 @@ var require_h1_over_h2 = __commonJS({
         createConnection(this, options, callback);
       }
     };
-    var HttpsOverHttp2 = class extends https3.Agent {
+    var HttpsOverHttp2 = class extends https4.Agent {
       constructor(options) {
         super(options);
         initialize(this, options.proxyOptions);
@@ -81092,8 +81092,8 @@ var require_h2_over_h2 = __commonJS({
 var require_h2_over_h1 = __commonJS({
   "node_modules/tiktok-live-connector/node_modules/http2-wrapper/source/proxies/h2-over-h1.js"(exports2, module2) {
     "use strict";
-    var http5 = require("http");
-    var https3 = require("https");
+    var http6 = require("http");
+    var https4 = require("https");
     var Http2OverHttpX = require_h2_over_hx();
     var getAuthorizationHeaders = require_get_auth_headers();
     var getStream = (request) => new Promise((resolve, reject) => {
@@ -81109,7 +81109,7 @@ var require_h2_over_h1 = __commonJS({
       async _getProxyStream(authority) {
         const { proxyOptions } = this;
         const { url: url2, headers } = this.proxyOptions;
-        const network = url2.protocol === "https:" ? https3 : http5;
+        const network = url2.protocol === "https:" ? https4 : http6;
         const request = network.request({
           ...proxyOptions,
           hostname: url2.hostname,
@@ -81715,8 +81715,8 @@ var require_form_data = __commonJS({
     var CombinedStream = require_combined_stream();
     var util5 = require("util");
     var path3 = require("path");
-    var http5 = require("http");
-    var https3 = require("https");
+    var http6 = require("http");
+    var https4 = require("https");
     var parseUrl2 = require("url").parse;
     var fs3 = require("fs");
     var Stream = require("stream").Stream;
@@ -81988,9 +81988,9 @@ var require_form_data = __commonJS({
       }
       options.headers = this.getHeaders(params.headers);
       if (options.protocol === "https:") {
-        request = https3.request(options);
+        request = https4.request(options);
       } else {
-        request = http5.request(options);
+        request = http6.request(options);
       }
       this.getLength(function(err2, length) {
         if (err2 && err2 !== "Unknown stream") {
@@ -82505,8 +82505,8 @@ var require_follow_redirects = __commonJS({
   "node_modules/follow-redirects/index.js"(exports2, module2) {
     var url2 = require("url");
     var URL3 = url2.URL;
-    var http5 = require("http");
-    var https3 = require("https");
+    var http6 = require("http");
+    var https4 = require("https");
     var Writable = require("stream").Writable;
     var assert2 = require("assert");
     var debug2 = require_debug();
@@ -83006,7 +83006,7 @@ var require_follow_redirects = __commonJS({
     function escapeRegex(regex) {
       return regex.replace(/[\]\\/()*+?.$]/g, "\\$&");
     }
-    module2.exports = wrap({ http: http5, https: https3 });
+    module2.exports = wrap({ http: http6, https: https4 });
     module2.exports.wrap = wrap;
   }
 });
@@ -83024,7 +83024,7 @@ __export(server_exports, {
 });
 module.exports = __toCommonJS(server_exports);
 var import_express = __toESM(require_express2());
-var import_http4 = __toESM(require("http"));
+var import_http5 = __toESM(require("http"));
 
 // node_modules/socket.io/wrapper.mjs
 var import_dist = __toESM(require_dist5(), 1);
@@ -170643,8 +170643,8 @@ var Options = class _Options {
     } else {
       agent = internals.agent.http;
     }
-    const { https: https3 } = internals;
-    let { pfx } = https3;
+    const { https: https4 } = internals;
+    let { pfx } = https4;
     if (distribution_default.array(pfx) && distribution_default.plainObject(pfx[0])) {
       pfx = pfx.map((object) => ({
         buf: object.buffer,
@@ -170665,25 +170665,25 @@ var Options = class _Options {
       ...unixOptions,
       // HTTPS options
       // eslint-disable-next-line @typescript-eslint/naming-convention
-      ALPNProtocols: https3.alpnProtocols,
-      ca: https3.certificateAuthority,
-      cert: https3.certificate,
-      key: https3.key,
-      passphrase: https3.passphrase,
+      ALPNProtocols: https4.alpnProtocols,
+      ca: https4.certificateAuthority,
+      cert: https4.certificate,
+      key: https4.key,
+      passphrase: https4.passphrase,
       pfx,
-      rejectUnauthorized: https3.rejectUnauthorized,
-      checkServerIdentity: https3.checkServerIdentity ?? import_node_tls.checkServerIdentity,
-      servername: https3.serverName,
-      ciphers: https3.ciphers,
-      honorCipherOrder: https3.honorCipherOrder,
-      minVersion: https3.minVersion,
-      maxVersion: https3.maxVersion,
-      sigalgs: https3.signatureAlgorithms,
-      sessionTimeout: https3.tlsSessionLifetime,
-      dhparam: https3.dhparam,
-      ecdhCurve: https3.ecdhCurve,
-      crl: https3.certificateRevocationLists,
-      secureOptions: https3.secureOptions,
+      rejectUnauthorized: https4.rejectUnauthorized,
+      checkServerIdentity: https4.checkServerIdentity ?? import_node_tls.checkServerIdentity,
+      servername: https4.serverName,
+      ciphers: https4.ciphers,
+      honorCipherOrder: https4.honorCipherOrder,
+      minVersion: https4.minVersion,
+      maxVersion: https4.maxVersion,
+      sigalgs: https4.signatureAlgorithms,
+      sessionTimeout: https4.tlsSessionLifetime,
+      dhparam: https4.dhparam,
+      ecdhCurve: https4.ecdhCurve,
+      crl: https4.certificateRevocationLists,
+      secureOptions: https4.secureOptions,
       // HTTP options
       lookup: internals.dnsLookup ?? internals.dnsCache?.lookup,
       family: internals.dnsLookupIpVersion,
@@ -184577,6 +184577,245 @@ var TikTokBackend = class extends import_events3.EventEmitter {
   }
 };
 
+// src/main/utils/useGeoIndoChat.ts
+var import_events4 = require("events");
+var import_http4 = __toESM(require("http"));
+var import_https2 = __toESM(require("https"));
+var GeoIndoBackend = class extends import_events4.EventEmitter {
+  #req = null;
+  #connected = false;
+  #closing = false;
+  #reconnectTimer = null;
+  #pollTimer = null;
+  #lastProcessedIds = /* @__PURE__ */ new Set();
+  uid;
+  baseUrl;
+  constructor(options) {
+    super();
+    this.uid = options.uid.trim();
+    this.baseUrl = (options.baseUrl || "https://www.geoindo.my.id").replace(/\/$/, "");
+  }
+  get streamTarget() {
+    return this.uid;
+  }
+  async connect() {
+    this.#closing = false;
+    if (!this.uid) {
+      throw new Error("UID GeoIndo tidak boleh kosong!");
+    }
+    this.closeRequest();
+    this.startSSE();
+    this.startPollingFallback();
+    return true;
+  }
+  startSSE() {
+    if (this.#closing) return;
+    const streamUrl = `${this.baseUrl}/api/donations/stream?uid=${encodeURIComponent(this.uid)}`;
+    console.log(`[GeoIndo Stream] Connecting to SSE: ${streamUrl}`);
+    try {
+      const parsed = new URL(streamUrl);
+      const client = parsed.protocol === "https:" ? import_https2.default : import_http4.default;
+      const req = client.get(
+        parsed,
+        {
+          headers: {
+            Accept: "text/event-stream",
+            "Cache-Control": "no-cache",
+            Connection: "keep-alive"
+          }
+        },
+        (res) => {
+          if (res.statusCode && res.statusCode >= 400) {
+            const err2 = new Error(`HTTP Error ${res.statusCode} connecting to donation stream`);
+            console.error("[GeoIndo Stream] HTTP Error:", err2.message);
+            this.emit("error", err2);
+            this.scheduleReconnect();
+            return;
+          }
+          this.#connected = true;
+          this.emit("connected", this.uid);
+          console.log(`[GeoIndo Stream] Connected SSE stream for UID ${this.uid}`);
+          let buffer = "";
+          res.setEncoding("utf8");
+          res.on("data", (chunk2) => {
+            buffer += chunk2;
+            const lines = buffer.split(/\r?\n/);
+            buffer = lines.pop() || "";
+            for (const line of lines) {
+              const trimmed = line.trim();
+              if (!trimmed || trimmed.startsWith(":")) continue;
+              if (trimmed.startsWith("data:")) {
+                const jsonStr = trimmed.slice(5).trim();
+                if (jsonStr) {
+                  this.handleIncomingRaw(jsonStr);
+                }
+              }
+            }
+          });
+          res.on("end", () => {
+            if (!this.#closing) {
+              console.warn("[GeoIndo Stream] SSE stream ended by remote. Reconnecting...");
+              this.scheduleReconnect();
+            }
+          });
+          res.on("error", (err2) => {
+            if (!this.#closing) {
+              console.error("[GeoIndo Stream] Response error:", err2);
+              this.emit("error", err2);
+              this.scheduleReconnect();
+            }
+          });
+        }
+      );
+      req.on("error", (err2) => {
+        if (!this.#closing) {
+          console.error("[GeoIndo Stream] Request error:", err2.message);
+          this.emit("error", err2);
+          this.scheduleReconnect();
+        }
+      });
+      this.#req = req;
+    } catch (err2) {
+      this.emit("error", err2);
+      this.scheduleReconnect();
+    }
+  }
+  scheduleReconnect() {
+    if (this.#closing || this.#reconnectTimer) return;
+    this.#connected = false;
+    this.#reconnectTimer = setTimeout(() => {
+      this.#reconnectTimer = null;
+      if (!this.#closing) {
+        console.log("[GeoIndo Stream] Attempting SSE reconnect...");
+        this.startSSE();
+      }
+    }, 5e3);
+  }
+  handleIncomingRaw(jsonStr) {
+    try {
+      const data = JSON.parse(jsonStr);
+      if (data.status === "connected") {
+        return;
+      }
+      this.processDonationItem(data);
+    } catch (err2) {
+      console.warn("[GeoIndo Stream] Failed to parse SSE event JSON:", err2);
+    }
+  }
+  processDonationItem(donation) {
+    if (!donation) return;
+    const id = donation.id || donation.rawId || `${donation.donorName}-${donation.createdAt}`;
+    if (id && this.#lastProcessedIds.has(id)) {
+      return;
+    }
+    if (id) {
+      this.#lastProcessedIds.add(id);
+      if (this.#lastProcessedIds.size > 2e3) {
+        const arr = Array.from(this.#lastProcessedIds);
+        for (let i2 = 0; i2 < 500; i2++) {
+          this.#lastProcessedIds.delete(arr[i2]);
+        }
+      }
+    }
+    const donorName = (donation.donorName || "Donatur GeoIndo").trim();
+    const msg = (donation.message || "").trim();
+    if (/^!g\s+/i.test(msg)) {
+      const userstate = {
+        "user-id": `geoindo_${id}`,
+        "display-name": donorName,
+        username: donorName,
+        avatar: "",
+        platform: donation.platform || "geoindo",
+        amount: donation.amount
+      };
+      console.log(`[GeoIndo Guess] ${donorName} ($${donation.amount || 0}): ${msg}`);
+      this.emit("guess", userstate, msg);
+    }
+  }
+  startPollingFallback() {
+    if (this.#pollTimer) clearInterval(this.#pollTimer);
+    const poll = async () => {
+      if (this.#closing) return;
+      try {
+        const url2 = `${this.baseUrl}/api/donations?uid=${encodeURIComponent(this.uid)}`;
+        const parsed = new URL(url2);
+        const client = parsed.protocol === "https:" ? import_https2.default : import_http4.default;
+        client.get(parsed, (res) => {
+          let body = "";
+          res.on("data", (d) => body += d);
+          res.on("end", () => {
+            try {
+              const parsedData = JSON.parse(body);
+              const list = Array.isArray(parsedData) ? parsedData : parsedData.donations || parsedData.data || [];
+              const recent = list.slice(0, 10);
+              for (const item of recent) {
+                this.processDonationItem(item);
+              }
+            } catch (_) {
+            }
+          });
+        }).on("error", () => {
+        });
+      } catch (_) {
+      }
+    };
+    this.prepopulateCache();
+    this.#pollTimer = setInterval(poll, 7e3);
+  }
+  prepopulateCache() {
+    try {
+      const url2 = `${this.baseUrl}/api/donations?uid=${encodeURIComponent(this.uid)}`;
+      const parsed = new URL(url2);
+      const client = parsed.protocol === "https:" ? import_https2.default : import_http4.default;
+      client.get(parsed, (res) => {
+        let body = "";
+        res.on("data", (d) => body += d);
+        res.on("end", () => {
+          try {
+            const parsedData = JSON.parse(body);
+            const list = Array.isArray(parsedData) ? parsedData : parsedData.donations || parsedData.data || [];
+            for (const item of list) {
+              const id = item.id || item.rawId || `${item.donorName}-${item.createdAt}`;
+              if (id) this.#lastProcessedIds.add(id);
+            }
+            console.log(
+              `[GeoIndo] Cached ${this.#lastProcessedIds.size} historic donations (will not trigger duplicate guesses)`
+            );
+          } catch (_) {
+          }
+        });
+      }).on("error", () => {
+      });
+    } catch (_) {
+    }
+  }
+  closeRequest() {
+    if (this.#req) {
+      try {
+        this.#req.destroy();
+      } catch (_) {
+      }
+      this.#req = null;
+    }
+    if (this.#reconnectTimer) {
+      clearTimeout(this.#reconnectTimer);
+      this.#reconnectTimer = null;
+    }
+    if (this.#pollTimer) {
+      clearInterval(this.#pollTimer);
+      this.#pollTimer = null;
+    }
+  }
+  close() {
+    this.#closing = true;
+    this.closeRequest();
+    if (this.#connected) {
+      this.#connected = false;
+      this.emit("disconnected", true);
+    }
+  }
+};
+
 // src/shared/countryMap.ts
 var COUNTRY_MAP = {
   // Indonesia & Kota-kota
@@ -186627,6 +186866,39 @@ var embeddedDashboardHtml = `<!DOCTYPE html>
         </div>
       </div>
 
+      <!-- GeoIndo Donation Stream Connect Card -->
+      <div class="card card-blue" style="grid-column: 1 / -1;">
+        <div class="card-header">
+          <div class="card-title">
+            <span>\u{1F4B8}</span> GeoIndo Live Donation Stream (Tako / Saweria)
+          </div>
+          <span id="giBadge" class="badge-pill badge-disconnected">
+            <span class="badge-dot"></span> <span id="giBadgeText">Disconnected</span>
+          </span>
+        </div>
+
+        <p style="font-size: 13px; font-weight: 700; color: #1f2937;">
+          Masukkan Link Stream Donasi atau Stream UID (contoh: <code>https://www.geoindo.my.id/api/donations/stream?uid=60jJcJMPiASdRgNtRQU2xxj5iwC2</code>):
+        </p>
+
+        <div class="input-group">
+          <input type="text" id="geoindoInput" placeholder="Link stream atau UID GeoIndo">
+          <button id="btnConnectGi" class="btn btn-black" onclick="connectGeoIndo()">Connect</button>
+          <button id="btnDisconnectGi" class="btn btn-red" onclick="disconnectGeoIndo()" style="display: none;">Disconnect</button>
+        </div>
+
+        <div class="info-list">
+          <div class="info-item">
+            <span class="info-label">\u{1F3AF} Active UID:</span>
+            <span class="info-val" id="activeGeoindoTarget">-</span>
+          </div>
+        </div>
+
+        <div id="giErrorBox" style="display: none; padding: 10px 14px; background: #fee2e2; border: 2.5px solid #000; border-radius: 12px; box-shadow: 2px 2px 0px #000; color: #991b1b; font-size: 12px; font-weight: 800;">
+          <span>\u26A0\uFE0F Gagal Connect GeoIndo:</span> <span id="giErrorText"></span>
+        </div>
+      </div>
+
       <!-- GeoGuessr Game Status Card -->
       <div class="card card-green" style="grid-column: 1 / -1;">
         <div class="card-header">
@@ -186801,6 +187073,41 @@ var embeddedDashboardHtml = `<!DOCTYPE html>
         }
       }
 
+      // Update GeoIndo Status
+      const giBadge = document.getElementById('giBadge');
+      const giBadgeText = document.getElementById('giBadgeText');
+      const btnConnectGi = document.getElementById('btnConnectGi');
+      const btnDisconnectGi = document.getElementById('btnDisconnectGi');
+      const activeGeoindoTarget = document.getElementById('activeGeoindoTarget');
+
+      if (giBadge && giBadgeText) {
+        giBadge.className = 'badge-pill badge-' + (currentState.geoindoStatus || 'disconnected');
+        giBadgeText.textContent = currentState.geoindoStatus || 'disconnected';
+      }
+
+      const giErrorBox = document.getElementById('giErrorBox');
+      const giErrorText = document.getElementById('giErrorText');
+      if (giErrorBox && giErrorText) {
+        if (currentState.geoindoStatus === 'error' && currentState.geoindoError) {
+          giErrorBox.style.display = 'block';
+          giErrorText.textContent = currentState.geoindoError;
+        } else {
+          giErrorBox.style.display = 'none';
+        }
+      }
+
+      if (btnConnectGi && btnDisconnectGi && activeGeoindoTarget) {
+        if (currentState.geoindoStatus === 'connected') {
+          btnConnectGi.style.display = 'none';
+          btnDisconnectGi.style.display = 'inline-flex';
+          activeGeoindoTarget.textContent = currentState.geoindoUid || '-';
+        } else {
+          btnConnectGi.style.display = 'inline-flex';
+          btnDisconnectGi.style.display = 'none';
+          activeGeoindoTarget.textContent = currentState.geoindoUid || '-';
+        }
+      }
+
       // Update Game Status
       document.getElementById('mapNameDisplay').textContent = currentState.mapName || 'GeoGuessr Map';
       document.getElementById('roundDisplay').textContent = \`R\${currentState.round} / 5\`;
@@ -186856,13 +187163,17 @@ var embeddedDashboardHtml = `<!DOCTYPE html>
         const distance = currentView === 'round' ? \`\${item.distance} km\` : \`\${Math.round(item.totalDistance)} km total\`;
         const score = currentView === 'round' ? \`\${item.score.toLocaleString()} pts\` : \`\${item.totalScore.toLocaleString()} pts\`;
 
+        const isDonation = item.platform === 'geoindo' || item.platform === 'Tako' || (item.userId && item.userId.startsWith('geoindo_'));
+        const donTag = isDonation ? '<span style="background: #10b981; color: #fff; font-size: 10px; font-weight: 900; padding: 1px 6px; border-radius: 99px; border: 1.5px solid #000; margin-left: 6px;">\u{1F4B8} DONASI</span>' : '';
+
         html += \`
-          <tr>
+          <tr style="\${isDonation ? 'background: #f0fdf4;' : ''}">
             <td>\${rankBadge}</td>
             <td>
               <div class="user-box">
                 \${avatar}
                 <strong style="font-size: 14px;">\${escapeHtml(item.username)}</strong>
+                \${donTag}
               </div>
             </td>
             <td><span class="dist-tag">\${distance}</span></td>
@@ -186917,6 +187228,29 @@ var embeddedDashboardHtml = `<!DOCTYPE html>
 
     async function disconnectTikTok() {
       await fetch('/api/tiktok/disconnect', { method: 'POST' });
+    }
+
+    async function connectGeoIndo() {
+      const input = document.getElementById('geoindoInput').value.trim();
+      if (!input) {
+        alert('Masukkan link stream donasi atau UID GeoIndo terlebih dahulu!');
+        return;
+      }
+      localStorage.setItem('cg_last_gi_target', input);
+      await fetch('/api/geoindo/connect', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ uid: input })
+      });
+    }
+
+    const savedGiTarget = localStorage.getItem('cg_last_gi_target') || 'https://www.geoindo.my.id/api/donations/stream?uid=60jJcJMPiASdRgNtRQU2xxj5iwC2';
+    if (savedGiTarget && document.getElementById('geoindoInput')) {
+      document.getElementById('geoindoInput').value = savedGiTarget;
+    }
+
+    async function disconnectGeoIndo() {
+      await fetch('/api/geoindo/disconnect', { method: 'POST' });
     }
 
     async function toggleGuesses() {
@@ -187681,13 +188015,16 @@ var embeddedOverlayHtml = `<!DOCTYPE html>
         else if (rank === 3) rankClass = 'rank-3';
 
         const avatar = p.avatar ? \`<img class="player-avatar" src="\${p.avatar}" alt="" />\` : \`<div class="player-avatar" style="display:flex;align-items:center;justify-content:center;font-size:10px;">\u{1F464}</div>\`;
+        const isDonation = p.platform === 'geoindo' || p.platform === 'Tako' || (p.userId && p.userId.startsWith('geoindo_'));
+        const donBadge = isDonation ? '<span style="background: #10b981; color: #fff; font-size: 8px; font-weight: 900; padding: 1px 4px; border-radius: 99px; border: 1px solid #000; margin-left: 4px;">\u{1F4B8}</span>' : '';
 
         html += \`
-          <div class="player-row">
+          <div class="player-row" style="\${isDonation ? 'background: #f0fdf4;' : ''}">
             <div class="player-left">
               <span class="rank-pill \${rankClass}">\${rank}</span>
               \${avatar}
               <span class="player-name">\${escapeHtml(p.username)}</span>
+              \${donBadge}
             </div>
             <div class="player-right">
               <span class="player-score">\${p.score.toLocaleString()}</span>
@@ -187734,7 +188071,7 @@ var embeddedOverlayHtml = `<!DOCTYPE html>
 var embeddedUserscript = `// ==UserScript==
 // @name         AHUNG SERVER MabarBang YouTube 
 // @namespace    http://tampermonkey.net/
-// @version      2.7
+// @version      2.8.0
 // @description  Otomatis mengirim data ronde GeoGuessr ke Railway/Local, menampilkan Scoreboard Overlay & PIN tebakan penonton di peta GeoGuessr
 // @author       MabarBang
 // @match        *://*.geoguessr.com/*
@@ -188023,6 +188360,8 @@ var embeddedUserscript = `// ==UserScript==
       // Garis putus-putus ke jawaban benar
       if (targetLocation && typeof targetLocation.lat === 'number' && win.google?.maps?.Polyline) {
         try {
+          const isDonationGuess = p.platform === 'geoindo' || p.platform === 'Tako' || p.isDonation || (p.userId && p.userId.startsWith('geoindo_'));
+          const lineStrokeColor = isDonationGuess ? '#10b981' : (rank === 1 ? '#f59e0b' : '#38bdf8');
           const line = new win.google.maps.Polyline({
             path: [p.position, targetLocation],
             map: globalMap,
@@ -188034,7 +188373,7 @@ var embeddedUserscript = `// ==UserScript==
                 repeat: '8px'
               }
             ],
-            strokeColor: rank === 1 ? '#f59e0b' : '#38bdf8',
+            strokeColor: lineStrokeColor,
             geodesic: true
           });
           polylines.push(line);
@@ -188074,17 +188413,20 @@ var embeddedUserscript = `// ==UserScript==
       z-index: \${1000 - rank};
     \`;
 
-    const rankColor =
-      rank === 1 ? '#ffd166' : rank === 2 ? '#70d6ff' : rank === 3 ? '#ff9ebb' : '#ffffff';
+    const isDonation = p.platform === 'geoindo' || p.platform === 'Tako' || p.isDonation || (p.userId && p.userId.startsWith('geoindo_'));
+
+    const rankColor = isDonation
+      ? '#10b981'
+      : (rank === 1 ? '#ffd166' : rank === 2 ? '#70d6ff' : rank === 3 ? '#ff9ebb' : '#ffffff');
 
     const avatarBox = document.createElement('div');
     avatarBox.style.cssText = \`
-      width: 34px;
-      height: 34px;
+      width: \${isDonation ? '36px' : '34px'};
+      height: \${isDonation ? '36px' : '34px'};
       border-radius: 50%;
-      border: 2.5px solid #000;
-      box-shadow: 2.5px 2.5px 0px #000;
-      background: #ffffff;
+      border: \${isDonation ? '3px solid #000' : '2.5px solid #000'};
+      box-shadow: \${isDonation ? '3px 3px 0px #059669' : '2.5px 2.5px 0px #000'};
+      background: \${isDonation ? '#d1fae5' : '#ffffff'};
       overflow: hidden;
       display: flex;
       align-items: center;
@@ -188098,8 +188440,8 @@ var embeddedUserscript = `// ==UserScript==
       avatarBox.appendChild(img);
     } else {
       const txt = document.createElement('span');
-      txt.textContent = (p.username || '?')[0].toUpperCase();
-      txt.style.cssText = 'color: #000; font-size: 13px; font-weight: 900;';
+      txt.textContent = isDonation ? '\u{1F4B8}' : (p.username || '?')[0].toUpperCase();
+      txt.style.cssText = \`color: #000; font-size: \${isDonation ? '16px' : '13px'}; font-weight: 900;\`;
       avatarBox.appendChild(txt);
     }
 
@@ -188110,7 +188452,7 @@ var embeddedUserscript = `// ==UserScript==
       top: -4px;
       right: -4px;
       background: \${rankColor};
-      color: #000;
+      color: \${isDonation ? '#ffffff' : '#000000'};
       font-size: 10px;
       font-weight: 900;
       width: 18px;
@@ -188124,22 +188466,48 @@ var embeddedUserscript = `// ==UserScript==
     \`;
 
     const nameTag = document.createElement('span');
-    nameTag.textContent = p.username;
+    nameTag.textContent = (isDonation ? '\u{1F4B8} ' : '') + p.username;
     nameTag.style.cssText = \`
       margin-top: 4px;
-      background: #ffffff;
-      color: #000;
+      background: \${isDonation ? '#ecfdf5' : '#ffffff'};
+      color: \${isDonation ? '#065f46' : '#000000'};
       font-size: 10px;
       font-weight: 800;
       padding: 2px 8px;
       border-radius: 9999px;
-      border: 2px solid #000;
+      border: 2px solid \${isDonation ? '#059669' : '#000000'};
       white-space: nowrap;
       box-shadow: 2px 2px 0px #000;
     \`;
 
     el.appendChild(avatarBox);
     el.appendChild(rankBadge);
+
+    // Badge tanda donasi jika tebakan berasal dari donasi GeoIndo
+    if (isDonation) {
+      const donBadge = document.createElement('span');
+      donBadge.textContent = '\u2605';
+      donBadge.title = 'Donasi GeoIndo / Tako';
+      donBadge.style.cssText = \`
+        position: absolute;
+        top: -4px;
+        left: -4px;
+        background: #f59e0b;
+        color: #ffffff;
+        font-size: 11px;
+        font-weight: 900;
+        width: 18px;
+        height: 18px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border: 2px solid #000;
+        box-shadow: 1.5px 1.5px 0px #000;
+      \`;
+      el.appendChild(donBadge);
+    }
+
     el.appendChild(nameTag);
 
     el.onmouseenter = () => {
@@ -188881,13 +189249,14 @@ var embeddedUserscript = `// ==UserScript==
       else if (rank === 3) rankClass = 'cg-rank-bronze';
 
       const isStreamer = p.isStreamer || p.userId === 'streamer';
+      const isDonation = p.platform === 'geoindo' || p.platform === 'Tako' || (p.userId && p.userId.startsWith('geoindo_'));
       const streamerRowStyle = isStreamer
         ? 'background: #fef08a !important; border-left: 4px solid #f59e0b !important; box-shadow: inset 0 0 0 1px rgba(245, 158, 11, 0.3); font-weight: 800;'
-        : '';
+        : (isDonation ? 'background: #f0fdf4 !important; border-left: 3.5px solid #10b981 !important;' : '');
       const streamerBadge = isStreamer
         ? '<span style="background: #f59e0b; color: #000; font-size: 9px; font-weight: 900; padding: 1px 6px; border-radius: 999px; border: 1px solid #000; margin-left: 4px; box-shadow: 1px 1px 0 #000;">STREAMER</span>'
-        : '';
-      const scoreColor = isStreamer ? '#b45309' : '#0284c7';
+        : (isDonation ? '<span style="background: #10b981; color: #fff; font-size: 9px; font-weight: 900; padding: 1px 5px; border-radius: 999px; border: 1px solid #000; margin-left: 4px;" title="Donasi GeoIndo">\u{1F4B8} DONASI</span>' : '');
+      const scoreColor = isStreamer ? '#b45309' : (isDonation ? '#047857' : '#0284c7');
 
       html += \`
         <div class="cg-player-row" data-user-id="\${p.userId}" style="\${streamerRowStyle}" title="Klik untuk fokus pin di peta">
@@ -189329,7 +189698,7 @@ var embeddedUserscript = `// ==UserScript==
 
 // src/server/index.ts
 var app = (0, import_express.default)();
-var server = import_http4.default.createServer(app);
+var server = import_http5.default.createServer(app);
 var io2 = new Server(server, {
   cors: {
     origin: "*",
@@ -189375,6 +189744,10 @@ var GameServerManager = class {
   tiktokUsername = "";
   tiktokStatus = "disconnected";
   tiktokError = "";
+  geoindoBackend = null;
+  geoindoUid = "";
+  geoindoStatus = "disconnected";
+  geoindoError = "";
   token = null;
   mapName = "GeoGuessr Map";
   mapScale = 2e3;
@@ -189546,6 +189919,67 @@ var GameServerManager = class {
     this.tiktokStatus = "disconnected";
     this.broadcastState();
   }
+  connectGeoIndo(uidOrUrl) {
+    if (this.geoindoBackend) {
+      this.geoindoBackend.close();
+      this.geoindoBackend = null;
+    }
+    let cleanUid = uidOrUrl.trim();
+    const urlMatch = cleanUid.match(/uid=([a-zA-Z0-9_-]+)/i);
+    if (urlMatch && urlMatch[1]) {
+      cleanUid = urlMatch[1];
+    }
+    this.geoindoUid = cleanUid;
+    if (!this.geoindoUid) {
+      this.geoindoStatus = "disconnected";
+      this.broadcastState();
+      return;
+    }
+    this.geoindoStatus = "connecting";
+    this.geoindoError = "";
+    this.broadcastState();
+    try {
+      this.geoindoBackend = new GeoIndoBackend({ uid: this.geoindoUid });
+      this.geoindoBackend.on("connected", (uid) => {
+        this.geoindoStatus = "connected";
+        console.log(`[Server] GeoIndo Donation Stream connected for UID ${uid}`);
+        this.broadcastState();
+      });
+      this.geoindoBackend.on("disconnected", () => {
+        this.geoindoStatus = "disconnected";
+        console.log(`[Server] GeoIndo Donation Stream disconnected`);
+        this.broadcastState();
+      });
+      this.geoindoBackend.on("error", (err2) => {
+        this.geoindoStatus = "error";
+        this.geoindoError = err2?.message || String(err2);
+        console.error(`[Server] GeoIndo Stream error:`, err2);
+        this.broadcastState();
+      });
+      this.geoindoBackend.on("guess", (userstate, message) => {
+        this.handleChatGuess(userstate, message).catch((err2) => {
+          console.error("[Server] Error handling GeoIndo donation guess:", err2);
+        });
+      });
+      this.geoindoBackend.connect().catch((err2) => {
+        this.geoindoStatus = "error";
+        this.geoindoError = err2?.message || String(err2);
+        this.broadcastState();
+      });
+    } catch (err2) {
+      this.geoindoStatus = "error";
+      this.geoindoError = err2?.message || String(err2);
+      this.broadcastState();
+    }
+  }
+  disconnectGeoIndo() {
+    if (this.geoindoBackend) {
+      this.geoindoBackend.close();
+      this.geoindoBackend = null;
+    }
+    this.geoindoStatus = "disconnected";
+    this.broadcastState();
+  }
   async handleChatGuess(userstate, message) {
     if (!this.guessesOpen) {
       console.log(`[Guess Ignored] Guesses are closed: "${message}"`);
@@ -189704,6 +190138,9 @@ var GameServerManager = class {
       tiktokUsername: this.tiktokUsername,
       tiktokStatus: this.tiktokStatus,
       tiktokError: this.tiktokError,
+      geoindoUid: this.geoindoUid,
+      geoindoStatus: this.geoindoStatus,
+      geoindoError: this.geoindoError,
       token: this.token,
       mapName: this.mapName,
       round: this.round,
@@ -189759,6 +190196,19 @@ app.post("/api/tiktok/connect", (req, res) => {
 });
 app.post("/api/tiktok/disconnect", (_req, res) => {
   manager.disconnectTikTok();
+  res.json({ success: true, state: manager.getState() });
+});
+app.post("/api/geoindo/connect", (req, res) => {
+  const { uid } = req.body;
+  if (!uid) {
+    res.status(400).json({ error: "uid is required" });
+    return;
+  }
+  manager.connectGeoIndo(uid);
+  res.json({ success: true, state: manager.getState() });
+});
+app.post("/api/geoindo/disconnect", (_req, res) => {
+  manager.disconnectGeoIndo();
   res.json({ success: true, state: manager.getState() });
 });
 app.post("/api/geoguessr/update", (req, res) => {
@@ -189871,7 +190321,7 @@ app.get(["/chatguessr.user.js", "/userscript"], (_req, res) => {
 app.get("/", (_req, res) => {
   res.redirect("/dashboard");
 });
-var APP_VERSION = "3.1.8";
+var APP_VERSION = "3.2.0";
 var GITHUB_REPO = "PaddlePOPA96/geochat";
 var cachedUpdateInfo = {
   hasUpdate: false,
