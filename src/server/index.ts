@@ -11,6 +11,7 @@ import TikTokBackend from '../main/utils/useTikTokChat'
 import GeoIndoBackend from '../main/utils/useGeoIndoChat'
 import { resolveLocation, parseCoordinates } from '../shared/geocoding'
 import { embeddedDashboardHtml, embeddedOverlayHtml, embeddedUserscript } from './embeddedTemplates'
+import { saveSessionLeaderboard } from './supabase'
 
 export { resolveLocation, parseCoordinates }
 
@@ -113,12 +114,14 @@ class GameServerManager {
   geoindoError = ''
 
   token: string | null = null
+  sessionCode: string = `session_${Date.now()}`
   mapName = 'GeoGuessr Map'
   mapScale = 2000
   maxErrorDistance?: number
   round = 1
   roundLocation: { lat: number; lng: number } | null = null
   guessesOpen = false
+  allowCoordinates = false
   isFinished = false
 
   // Streamer Score & Stats
@@ -415,6 +418,13 @@ class GameServerManager {
     this.userLastGuessTime[userId] = now
 
     const clean = message.replace(/^!g\s*/i, '').trim()
+
+    // If coordinates are disabled, reject raw coordinate guesses (e.g. "-6.2088, 106.8456")
+    if (!this.allowCoordinates && parseCoordinates(clean)) {
+      console.log(`[Guess Ignored] Raw coordinates guessing is disabled: "${clean}" by ${userId}`)
+      return
+    }
+
     const coords = await resolveLocation(clean)
     if (!coords) {
       console.log(`[Guess Ignored] Could not resolve coordinates for: "${clean}"`)
@@ -550,6 +560,12 @@ class GameServerManager {
       leaderboard: this.getSortedLeaderboard()
     })
 
+    // Automatically sync leaderboard to Supabase for current unique session
+    const currentLb = this.getSortedLeaderboard()
+    if (currentLb.length > 0) {
+      saveSessionLeaderboard(this.sessionCode, this.mapName, currentLb, 5)
+    }
+
     this.broadcastState()
     console.log(
       `[Server] Round ${this.round} finished. Total guesses: ${sortedRoundResults.length}`
@@ -559,14 +575,19 @@ class GameServerManager {
   finishGame() {
     this.finishRound()
     this.isFinished = true
+    const finalLb = this.getSortedLeaderboard()
     io.emit('game-finished', {
       rounds: this.roundsHistory,
-      leaderboard: this.getSortedLeaderboard()
+      leaderboard: finalLb
     })
+    if (finalLb.length > 0) {
+      saveSessionLeaderboard(this.sessionCode, this.mapName, finalLb, 5)
+    }
     this.broadcastState()
   }
 
   resetGame() {
+    this.sessionCode = `session_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`
     this.round = 1
     this.roundGuesses = {}
     this.gameLeaderboard = {}
@@ -603,11 +624,13 @@ class GameServerManager {
       geoindoStatus: this.geoindoStatus,
       geoindoError: this.geoindoError,
       token: this.token,
+      sessionCode: this.sessionCode,
       mapName: this.mapName,
       round: this.round,
       roundLocation: this.roundLocation,
       streamerStats: this.streamerStats,
       guessesOpen: this.guessesOpen,
+      allowCoordinates: this.allowCoordinates,
       isFinished: this.isFinished,
       roundGuesses: Object.values(this.roundGuesses).sort((a, b) => b.score - a.score),
       leaderboard: this.getSortedLeaderboard()
@@ -780,6 +803,16 @@ app.post('/api/game/close-guesses', (_req, res) => {
 app.post('/api/game/reset', (_req, res) => {
   manager.resetGame()
   res.json({ success: true })
+})
+
+app.post('/api/game/toggle-coordinates', (req, res) => {
+  if (typeof req.body?.allow === 'boolean') {
+    manager.allowCoordinates = req.body.allow
+  } else {
+    manager.allowCoordinates = !manager.allowCoordinates
+  }
+  manager.broadcastState()
+  res.json({ success: true, allowCoordinates: manager.allowCoordinates })
 })
 
 // Serve Dashboard & Overlay HTML routes

@@ -186923,10 +186923,15 @@ var embeddedDashboardHtml = `<!DOCTYPE html>
             <span class="info-label">\u{1F465} Tebakan Ronde Ini:</span>
             <span class="info-val" id="guessCountDisplay">0 Guesses</span>
           </div>
+          <div class="info-item">
+            <span class="info-label">\u{1F310} Tebak Koordinat:</span>
+            <span class="info-val" id="coordsStatusDisplay" style="color: #dc2626;">\u26D4 Disabled</span>
+          </div>
         </div>
 
-        <div style="display: flex; gap: 10px; margin-top: auto;">
+        <div style="display: flex; gap: 10px; margin-top: auto; flex-wrap: wrap;">
           <button id="btnToggleGuesses" class="btn btn-white btn-sm" onclick="toggleGuesses()">\u{1F513} Open Guesses</button>
+          <button id="btnToggleCoords" class="btn btn-yellow btn-sm" onclick="toggleCoordinates()" title="Aktifkan/nonaktifkan tebakan via koordinat angka">\u{1F310} Koordinat: OFF</button>
           <button class="btn btn-red btn-sm" onclick="resetGame()">\u{1F504} Reset Game</button>
         </div>
       </div>
@@ -187127,6 +187132,23 @@ var embeddedDashboardHtml = `<!DOCTYPE html>
         btnToggleGuesses.textContent = '\u{1F513} Open Guesses';
       }
 
+      // Update Coordinates Allowed Status
+      const coordsStatus = document.getElementById('coordsStatusDisplay');
+      const btnToggleCoords = document.getElementById('btnToggleCoords');
+      if (coordsStatus && btnToggleCoords) {
+        if (currentState.allowCoordinates) {
+          coordsStatus.textContent = '\u2705 Diizinkan';
+          coordsStatus.style.color = '#16a34a';
+          btnToggleCoords.className = 'btn btn-green btn-sm';
+          btnToggleCoords.textContent = '\u{1F310} Koordinat: ON';
+        } else {
+          coordsStatus.textContent = '\u26D4 Dinonaktifkan';
+          coordsStatus.style.color = '#dc2626';
+          btnToggleCoords.className = 'btn btn-yellow btn-sm';
+          btnToggleCoords.textContent = '\u{1F310} Koordinat: OFF';
+        }
+      }
+
       renderScoreboard();
     }
 
@@ -187257,6 +187279,10 @@ var embeddedDashboardHtml = `<!DOCTYPE html>
       if (!currentState) return;
       const endpoint = currentState.guessesOpen ? '/api/game/close-guesses' : '/api/game/open-guesses';
       await fetch(endpoint, { method: 'POST' });
+    }
+
+    async function toggleCoordinates() {
+      await fetch('/api/game/toggle-coordinates', { method: 'POST' });
     }
 
     async function resetGame() {
@@ -188071,7 +188097,7 @@ var embeddedOverlayHtml = `<!DOCTYPE html>
 var embeddedUserscript = `// ==UserScript==
 // @name         AHUNG SERVER MabarBang YouTube 
 // @namespace    http://tampermonkey.net/
-// @version      2.8.0
+// @version      2.8.1
 // @description  Otomatis mengirim data ronde GeoGuessr ke Railway/Local, menampilkan Scoreboard Overlay & PIN tebakan penonton di peta GeoGuessr
 // @author       MabarBang
 // @match        *://*.geoguessr.com/*
@@ -189696,6 +189722,65 @@ var embeddedUserscript = `// ==UserScript==
 })();
 `;
 
+// src/server/supabase.ts
+var SUPABASE_URL = process.env.SUPABASE_URL || "https://REDACTED_PROJECT.supabase.co";
+var SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || "REDACTED_SERVICE_KEY";
+async function saveSessionLeaderboard(sessionCode, mapName, leaderboard, totalRounds = 5) {
+  if (!sessionCode || !leaderboard || leaderboard.length === 0) return;
+  try {
+    const sessionRes = await fetch(`${SUPABASE_URL}/rest/v1/game_sessions`, {
+      method: "POST",
+      headers: {
+        apikey: SUPABASE_KEY,
+        Authorization: `Bearer ${SUPABASE_KEY}`,
+        "Content-Type": "application/json",
+        Prefer: "resolution=merge-duplicates,return=representation"
+      },
+      body: JSON.stringify({
+        session_code: sessionCode,
+        map_name: mapName,
+        total_rounds: totalRounds
+      })
+    });
+    let sessionId = null;
+    if (sessionRes.ok) {
+      const sessionData = await sessionRes.json();
+      sessionId = sessionData?.[0]?.id || null;
+    }
+    const rows = leaderboard.map((entry, index) => ({
+      session_code: sessionCode,
+      session_id: sessionId,
+      user_id: entry.userId,
+      username: entry.username,
+      avatar: entry.avatar || null,
+      total_score: entry.totalScore,
+      total_distance: entry.totalDistance,
+      rounds_count: entry.roundsCount,
+      rank: index + 1
+    }));
+    const lbRes = await fetch(`${SUPABASE_URL}/rest/v1/leaderboards`, {
+      method: "POST",
+      headers: {
+        apikey: SUPABASE_KEY,
+        Authorization: `Bearer ${SUPABASE_KEY}`,
+        "Content-Type": "application/json",
+        Prefer: "resolution=merge-duplicates"
+      },
+      body: JSON.stringify(rows)
+    });
+    if (!lbRes.ok) {
+      const errText = await lbRes.text();
+      console.error(`[Supabase] Failed to save leaderboard:`, errText);
+    } else {
+      console.log(
+        `[Supabase] Leaderboard saved successfully for session ${sessionCode} (${rows.length} players)`
+      );
+    }
+  } catch (err2) {
+    console.error(`[Supabase] Error saving session leaderboard:`, err2);
+  }
+}
+
 // src/server/index.ts
 var app = (0, import_express.default)();
 var server = import_http5.default.createServer(app);
@@ -189749,12 +189834,14 @@ var GameServerManager = class {
   geoindoStatus = "disconnected";
   geoindoError = "";
   token = null;
+  sessionCode = `session_${Date.now()}`;
   mapName = "GeoGuessr Map";
   mapScale = 2e3;
   maxErrorDistance;
   round = 1;
   roundLocation = null;
   guessesOpen = false;
+  allowCoordinates = false;
   isFinished = false;
   // Streamer Score & Stats
   streamerStats = {
@@ -189994,6 +190081,10 @@ var GameServerManager = class {
     }
     this.userLastGuessTime[userId] = now;
     const clean = message.replace(/^!g\s*/i, "").trim();
+    if (!this.allowCoordinates && parseCoordinates(clean)) {
+      console.log(`[Guess Ignored] Raw coordinates guessing is disabled: "${clean}" by ${userId}`);
+      return;
+    }
     const coords = await resolveLocation(clean);
     if (!coords) {
       console.log(`[Guess Ignored] Could not resolve coordinates for: "${clean}"`);
@@ -190093,6 +190184,10 @@ var GameServerManager = class {
       results: sortedRoundResults,
       leaderboard: this.getSortedLeaderboard()
     });
+    const currentLb = this.getSortedLeaderboard();
+    if (currentLb.length > 0) {
+      saveSessionLeaderboard(this.sessionCode, this.mapName, currentLb, 5);
+    }
     this.broadcastState();
     console.log(
       `[Server] Round ${this.round} finished. Total guesses: ${sortedRoundResults.length}`
@@ -190101,13 +190196,18 @@ var GameServerManager = class {
   finishGame() {
     this.finishRound();
     this.isFinished = true;
+    const finalLb = this.getSortedLeaderboard();
     io2.emit("game-finished", {
       rounds: this.roundsHistory,
-      leaderboard: this.getSortedLeaderboard()
+      leaderboard: finalLb
     });
+    if (finalLb.length > 0) {
+      saveSessionLeaderboard(this.sessionCode, this.mapName, finalLb, 5);
+    }
     this.broadcastState();
   }
   resetGame() {
+    this.sessionCode = `session_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
     this.round = 1;
     this.roundGuesses = {};
     this.gameLeaderboard = {};
@@ -190142,11 +190242,13 @@ var GameServerManager = class {
       geoindoStatus: this.geoindoStatus,
       geoindoError: this.geoindoError,
       token: this.token,
+      sessionCode: this.sessionCode,
       mapName: this.mapName,
       round: this.round,
       roundLocation: this.roundLocation,
       streamerStats: this.streamerStats,
       guessesOpen: this.guessesOpen,
+      allowCoordinates: this.allowCoordinates,
       isFinished: this.isFinished,
       roundGuesses: Object.values(this.roundGuesses).sort((a2, b) => b.score - a2.score),
       leaderboard: this.getSortedLeaderboard()
@@ -190284,6 +190386,15 @@ app.post("/api/game/close-guesses", (_req, res) => {
 app.post("/api/game/reset", (_req, res) => {
   manager.resetGame();
   res.json({ success: true });
+});
+app.post("/api/game/toggle-coordinates", (req, res) => {
+  if (typeof req.body?.allow === "boolean") {
+    manager.allowCoordinates = req.body.allow;
+  } else {
+    manager.allowCoordinates = !manager.allowCoordinates;
+  }
+  manager.broadcastState();
+  res.json({ success: true, allowCoordinates: manager.allowCoordinates });
 });
 app.get(["/dashboard", "/dashboard/"], (_req, res) => {
   const filePath = import_path3.default.join(publicDir, "dashboard/index.html");

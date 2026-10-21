@@ -893,10 +893,15 @@
             <span class="info-label">👥 Tebakan Ronde Ini:</span>
             <span class="info-val" id="guessCountDisplay">0 Guesses</span>
           </div>
+          <div class="info-item">
+            <span class="info-label">🌐 Tebak Koordinat:</span>
+            <span class="info-val" id="coordsStatusDisplay" style="color: #dc2626;">⛔ Disabled</span>
+          </div>
         </div>
 
-        <div style="display: flex; gap: 10px; margin-top: auto;">
+        <div style="display: flex; gap: 10px; margin-top: auto; flex-wrap: wrap;">
           <button id="btnToggleGuesses" class="btn btn-white btn-sm" onclick="toggleGuesses()">🔓 Open Guesses</button>
+          <button id="btnToggleCoords" class="btn btn-yellow btn-sm" onclick="toggleCoordinates()" title="Aktifkan/nonaktifkan tebakan via koordinat angka">🌐 Koordinat: OFF</button>
           <button class="btn btn-red btn-sm" onclick="resetGame()">🔄 Reset Game</button>
         </div>
       </div>
@@ -1097,6 +1102,23 @@
         btnToggleGuesses.textContent = '🔓 Open Guesses';
       }
 
+      // Update Coordinates Allowed Status
+      const coordsStatus = document.getElementById('coordsStatusDisplay');
+      const btnToggleCoords = document.getElementById('btnToggleCoords');
+      if (coordsStatus && btnToggleCoords) {
+        if (currentState.allowCoordinates) {
+          coordsStatus.textContent = '✅ Diizinkan';
+          coordsStatus.style.color = '#16a34a';
+          btnToggleCoords.className = 'btn btn-green btn-sm';
+          btnToggleCoords.textContent = '🌐 Koordinat: ON';
+        } else {
+          coordsStatus.textContent = '⛔ Dinonaktifkan';
+          coordsStatus.style.color = '#dc2626';
+          btnToggleCoords.className = 'btn btn-yellow btn-sm';
+          btnToggleCoords.textContent = '🌐 Koordinat: OFF';
+        }
+      }
+
       renderScoreboard();
     }
 
@@ -1227,6 +1249,10 @@
       if (!currentState) return;
       const endpoint = currentState.guessesOpen ? '/api/game/close-guesses' : '/api/game/open-guesses';
       await fetch(endpoint, { method: 'POST' });
+    }
+
+    async function toggleCoordinates() {
+      await fetch('/api/game/toggle-coordinates', { method: 'POST' });
     }
 
     async function resetGame() {
