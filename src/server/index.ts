@@ -635,11 +635,8 @@ class GameServerManager {
       io.emit('round-finished', roundFinishedPayload)
     }
 
-    // Automatically sync leaderboard to Supabase for current unique session
-    const currentLb = this.getSortedLeaderboard()
-    if (currentLb.length > 0) {
-      saveSessionLeaderboard(this.sessionCode, this.mapName, currentLb, 5, this.streamerId)
-    }
+    // Catatan: Tidak memanggil Supabase di setiap ronde agar kuota REST API hemat 80%.
+    // Data papan skor selama game berlangsung disimpan di RAM VPS, dan baru disinkronkan ke Supabase saat Game Selesai (finishGame).
 
     this.broadcastState()
     console.log(
@@ -662,8 +659,10 @@ class GameServerManager {
       io.emit('game-finished', gameFinishedPayload)
     }
 
+    // Simpan ke Supabase HANYA 1x saat game selesai (Top 100 pemain teratas)
     if (finalLb.length > 0) {
-      saveSessionLeaderboard(this.sessionCode, this.mapName, finalLb, 5, this.streamerId)
+      const topLeaderboard = finalLb.slice(0, 100)
+      saveSessionLeaderboard(this.sessionCode, this.mapName, topLeaderboard, 5, this.streamerId)
     }
     this.broadcastState()
   }

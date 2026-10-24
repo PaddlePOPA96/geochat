@@ -190459,11 +190459,21 @@ async function verifySupabaseUser(token) {
     return null;
   }
 }
+var savedSessions = /* @__PURE__ */ new Set();
 async function saveSessionLeaderboard(sessionCode, mapName, leaderboard, totalRounds = 5, streamerId) {
   if (!sessionCode || !leaderboard || leaderboard.length === 0) return;
+  if (savedSessions.has(sessionCode)) {
+    console.log(`[Supabase] Session ${sessionCode} sudah tersimpan sebelumnya, mengabaikan double-save.`);
+    return;
+  }
   const supabaseUrl = getSupabaseUrl();
   const supabaseKey = getSupabaseKey();
   if (!supabaseUrl || !supabaseKey) return;
+  savedSessions.add(sessionCode);
+  if (savedSessions.size > 500) {
+    const firstKey = savedSessions.values().next().value;
+    if (firstKey) savedSessions.delete(firstKey);
+  }
   try {
     const sessionPayload = {
       session_code: sessionCode,
@@ -191062,10 +191072,6 @@ var GameServerManager = class {
     if (this.streamerId === "default" || getActiveStreamerCount() === 1) {
       io2.emit("round-finished", roundFinishedPayload);
     }
-    const currentLb = this.getSortedLeaderboard();
-    if (currentLb.length > 0) {
-      saveSessionLeaderboard(this.sessionCode, this.mapName, currentLb, 5, this.streamerId);
-    }
     this.broadcastState();
     console.log(
       `[Server] [Streamer: ${this.streamerName}] Round ${this.round} finished. Total guesses: ${sortedRoundResults.length}`
@@ -191085,7 +191091,8 @@ var GameServerManager = class {
       io2.emit("game-finished", gameFinishedPayload);
     }
     if (finalLb.length > 0) {
-      saveSessionLeaderboard(this.sessionCode, this.mapName, finalLb, 5, this.streamerId);
+      const topLeaderboard = finalLb.slice(0, 100);
+      saveSessionLeaderboard(this.sessionCode, this.mapName, topLeaderboard, 5, this.streamerId);
     }
     this.broadcastState();
   }

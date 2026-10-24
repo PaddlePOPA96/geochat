@@ -32,6 +32,9 @@ export async function verifySupabaseUser(token: string) {
   }
 }
 
+// In-memory set untuk mencegah pemanggilan ganda (double-save) pada sessionCode yang sama
+const savedSessions = new Set<string>()
+
 /**
  * Helper to interact with Supabase REST API without external client bloat
  */
@@ -43,9 +46,21 @@ export async function saveSessionLeaderboard(
   streamerId?: string
 ) {
   if (!sessionCode || !leaderboard || leaderboard.length === 0) return
+  if (savedSessions.has(sessionCode)) {
+    console.log(`[Supabase] Session ${sessionCode} sudah tersimpan sebelumnya, mengabaikan double-save.`)
+    return
+  }
+
   const supabaseUrl = getSupabaseUrl()
   const supabaseKey = getSupabaseKey()
   if (!supabaseUrl || !supabaseKey) return
+
+  savedSessions.add(sessionCode)
+  // Prune cache jika sudah lebih dari 500 session agar hemat memori
+  if (savedSessions.size > 500) {
+    const firstKey = savedSessions.values().next().value
+    if (firstKey) savedSessions.delete(firstKey)
+  }
 
   try {
     // 1. Upsert Game Session (with streamer_id if provided)
