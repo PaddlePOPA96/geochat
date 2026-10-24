@@ -187772,8 +187772,7 @@ var embeddedUserscript = `// ==UserScript==
 (function () {
   'use strict';
 
-  // Server URLs (Local 5050 vs Cloud Domain)
-  const CLOUD_SERVER_URL = 'https://geoindo.my.id';
+  // Server URLs (Default Local 5050)
   const LOCAL_SERVER_URL = 'http://localhost:5050';
 
   let serverUrl = LOCAL_SERVER_URL;
@@ -187802,9 +187801,6 @@ var embeddedUserscript = `// ==UserScript==
   function getServerMode() {
     if (serverUrl.includes('localhost') || serverUrl.includes('127.0.0.1')) {
       return 'local';
-    }
-    if (serverUrl.includes('geoindo.my.id') || serverUrl === CLOUD_SERVER_URL) {
-      return 'cloud';
     }
     return 'custom';
   }
@@ -189411,56 +189407,36 @@ var embeddedUserscript = `// ==UserScript==
                   \${currentMode === 'local' ? '<span style="background: #000; color: #fff; font-size: 9px; padding: 2px 6px; border-radius: 99px;">AKTIF</span>' : ''}
                 </div>
                 <div style="font-size: 11px; color: #475569; font-weight: 700; margin-top: 2px;">
-                  http://localhost:5050 (Standalone / Local)
+                  http://localhost:5050 (Default)
                 </div>
               </div>
               <span style="font-size: 16px; font-weight: 900;">\${currentMode === 'local' ? '\u2713' : '\u2794'}</span>
             </button>
 
-            <!-- Tombol Cloud Server -->
-            <button id="cg-btn-cloud" style="
-              display: flex;
-              align-items: center;
-              justify-content: space-between;
-              background: \${currentMode === 'cloud' ? '#ffe082' : '#f8fafc'};
-              border: 2.5px solid #000;
-              border-radius: 14px;
-              padding: 12px 14px;
-              cursor: pointer;
-              box-shadow: \${currentMode === 'cloud' ? '4px 4px 0px #000' : '2px 2px 0px #000'};
-              text-align: left;
-              transition: all 0.15s ease;
-            ">
-              <div>
-                <div style="font-size: 14px; font-weight: 900; display: flex; align-items: center; gap: 6px;">
-                  <span>\u2601\uFE0F</span> Cloud Server
-                  \${currentMode === 'cloud' ? '<span style="background: #000; color: #fff; font-size: 9px; padding: 2px 6px; border-radius: 99px;">AKTIF</span>' : ''}
-                </div>
-                <div style="font-size: 11px; color: #475569; font-weight: 700; margin-top: 2px;">
-                  https://geoindo.my.id
-                </div>
-              </div>
-              <span style="font-size: 16px; font-weight: 900;">\${currentMode === 'cloud' ? '\u2713' : '\u2794'}</span>
-            </button>
-
-            <!-- Tombol Custom Server -->
+            <!-- Tombol Custom Server (Connect Manual) -->
             <button id="cg-btn-custom" style="
               display: flex;
               align-items: center;
               justify-content: space-between;
               background: \${currentMode === 'custom' ? '#70d6ff' : '#f8fafc'};
-              border: 2px solid #000;
-              border-radius: 12px;
-              padding: 10px 14px;
+              border: 2.5px solid #000;
+              border-radius: 14px;
+              padding: 12px 14px;
               cursor: pointer;
-              box-shadow: \${currentMode === 'custom' ? '3px 3px 0px #000' : '2px 2px 0px #000'};
+              box-shadow: \${currentMode === 'custom' ? '4px 4px 0px #000' : '2px 2px 0px #000'};
               text-align: left;
+              transition: all 0.15s ease;
             ">
-              <div style="font-size: 12px; font-weight: 800;">
-                <span>\u2699\uFE0F</span> Custom URL Server...
-                \${currentMode === 'custom' ? '<span style="background: #000; color: #fff; font-size: 9px; padding: 2px 6px; border-radius: 99px; margin-left: 6px;">AKTIF</span>' : ''}
+              <div>
+                <div style="font-size: 14px; font-weight: 900; display: flex; align-items: center; gap: 6px;">
+                  <span>\u{1F310}</span> Connect Manual (Custom URL)
+                  \${currentMode === 'custom' ? '<span style="background: #000; color: #fff; font-size: 9px; padding: 2px 6px; border-radius: 99px;">AKTIF</span>' : ''}
+                </div>
+                <div style="font-size: 11px; color: #475569; font-weight: 700; margin-top: 2px;">
+                  \${currentMode === 'custom' ? serverUrl : 'Masukkan IP / domain manual (misal: VPS / ngrok / dll)'}
+                </div>
               </div>
-              <span style="font-size: 13px;">\${currentMode === 'custom' ? '\u2713' : '\u270E'}</span>
+              <span style="font-size: 16px; font-weight: 900;">\${currentMode === 'custom' ? '\u2713' : '\u270E'}</span>
             </button>
 
             <!-- Streamer ID Configuration (Multi-User) -->
@@ -189517,18 +189493,10 @@ var embeddedUserscript = `// ==UserScript==
         }, 220);
       };
 
-      document.getElementById('cg-btn-cloud').onclick = () => {
-        setServerUrl(CLOUD_SERVER_URL, 'Cloud (geoindo.my.id)');
-        renderModalContent();
-        setTimeout(() => {
-          modal.style.display = 'none';
-        }, 220);
-      };
-
       document.getElementById('cg-btn-custom').onclick = () => {
-        const customUrl = prompt('Masukkan URL Server Custom:', serverUrl);
+        const customUrl = prompt('Masukkan URL Server (contoh: http://192.168.1.10:5050 atau https://domain-anda.com):', serverUrl !== LOCAL_SERVER_URL ? serverUrl : '');
         if (customUrl && customUrl.trim()) {
-          setServerUrl(customUrl.trim(), 'Custom');
+          setServerUrl(customUrl.trim(), 'Custom Server');
           renderModalContent();
           setTimeout(() => {
             modal.style.display = 'none';
