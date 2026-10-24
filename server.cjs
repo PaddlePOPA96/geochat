@@ -191631,6 +191631,22 @@ async function checkForAppUpdates() {
 app.get("/api/update-info", (_req, res) => {
   res.json(cachedUpdateInfo);
 });
+function cleanOldTempInstallers(keepFile) {
+  try {
+    const tempDir = import_os2.default.tmpdir();
+    const files = import_fs.default.readdirSync(tempDir);
+    for (const f of files) {
+      if ((f.startsWith("MabarBang-Update-") || f.startsWith("MabarBang-")) && (f.endsWith(".exe") || f.endsWith(".zip"))) {
+        if (keepFile && f === import_path3.default.basename(keepFile)) continue;
+        try {
+          import_fs.default.unlinkSync(import_path3.default.join(tempDir, f));
+        } catch (_) {
+        }
+      }
+    }
+  } catch (_) {
+  }
+}
 app.post("/api/app/update-and-restart", async (_req, res) => {
   try {
     if (!cachedUpdateInfo.checkedAt || Date.now() - cachedUpdateInfo.checkedAt > 12e4) {
@@ -191661,11 +191677,12 @@ app.post("/api/app/update-and-restart", async (_req, res) => {
         error: `Gagal mengunduh installer: HTTP ${fetchRes.status} ${fetchRes.statusText}`
       });
     }
+    cleanOldTempInstallers();
     const fileBuffer = Buffer.from(await fetchRes.arrayBuffer());
     const ext = downloadUrl.toLowerCase().endsWith(".zip") ? ".zip" : ".exe";
     const tempInstallerPath = import_path3.default.join(
       import_os2.default.tmpdir(),
-      `MabarBang-${cachedUpdateInfo.latestVersion}-Setup${ext}`
+      `MabarBang-Update-${cachedUpdateInfo.latestVersion}${ext}`
     );
     await import_fs.default.promises.writeFile(tempInstallerPath, fileBuffer);
     console.log(
@@ -191680,11 +191697,15 @@ app.post("/api/app/update-and-restart", async (_req, res) => {
       console.log(`[AutoUpdate] Menjalankan installer: ${tempInstallerPath}`);
       try {
         if (process.platform === "win32") {
-          const child = (0, import_child_process.spawn)(tempInstallerPath, [], {
-            detached: true,
-            stdio: "ignore"
-          });
-          child.unref();
+          (0, import_child_process.exec)(
+            `cmd.exe /c start /wait "" "${tempInstallerPath}" /VERYSILENT /SUPPRESSMSGBOXES /CLOSEAPPLICATIONS /RESTARTAPPLICATIONS && del /f /q "${tempInstallerPath}"`,
+            () => {
+              try {
+                if (import_fs.default.existsSync(tempInstallerPath)) import_fs.default.unlinkSync(tempInstallerPath);
+              } catch (_) {
+              }
+            }
+          );
         } else if (process.platform === "darwin") {
           (0, import_child_process.spawn)("open", [tempInstallerPath], { detached: true, stdio: "ignore" }).unref();
         } else {
@@ -191832,6 +191853,7 @@ Tekan tombol ENTER untuk keluar...`);
         try {
           const tempDir = import_os2.default.tmpdir();
           const installerPath = import_path3.default.join(tempDir, `MabarBang-Update-${update.latestVersion}.exe`);
+          cleanOldTempInstallers(installerPath);
           fetch(update.downloadUrl, {
             headers: { "User-Agent": "MabarBang-App" }
           }).then(async (downloadRes) => {
@@ -191843,13 +191865,13 @@ Tekan tombol ENTER untuk keluar...`);
 ================================================================================`
             );
             console.log(`\u2728 UPDATE v${update.latestVersion} SIAP DIPASANG!`);
-            console.log(`\u{1F4A1} Menjalankan installer otomatis...`);
+            console.log(`\u{1F4A1} Menjalankan installer otomatis di background (tanpa sampah)...`);
             console.log(
               `================================================================================
 `
             );
             (0, import_child_process.exec)(
-              `start /wait "" "${installerPath}" /VERYSILENT /SUPPRESSMSGBOXES /CLOSEAPPLICATIONS /RESTARTAPPLICATIONS && del /f /q "${installerPath}"`,
+              `cmd.exe /c start /wait "" "${installerPath}" /VERYSILENT /SUPPRESSMSGBOXES /CLOSEAPPLICATIONS /RESTARTAPPLICATIONS && del /f /q "${installerPath}"`,
               () => {
                 try {
                   if (import_fs.default.existsSync(installerPath)) {

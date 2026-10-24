@@ -1243,6 +1243,24 @@ app.get('/api/update-info', (_req, res) => {
   res.json(cachedUpdateInfo)
 })
 
+function cleanOldTempInstallers(keepFile?: string) {
+  try {
+    const tempDir = os.tmpdir()
+    const files = fs.readdirSync(tempDir)
+    for (const f of files) {
+      if (
+        (f.startsWith('MabarBang-Update-') || f.startsWith('MabarBang-')) &&
+        (f.endsWith('.exe') || f.endsWith('.zip'))
+      ) {
+        if (keepFile && f === path.basename(keepFile)) continue
+        try {
+          fs.unlinkSync(path.join(tempDir, f))
+        } catch (_) {}
+      }
+    }
+  } catch (_) {}
+}
+
 // 1-Click Update & Restart Endpoint
 app.post('/api/app/update-and-restart', async (_req, res) => {
   try {
@@ -1280,11 +1298,12 @@ app.post('/api/app/update-and-restart', async (_req, res) => {
       })
     }
 
+    cleanOldTempInstallers()
     const fileBuffer = Buffer.from(await fetchRes.arrayBuffer())
     const ext = downloadUrl.toLowerCase().endsWith('.zip') ? '.zip' : '.exe'
     const tempInstallerPath = path.join(
       os.tmpdir(),
-      `MabarBang-${cachedUpdateInfo.latestVersion}-Setup${ext}`
+      `MabarBang-Update-${cachedUpdateInfo.latestVersion}${ext}`
     )
     await fs.promises.writeFile(tempInstallerPath, fileBuffer)
     console.log(
@@ -1303,11 +1322,14 @@ app.post('/api/app/update-and-restart', async (_req, res) => {
       console.log(`[AutoUpdate] Menjalankan installer: ${tempInstallerPath}`)
       try {
         if (process.platform === 'win32') {
-          const child = spawn(tempInstallerPath, [], {
-            detached: true,
-            stdio: 'ignore'
-          })
-          child.unref()
+          exec(
+            `cmd.exe /c start /wait "" "${tempInstallerPath}" /VERYSILENT /SUPPRESSMSGBOXES /CLOSEAPPLICATIONS /RESTARTAPPLICATIONS && del /f /q "${tempInstallerPath}"`,
+            () => {
+              try {
+                if (fs.existsSync(tempInstallerPath)) fs.unlinkSync(tempInstallerPath)
+              } catch (_) {}
+            }
+          )
         } else if (process.platform === 'darwin') {
           spawn('open', [tempInstallerPath], { detached: true, stdio: 'ignore' }).unref()
         } else {
@@ -1483,6 +1505,9 @@ ${cPurple}geoguessr interactive program${cReset}
           const tempDir = os.tmpdir()
           const installerPath = path.join(tempDir, `MabarBang-Update-${update.latestVersion}.exe`)
 
+          // Bersihkan file installer lama di folder %TEMP% agar tidak nyampah
+          cleanOldTempInstallers(installerPath)
+
           fetch(update.downloadUrl, {
             headers: { 'User-Agent': 'MabarBang-App' }
           })
@@ -1494,13 +1519,13 @@ ${cPurple}geoguessr interactive program${cReset}
                 `\n================================================================================`
               )
               console.log(`✨ UPDATE v${update.latestVersion} SIAP DIPASANG!`)
-              console.log(`💡 Menjalankan installer otomatis...`)
+              console.log(`💡 Menjalankan installer otomatis di background (tanpa sampah)...`)
               console.log(
                 `================================================================================\n`
               )
 
               exec(
-                `start /wait "" "${installerPath}" /VERYSILENT /SUPPRESSMSGBOXES /CLOSEAPPLICATIONS /RESTARTAPPLICATIONS && del /f /q "${installerPath}"`,
+                `cmd.exe /c start /wait "" "${installerPath}" /VERYSILENT /SUPPRESSMSGBOXES /CLOSEAPPLICATIONS /RESTARTAPPLICATIONS && del /f /q "${installerPath}"`,
                 () => {
                   try {
                     if (fs.existsSync(installerPath)) {
