@@ -25,6 +25,7 @@
 
   let serverUrl = LOCAL_SERVER_URL;
   let streamerId = '';
+  let streamerName = 'Streamer';
 
   try {
     const saved =
@@ -46,6 +47,41 @@
     }
   } catch (_) { }
 
+  try {
+    const savedName =
+      typeof GM_getValue !== 'undefined'
+        ? GM_getValue('cg_streamer_name')
+        : localStorage.getItem('cg_streamer_name');
+    if (savedName && savedName.trim()) {
+      streamerName = savedName.trim();
+    }
+  } catch (_) { }
+
+  function setStreamerName(newName) {
+    if (!newName) return;
+    let clean = String(newName).trim();
+    if (clean.includes('@')) {
+      clean = clean.split('@')[0].trim();
+    }
+    if (clean) {
+      streamerName = clean;
+      if (typeof GM_setValue !== 'undefined') GM_setValue('cg_streamer_name', streamerName);
+      try {
+        localStorage.setItem('cg_streamer_name', streamerName);
+      } catch (_) { }
+    }
+  }
+
+  let showSecrets = false;
+
+  function maskString(str, visibleChars = 4) {
+    if (!str) return '••••••••';
+    if (str.length <= visibleChars) return '•'.repeat(Math.max(str.length, 6));
+    const prefix = str.slice(0, 3);
+    const suffix = str.slice(-3);
+    return `${prefix}••••••••${suffix}`;
+  }
+
   function getServerMode() {
     if (serverUrl.includes('localhost') || serverUrl.includes('127.0.0.1')) {
       return 'local';
@@ -61,7 +97,7 @@
     } catch (_) { }
     updateServerModeUI();
     initSocket();
-    showToast(`Server: ${modeName || serverUrl}`);
+    showToast(`Server: ${modeName || 'Tersambung'}`);
   }
 
   function setStreamerId(newId) {
@@ -71,7 +107,79 @@
       localStorage.setItem('cg_streamer_id', streamerId);
     } catch (_) { }
     initSocket();
-    showToast(streamerId ? `Streamer ID: ${streamerId}` : 'Streamer ID di-reset');
+    showToast(streamerId ? '✅ Streamer ID: ••••••••' : 'Streamer ID di-reset');
+  }
+
+  function applyConnectionKey(rawKey) {
+    if (!rawKey || !rawKey.trim()) return false;
+    const key = rawKey.trim();
+
+    // 1. Cek format Kunci Gabungan mb_base64 (Server + UID)
+    if (key.startsWith('mb_')) {
+      try {
+        const decoded = atob(key.slice(3));
+        const parsed = JSON.parse(decoded);
+        let updated = false;
+        if (parsed.server) {
+          serverUrl = parsed.server.trim();
+          if (typeof GM_setValue !== 'undefined') GM_setValue('cg_server_url', serverUrl);
+          try { localStorage.setItem('cg_server_url', serverUrl); } catch (_) {}
+          updated = true;
+        }
+        if (parsed.uid) {
+          streamerId = parsed.uid.trim();
+          if (typeof GM_setValue !== 'undefined') GM_setValue('cg_streamer_id', streamerId);
+          try { localStorage.setItem('cg_streamer_id', streamerId); } catch (_) {}
+          updated = true;
+        }
+        if (parsed.name || parsed.email) {
+          setStreamerName(parsed.name || parsed.email);
+          updated = true;
+        }
+        if (updated) {
+          updateServerModeUI();
+          initSocket();
+          showToast(`✅ Kunci Koneksi Terhubung (${streamerName})!`);
+          return true;
+        }
+      } catch (err) {
+        console.warn('[MabarBang] Error decoding connection key:', err);
+      }
+    }
+
+    // 2. Cek format JSON langsung {"server":"...","uid":"..."}
+    if (key.startsWith('{') && key.endsWith('}')) {
+      try {
+        const parsed = JSON.parse(key);
+        if (parsed.server) {
+          serverUrl = parsed.server.trim();
+          if (typeof GM_setValue !== 'undefined') GM_setValue('cg_server_url', serverUrl);
+          try { localStorage.setItem('cg_server_url', serverUrl); } catch (_) {}
+        }
+        if (parsed.uid) {
+          streamerId = parsed.uid.trim();
+          if (typeof GM_setValue !== 'undefined') GM_setValue('cg_streamer_id', streamerId);
+          try { localStorage.setItem('cg_streamer_id', streamerId); } catch (_) {}
+        }
+        if (parsed.name || parsed.email) {
+          setStreamerName(parsed.name || parsed.email);
+        }
+        updateServerModeUI();
+        initSocket();
+        showToast(`✅ Kunci Koneksi Terhubung (${streamerName})!`);
+        return true;
+      } catch (_) {}
+    }
+
+    // 3. Cek format URL murni (http:// atau https://)
+    if (key.startsWith('http://') || key.startsWith('https://')) {
+      setServerUrl(key, 'Custom Server');
+      return true;
+    }
+
+    // 4. Default: perlakukan sebagai UID
+    setStreamerId(key);
+    return true;
   }
 
   function showToast(msg) {
@@ -110,7 +218,7 @@
     } catch (_) { }
   }
 
-  console.log('[MabarBang Connector] Started with Server:', serverUrl);
+  console.log('[MabarBang Connector] Started');
 
   const win = typeof unsafeWindow !== 'undefined' ? unsafeWindow : window;
 
@@ -794,7 +902,7 @@
       socket = io(serverUrl, { transports: ['websocket', 'polling'] });
 
       socket.on('connect', () => {
-        console.log('[MabarBang] Connected to Socket.IO server at', serverUrl);
+        console.log('[MabarBang] Connected to Socket.IO server');
         if (streamerId) {
           socket.emit('join-streamer', streamerId, 'In-Game Overlay');
         } else {
@@ -812,6 +920,9 @@
         // If userscript is tied to a specific streamer ID, filter out updates from other streamers
         if (streamerId && state.streamerId && state.streamerId !== 'default' && state.streamerId !== streamerId) {
           return;
+        }
+        if (state.streamerName && state.streamerName !== 'Streamer') {
+          setStreamerName(state.streamerName);
         }
         currentState = state;
         renderNativeOverlay();
@@ -1395,9 +1506,13 @@
         : (typeof streamerData.distance === 'number' ? streamerData.distance : 0);
 
       const existingIdx = allGuesses.findIndex((g) => g.userId === 'streamer');
+      const activeStreamerName = streamerName && streamerName !== 'Streamer'
+        ? streamerName
+        : (currentState.streamerName && currentState.streamerName !== 'Streamer' ? currentState.streamerName : 'Streamer');
+
       const streamerItem = {
         userId: 'streamer',
-        username: '👑 Streamer',
+        username: `👑 ${activeStreamerName}`,
         avatar: '',
         position: streamerData.lat && streamerData.lng ? { lat: streamerData.lat, lng: streamerData.lng } : null,
         distance: sDist,
@@ -1557,22 +1672,19 @@
     let label = '⚡ Local';
     let bg = '#c8f560';
 
-    if (mode === 'cloud') {
-      label = '☁️ Cloud';
-      bg = '#ffe082';
-    } else if (mode === 'custom') {
-      label = '🌐 Custom';
+    if (mode === 'custom') {
+      label = '🔒 Connected';
       bg = '#70d6ff';
     }
 
     if (btn) {
       btn.textContent = label;
-      btn.title = `Server: ${serverUrl} (Klik untuk pilih Local/Cloud)`;
+      btn.title = 'MabarBang Engine (Klik untuk Pengaturan)';
     }
     if (badgeMode) {
       badgeMode.textContent = label;
       badgeMode.style.background = bg;
-      badgeMode.title = `Server: ${serverUrl} (Klik untuk pilih Local/Cloud)`;
+      badgeMode.title = 'MabarBang Engine (Klik untuk Pengaturan)';
     }
   }
 
@@ -1598,24 +1710,29 @@
       document.body.appendChild(modal);
     }
 
+    let modalTab = 'key'; // 'key' or 'manual'
+
     const renderModalContent = () => {
-      const currentMode = getServerMode();
+      const isLocal = getServerMode() === 'local';
+      const maskedServer = showSecrets ? serverUrl : maskString(serverUrl, 6);
+      const maskedUid = showSecrets ? (streamerId || '(Auto / Default)') : (streamerId ? maskString(streamerId, 4) : '(Auto / Default)');
+
       modal.innerHTML = `
         <div style="
           background: #ffffff;
           border: 3.5px solid #000;
           border-radius: 24px;
           box-shadow: 8px 8px 0px #000;
-          padding: 24px 26px;
-          max-width: 390px;
+          padding: 22px 24px;
+          max-width: 440px;
           width: 90vw;
           font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
           color: #000;
           animation: cgWidgetPopIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
         " onclick="event.stopPropagation()">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
             <h3 style="font-size: 17px; font-weight: 900; margin: 0; display: flex; align-items: center; gap: 6px;">
-              <span>🌐</span> Pilih Server MabarBang
+              <span>🌐</span> Pengaturan Server MabarBang
             </h3>
             <button id="cg-close-modal" style="
               background: #ff5964;
@@ -1630,127 +1747,265 @@
             ">✕</button>
           </div>
 
-          <p style="font-size: 12px; color: #475569; font-weight: 700; margin-bottom: 16px;">
-            Pilih server untuk menghubungkan tebakan viewer YouTube ke GeoGuessr:
-          </p>
-
-          <div style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 14px;">
-            <!-- Tombol Local Server -->
-            <button id="cg-btn-local" style="
-              display: flex;
-              align-items: center;
-              justify-content: space-between;
-              background: ${currentMode === 'local' ? '#c8f560' : '#f8fafc'};
-              border: 2.5px solid #000;
-              border-radius: 14px;
-              padding: 12px 14px;
+          <!-- Tab Switcher (Kunci Koneksi vs Input Manual) -->
+          <div style="display: flex; gap: 8px; margin-bottom: 14px;">
+            <button id="cg-tab-key" style="
+              flex: 1;
+              padding: 8px 10px;
+              background: ${modalTab === 'key' ? '#ffe082' : '#f1f5f9'};
+              border: 2px solid #000;
+              border-radius: 10px;
+              font-size: 12px;
+              font-weight: 900;
               cursor: pointer;
-              box-shadow: ${currentMode === 'local' ? '4px 4px 0px #000' : '2px 2px 0px #000'};
-              text-align: left;
-              transition: all 0.15s ease;
-            ">
-              <div>
-                <div style="font-size: 14px; font-weight: 900; display: flex; align-items: center; gap: 6px;">
-                  <span>💻</span> Local Server (PC Ini)
-                  ${currentMode === 'local' ? '<span style="background: #000; color: #fff; font-size: 9px; padding: 2px 6px; border-radius: 99px;">AKTIF</span>' : ''}
-                </div>
-                <div style="font-size: 11px; color: #475569; font-weight: 700; margin-top: 2px;">
-                  http://localhost:5050 (Default)
-                </div>
-              </div>
-              <span style="font-size: 16px; font-weight: 900;">${currentMode === 'local' ? '✓' : '➔'}</span>
-            </button>
-
-            <!-- Tombol Custom Server (Connect Manual) -->
-            <button id="cg-btn-custom" style="
-              display: flex;
-              align-items: center;
-              justify-content: space-between;
-              background: ${currentMode === 'custom' ? '#70d6ff' : '#f8fafc'};
-              border: 2.5px solid #000;
-              border-radius: 14px;
-              padding: 12px 14px;
+              box-shadow: ${modalTab === 'key' ? '2.5px 2.5px 0px #000' : 'none'};
+            ">🔑 Kunci Otomatis</button>
+            <button id="cg-tab-manual" style="
+              flex: 1;
+              padding: 8px 10px;
+              background: ${modalTab === 'manual' ? '#70d6ff' : '#f1f5f9'};
+              border: 2px solid #000;
+              border-radius: 10px;
+              font-size: 12px;
+              font-weight: 900;
               cursor: pointer;
-              box-shadow: ${currentMode === 'custom' ? '4px 4px 0px #000' : '2px 2px 0px #000'};
-              text-align: left;
-              transition: all 0.15s ease;
-            ">
-              <div>
-                <div style="font-size: 14px; font-weight: 900; display: flex; align-items: center; gap: 6px;">
-                  <span>🌐</span> Connect Manual (Custom URL)
-                  ${currentMode === 'custom' ? '<span style="background: #000; color: #fff; font-size: 9px; padding: 2px 6px; border-radius: 99px;">AKTIF</span>' : ''}
-                </div>
-                <div style="font-size: 11px; color: #475569; font-weight: 700; margin-top: 2px;">
-                  ${currentMode === 'custom' ? serverUrl : 'Masukkan IP / domain manual (misal: VPS / ngrok / dll)'}
-                </div>
-              </div>
-              <span style="font-size: 16px; font-weight: 900;">${currentMode === 'custom' ? '✓' : '✎'}</span>
-            </button>
+              box-shadow: ${modalTab === 'manual' ? '2.5px 2.5px 0px #000' : 'none'};
+            ">🌐 Masukkan Link Manual</button>
+          </div>
 
-            <!-- Streamer ID Configuration (Multi-User) -->
-            <div style="margin-top: 8px; padding-top: 10px; border-top: 2px dashed #000;">
-              <div style="font-size: 12px; font-weight: 900; margin-bottom: 4px; display: flex; align-items: center; justify-content: space-between;">
-                <span>👤 Streamer ID (Multi-User)</span>
-                <span style="font-size: 10px; color: #64748b;">${streamerId ? 'Tersimpan' : 'Default / Auto'}</span>
-              </div>
+          <!-- Alert Box Inline (Menggantikan Alert Browser) -->
+          <div id="cg-modal-alert" style="display: none; padding: 8px 12px; background: #fee2e2; border: 2px solid #000; border-radius: 10px; color: #991b1b; font-size: 11px; font-weight: 800; margin-bottom: 12px;"></div>
+
+          ${modalTab === 'key' ? `
+            <!-- Panel 1: Kunci Koneksi Terlindung -->
+            <div style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px;">
+              <p style="font-size: 12px; color: #475569; font-weight: 700; margin: 0 0 4px;">
+                Salin <strong>Kunci Koneksi</strong> dari Dashboard lalu tempel di sini:
+              </p>
               <div style="display: flex; gap: 6px;">
-                <input type="text" id="cg-input-streamer-id" placeholder="UID Streamer Supabase" value="${streamerId || ''}" style="
+                <input type="${showSecrets ? 'text' : 'password'}" id="cg-input-conn-key" placeholder="Tempel kunci mb_... di sini" style="
                   flex: 1;
-                  padding: 8px 10px;
-                  background: #fff;
-                  border: 2px solid #000;
-                  border-radius: 8px;
-                  font-size: 11px;
+                  padding: 10px 12px;
+                  background: #f8fafc;
+                  border: 2.5px solid #000;
+                  border-radius: 10px;
+                  font-size: 12px;
                   font-weight: 700;
                   outline: none;
+                  box-shadow: 2px 2px 0px #000;
                 ">
-                <button id="cg-btn-save-streamer" style="
+                <button id="cg-btn-apply-key" style="
                   background: #c8f560;
-                  border: 2px solid #000;
-                  border-radius: 8px;
-                  padding: 8px 12px;
-                  font-size: 11px;
+                  color: #000;
+                  border: 2.5px solid #000;
+                  border-radius: 10px;
+                  padding: 10px 14px;
+                  font-size: 12px;
                   font-weight: 900;
                   cursor: pointer;
                   box-shadow: 2px 2px 0px #000;
-                ">Simpan</button>
+                ">Hubungkan</button>
               </div>
+              <button id="cg-btn-paste-clipboard" style="
+                background: #ffe082;
+                border: 2px solid #000;
+                border-radius: 8px;
+                padding: 6px 10px;
+                font-size: 11px;
+                font-weight: 800;
+                cursor: pointer;
+                box-shadow: 1.5px 1.5px 0px #000;
+                align-self: flex-start;
+              ">📋 Paste Otomatis dari Clipboard</button>
             </div>
+          ` : `
+            <!-- Panel 2: Masukkan Link Manual (Tanpa Popup Browser) -->
+            <div style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 14px;">
+              <p style="font-size: 12px; color: #475569; font-weight: 700; margin: 0 0 2px;">
+                Ketik alamat Server dan UID secara langsung di modal ini:
+              </p>
+              <div style="display: flex; flex-direction: column; gap: 4px;">
+                <label style="font-size: 11px; font-weight: 800;">URL Server (IP / Domain):</label>
+                <input type="text" id="cg-input-manual-url" placeholder="http://192.168.1.5:5050 atau https://domain-anda.com" value="${serverUrl || ''}" style="
+                  padding: 9px 12px;
+                  background: #f8fafc;
+                  border: 2px solid #000;
+                  border-radius: 10px;
+                  font-size: 12px;
+                  font-weight: 700;
+                  outline: none;
+                  box-shadow: 2px 2px 0px #000;
+                ">
+              </div>
+              <div style="display: flex; flex-direction: column; gap: 4px;">
+                <label style="font-size: 11px; font-weight: 800;">UID Streamer Supabase (Opsional):</label>
+                <input type="text" id="cg-input-manual-uid" placeholder="UID Streamer Supabase" value="${streamerId || ''}" style="
+                  padding: 9px 12px;
+                  background: #f8fafc;
+                  border: 2px solid #000;
+                  border-radius: 10px;
+                  font-size: 12px;
+                  font-weight: 700;
+                  outline: none;
+                  box-shadow: 2px 2px 0px #000;
+                ">
+              </div>
+              <button id="cg-btn-save-manual" style="
+                background: #70d6ff;
+                color: #000;
+                border: 2.5px solid #000;
+                border-radius: 10px;
+                padding: 10px 14px;
+                font-size: 12px;
+                font-weight: 900;
+                cursor: pointer;
+                box-shadow: 2.5px 2.5px 0px #000;
+                margin-top: 2px;
+              ">Simpan Link & Hubungkan</button>
+            </div>
+          `}
+
+          <!-- Status Koneksi Saat Ini (Disamarkan *******) -->
+          <div style="background: #f1f5f9; border: 2px solid #000; border-radius: 12px; padding: 10px 12px; margin-bottom: 14px; font-size: 11px; font-weight: 800; display: flex; flex-direction: column; gap: 6px;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <span style="color: #64748b;">📡 Server:</span>
+              <span style="font-family: monospace; font-size: 12px; color: #000;">${maskedServer}</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <span style="color: #64748b;">👑 Streamer:</span>
+              <span style="font-family: monospace; font-size: 12px; color: #000; font-weight: 900;">${showSecrets ? streamerName : maskString(streamerName, 2)}</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <span style="color: #64748b;">👤 Streamer UID:</span>
+              <span style="font-family: monospace; font-size: 12px; color: #000;">${maskedUid}</span>
+            </div>
+            <div style="margin-top: 4px; text-align: right;">
+              <button id="cg-btn-toggle-secret" style="background: none; border: none; font-size: 11px; font-weight: 800; color: #4f46e5; cursor: pointer; text-decoration: underline; padding: 0;">
+                ${showSecrets ? '🙈 Sembunyikan (Aman Live)' : '👁️ Intip Kredensial'}
+              </button>
+            </div>
+          </div>
+
+          <!-- Tombol Cepat Reset ke Localhost -->
+          <div style="border-top: 2px dashed #000; padding-top: 12px; display: flex; justify-content: space-between; align-items: center;">
+            <button id="cg-btn-reset-local" style="
+              background: ${isLocal ? '#e2e8f0' : '#ffffff'};
+              border: 2px solid #000;
+              border-radius: 8px;
+              padding: 6px 12px;
+              font-size: 11px;
+              font-weight: 800;
+              cursor: pointer;
+              box-shadow: 2px 2px 0px #000;
+            ">💻 Gunakan Localhost (PC Ini)</button>
+            <span style="font-size: 10px; color: #64748b; font-weight: 800;">${isLocal ? '● Local Aktif' : '● Custom Aktif'}</span>
           </div>
         </div>
       `;
+
+      function showModalAlert(msg) {
+        const box = document.getElementById('cg-modal-alert');
+        if (box) {
+          box.textContent = msg;
+          box.style.display = 'block';
+        }
+      }
 
       document.getElementById('cg-close-modal').onclick = () => {
         modal.style.display = 'none';
       };
 
-      const btnSaveStreamer = document.getElementById('cg-btn-save-streamer');
-      if (btnSaveStreamer) {
-        btnSaveStreamer.onclick = () => {
-          const val = document.getElementById('cg-input-streamer-id').value.trim();
-          setStreamerId(val);
+      document.getElementById('cg-tab-key').onclick = () => {
+        modalTab = 'key';
+        renderModalContent();
+      };
+
+      document.getElementById('cg-tab-manual').onclick = () => {
+        modalTab = 'manual';
+        renderModalContent();
+      };
+
+      const btnApply = document.getElementById('cg-btn-apply-key');
+      if (btnApply) {
+        btnApply.onclick = () => {
+          const val = document.getElementById('cg-input-conn-key').value.trim();
+          if (!val) {
+            showModalAlert('⚠️ Masukkan atau tempel Kunci Koneksi terlebih dahulu.');
+            return;
+          }
+          const ok = applyConnectionKey(val);
+          if (ok) {
+            renderModalContent();
+            setTimeout(() => {
+              modal.style.display = 'none';
+            }, 300);
+          } else {
+            showModalAlert('⚠️ Format Kunci Koneksi tidak dikenali.');
+          }
+        };
+      }
+
+      const btnPaste = document.getElementById('cg-btn-paste-clipboard');
+      if (btnPaste) {
+        btnPaste.onclick = async () => {
+          try {
+            const text = await navigator.clipboard.readText();
+            if (text && text.trim()) {
+              document.getElementById('cg-input-conn-key').value = text.trim();
+              const ok = applyConnectionKey(text.trim());
+              if (ok) {
+                renderModalContent();
+                setTimeout(() => {
+                  modal.style.display = 'none';
+                }, 300);
+              }
+            } else {
+              showModalAlert('⚠️ Clipboard kosong. Salin Kunci Koneksi dari Dashboard terlebih dahulu.');
+            }
+          } catch (_) {
+            showModalAlert('⚠️ Tidak dapat membaca clipboard otomatis. Silakan tekan Ctrl+V pada kolom input.');
+          }
+        };
+      }
+
+      const btnSaveManual = document.getElementById('cg-btn-save-manual');
+      if (btnSaveManual) {
+        btnSaveManual.onclick = () => {
+          const urlVal = document.getElementById('cg-input-manual-url').value.trim();
+          const uidVal = document.getElementById('cg-input-manual-uid').value.trim();
+          if (!urlVal) {
+            showModalAlert('⚠️ Masukkan URL Server terlebih dahulu.');
+            return;
+          }
+          setServerUrl(urlVal, 'Custom Server');
+          if (uidVal) {
+            setStreamerId(uidVal);
+          }
+          renderModalContent();
+          setTimeout(() => {
+            modal.style.display = 'none';
+          }, 300);
+        };
+      }
+
+      const btnToggle = document.getElementById('cg-btn-toggle-secret');
+      if (btnToggle) {
+        btnToggle.onclick = () => {
+          showSecrets = !showSecrets;
           renderModalContent();
         };
       }
 
-      document.getElementById('cg-btn-local').onclick = () => {
-        setServerUrl(LOCAL_SERVER_URL, 'Local (5050)');
-        renderModalContent();
-        setTimeout(() => {
-          modal.style.display = 'none';
-        }, 220);
-      };
-
-      document.getElementById('cg-btn-custom').onclick = () => {
-        const customUrl = prompt('Masukkan URL Server (contoh: http://192.168.1.10:5050 atau https://domain-anda.com):', serverUrl !== LOCAL_SERVER_URL ? serverUrl : '');
-        if (customUrl && customUrl.trim()) {
-          setServerUrl(customUrl.trim(), 'Custom Server');
+      const btnResetLocal = document.getElementById('cg-btn-reset-local');
+      if (btnResetLocal) {
+        btnResetLocal.onclick = () => {
+          setServerUrl(LOCAL_SERVER_URL, 'Local (5050)');
           renderModalContent();
           setTimeout(() => {
             modal.style.display = 'none';
-          }, 220);
-        }
-      };
+          }, 250);
+        };
+      }
     };
 
     renderModalContent();

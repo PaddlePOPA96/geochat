@@ -811,7 +811,7 @@
             <div id="streamerNameText" style="font-size: 13px; font-weight: 900; color: #000;">Streamer</div>
             <div id="streamerEmailText" style="font-size: 11px; font-weight: 700; color: #64748b;">user@supabase.co</div>
           </div>
-          <button class="btn btn-yellow btn-sm" onclick="copyStreamerUid()" style="padding: 4px 10px; font-size: 11px; margin-left: 4px;" title="Salin Streamer UID (untuk Userscript GeoGuessr)">📋 Salin UID</button>
+          <button class="btn btn-yellow btn-sm" onclick="copyStreamerUid()" style="padding: 4px 10px; font-size: 11px; margin-left: 4px;" title="Salin Kunci Koneksi Otomatis (Server + UID) untuk Userscript GeoGuessr">📋 Salin Kunci Koneksi</button>
           <button class="btn btn-red btn-sm" onclick="logoutSupabase()" style="padding: 4px 10px; font-size: 11px;" title="Keluar dari akun">Logout</button>
         </div>
         <button class="btn btn-yellow btn-sm" onclick="openStreamConnectModal()">📡 Koneksi Live Stream (YT / TikTok / Saweria)</button>
@@ -1301,13 +1301,24 @@
 
     function copyStreamerUid() {
       if (!authUser || !authUser.id) {
-        alert('Streamer UID belum tersedia. Silakan login terlebih dahulu.');
+        alert('Kunci koneksi belum siap. Silakan login terlebih dahulu.');
         return;
       }
-      navigator.clipboard.writeText(authUser.id).then(() => {
-        alert(`✅ Streamer UID berhasil disalin!\n\n${authUser.id}\n\nMasukkan UID ini di pengaturan Userscript GeoGuessr Anda.`);
+      // Ambil nama depan dari email (contoh: arvana@hung.com -> arvana)
+      const emailPrefix = authUser.email ? authUser.email.split('@')[0] : '';
+      const streamerName = emailPrefix || authUser.user_metadata?.name || 'Streamer';
+
+      const connData = {
+        server: window.location.origin,
+        uid: authUser.id,
+        name: streamerName
+      };
+      const connectionKey = 'mb_' + btoa(JSON.stringify(connData));
+
+      navigator.clipboard.writeText(connectionKey).then(() => {
+        alert(`✅ Kunci Koneksi Berhasil Disalin (${streamerName})!\n\nKunci ini sudah otomatis mencakup URL Server dan UID Streamer Anda.\nCukup tempelkan (Paste) ke Userscript GeoGuessr Anda.`);
       }).catch(() => {
-        prompt('Salin Streamer UID Anda secara manual:', authUser.id);
+        prompt('Salin Kunci Koneksi Anda secara manual:', connectionKey);
       });
     }
 

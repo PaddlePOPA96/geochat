@@ -962,7 +962,7 @@ app.post('/api/geoguessr/update', (req, res) => {
 
     mgr.roundGuesses['streamer'] = {
       userId: 'streamer',
-      username: '👑 Streamer',
+      username: `👑 ${mgr.streamerName || 'Streamer'}`,
       avatar: '',
       position: streamerPosition,
       distance: rDist,
@@ -1020,7 +1020,7 @@ app.post('/api/game/toggle-coordinates', (req, res) => {
 
 // Test Bulk Pins Injection Endpoint (for stress test 1k / 10k pins, disabled in production)
 app.post('/api/test/inject-pins', (req, res) => {
-  if (process.env.NODE_ENV === 'production') {
+  if (process.env.NODE_ENV !== 'test' && process.env.NODE_ENV !== 'development') {
     res.status(403).json({ error: 'Endpoint uji coba dinonaktifkan di mode produksi' })
     return
   }
