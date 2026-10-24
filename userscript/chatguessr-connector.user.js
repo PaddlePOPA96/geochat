@@ -12,7 +12,6 @@
 // @grant        unsafeWindow
 // @connect      localhost
 // @connect      127.0.0.1
-// @connect      geoindo.my.id
 // @require      https://cdn.socket.io/4.7.5/socket.io.min.js
 // @updateURL    https://raw.githubusercontent.com/PaddlePOPA96/geochat/main/userscript/chatguessr-connector.user.js
 // @downloadURL  https://raw.githubusercontent.com/PaddlePOPA96/geochat/main/userscript/chatguessr-connector.user.js
