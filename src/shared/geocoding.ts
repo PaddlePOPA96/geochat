@@ -55,7 +55,7 @@ async function processNominatimQueue() {
       const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(item.query)}&format=json&limit=1`
       const res = await axios.get(url, {
         headers: {
-          'User-Agent': 'MabarBang/3.3.5 (https://geoindo.my.id)',
+          'User-Agent': 'MabarBang/3.3.6 (https://geoindo.my.id)',
           'Accept-Language': 'id,en;q=0.9'
         },
         timeout: 4000

@@ -16,6 +16,5 @@ test-10000-pins.*
 # Agents
 .agents
 .agents/*
-
 GEMINI.md
 AGENTS.md

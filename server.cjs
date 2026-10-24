@@ -186500,7 +186500,7 @@ async function processNominatimQueue() {
       const url2 = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(item.query)}&format=json&limit=1`;
       const res = await axios_default.get(url2, {
         headers: {
-          "User-Agent": "MabarBang/3.3.5 (https://geoindo.my.id)",
+          "User-Agent": "MabarBang/3.3.6 (https://geoindo.my.id)",
           "Accept-Language": "id,en;q=0.9"
         },
         timeout: 4e3
@@ -188348,7 +188348,7 @@ var embeddedDashboardHtml = `<!DOCTYPE html>
 var embeddedUserscript = `// ==UserScript==
 // @name         MabarBang GeoGuessr Connector
 // @namespace    https://github.com/PaddlePOPA96/geochat
-// @version      3.3.5
+// @version      3.3.6
 // @description  Otomatis mengirim data ronde GeoGuessr ke Server MabarBang, menampilkan Scoreboard Overlay & PIN tebakan penonton di peta GeoGuessr
 // @author       kikobooo x arvana prod
 // @match        *://*.geoguessr.com/*
@@ -191559,7 +191559,7 @@ app.get(["/mabarbang.user.js", "/chatguessr.user.js", "/userscript"], (_req, res
 app.get("/", (_req, res) => {
   res.redirect("/dashboard");
 });
-var APP_VERSION = "3.3.5";
+var APP_VERSION = "3.3.6";
 var GITHUB_REPO = "PaddlePOPA96/geochat";
 var cachedUpdateInfo = {
   hasUpdate: false,

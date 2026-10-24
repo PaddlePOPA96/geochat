@@ -1,5 +1,5 @@
 #ifndef AppVersion
-#define AppVersion "3.3.5"
+#define AppVersion "3.3.6"
 #endif
 
 ; Script Inno Setup untuk MabarBang (Per-User / Tanpa UAC Admin)
