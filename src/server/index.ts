@@ -1051,7 +1051,7 @@ app.get(['/dashboard', '/dashboard/'], (_req, res) => {
 })
 
 // Serve Userscript directly so Tampermonkey can auto-update or @require it live
-app.get(['/chatguessr.user.js', '/userscript'], (_req, res) => {
+app.get(['/mabarbang.user.js', '/chatguessr.user.js', '/userscript'], (_req, res) => {
   const scriptCandidates = [
     path.resolve(__dirname, '../../userscript/chatguessr-connector.user.js'),
     path.join(process.cwd(), 'userscript/chatguessr-connector.user.js'),

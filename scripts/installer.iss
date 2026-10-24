@@ -22,7 +22,6 @@ UninstallDisplayIcon={app}\MabarBang.exe
 
 [Files]
 Source: "bin\MabarBang.exe"; DestDir: "{app}"; Flags: ignoreversion
-Source: "run.bat"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
 Name: "{userdesktop}\MabarBang"; Filename: "{app}\MabarBang.exe"

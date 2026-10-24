@@ -55,7 +55,7 @@ async function processNominatimQueue() {
       const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(item.query)}&format=json&limit=1`
       const res = await axios.get(url, {
         headers: {
-          'User-Agent': 'ChatGuessr-YouTube-Bot/1.0 (https://chatguessr.com)',
+          'User-Agent': 'MabarBang-Bot/3.3.0 (https://github.com/PaddlePOPA96/geochat)',
           'Accept-Language': 'id,en;q=0.9'
         },
         timeout: 4000

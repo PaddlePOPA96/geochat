@@ -2,7 +2,7 @@ import fs from 'fs'
 import { execSync } from 'child_process'
 import path from 'path'
 
-console.log('🚀 Building ChatGuessr Standalone Executable...')
+console.log('🚀 Building MabarBang Standalone Executable...')
 
 // 1. Generate embedded HTML templates
 console.log('1. Embedding dashboard & overlay templates...')

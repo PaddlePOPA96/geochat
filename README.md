@@ -32,15 +32,13 @@ Tidak perlu setup koding atau Node.js! Anda cukup mengunduh installer resmi dari
 
 ### 1. Windows
 
-- **Menggunakan Launcher / Batch File:**
-  Cukup klik dua kali `run.bat` atau jalankan via terminal:
-  ```cmd
-  run.bat
-  ```
-  *(Otomatis membuka blokir file internet jika diperlukan dan menjalankan `MabarBang.exe`)*
-
 - **Menggunakan Executable Langsung:**
   Jalankan `MabarBang.exe` yang ada di folder root atau di dalam folder `bin/mabarbang/`.
+
+- **Atau via Terminal:**
+  ```bash
+  npm start
+  ```
 
 ---
 

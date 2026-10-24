@@ -185989,7 +185989,7 @@ async function processNominatimQueue() {
       const url2 = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(item.query)}&format=json&limit=1`;
       const res = await axios_default.get(url2, {
         headers: {
-          "User-Agent": "ChatGuessr-YouTube-Bot/1.0 (https://chatguessr.com)",
+          "User-Agent": "MabarBang-Bot/3.3.0 (https://github.com/PaddlePOPA96/geochat)",
           "Accept-Language": "id,en;q=0.9"
         },
         timeout: 4e3
@@ -187954,7 +187954,7 @@ var embeddedUserscript = `// ==UserScript==
     if (!map) return;
     const isNewMap = map !== globalMap;
     globalMap = map;
-    console.log('[ChatGuessr] Map instance hooked:', map, 'isNewMap:', isNewMap);
+    console.log('[MabarBang] Map instance hooked:', map, 'isNewMap:', isNewMap);
 
     if (
       showPinsEnabled &&
@@ -187985,7 +187985,7 @@ var embeddedUserscript = `// ==UserScript==
         }
       };
       g.maps.Map.prototype = OriginalMap.prototype;
-      console.log('[ChatGuessr] Google Maps successfully hooked for Viewer Pins!');
+      console.log('[MabarBang] Google Maps successfully hooked for Viewer Pins!');
     } else {
       setTimeout(hookGoogleMaps, 300);
     }
@@ -188027,7 +188027,7 @@ var embeddedUserscript = `// ==UserScript==
         try {
           marker = new OverlayClass(p.position, markerContent, globalMap);
         } catch (err) {
-          console.warn('[ChatGuessr] CustomMarkerOverlay failed, falling back:', err);
+          console.warn('[MabarBang] CustomMarkerOverlay failed, falling back:', err);
         }
       }
 
@@ -188084,7 +188084,7 @@ var embeddedUserscript = `// ==UserScript==
       }
     });
 
-    console.log(\`[ChatGuessr] Placed \${guessMarkers.length} viewer pins on map!\`);
+    console.log(\`[MabarBang] Placed \${guessMarkers.length} viewer pins on map!\`);
   }
 
   function clearViewerPins() {
@@ -188247,7 +188247,7 @@ var embeddedUserscript = `// ==UserScript==
           })
           .catch(() => { });
       } catch (err) {
-        console.error('[ChatGuessr] Error parsing fetch response:', err);
+        console.error('[MabarBang] Error parsing fetch response:', err);
       }
     }
 
@@ -188283,7 +188283,7 @@ var embeddedUserscript = `// ==UserScript==
       const gameId = match[2];
       if (gameId !== activeGameId) {
         activeGameId = gameId;
-        console.log('[ChatGuessr] Detected active game URL:', gameId);
+        console.log('[MabarBang] Detected active game URL:', gameId);
         fetchGameData(gameId);
       }
       if (!pollingInterval) {
@@ -188320,7 +188320,7 @@ var embeddedUserscript = `// ==UserScript==
       if (nextBtn && !nextBtn.__cg_attached) {
         nextBtn.__cg_attached = true;
         nextBtn.addEventListener('click', () => {
-          console.log('[ChatGuessr] Streamer clicked Next Round button!');
+          console.log('[MabarBang] Streamer clicked Next Round button!');
           latestStreamerGuess = null;
           clearViewerPins();
           lastRoundResults = null;
@@ -188336,7 +188336,7 @@ var embeddedUserscript = `// ==UserScript==
       if (playAgainBtn && !playAgainBtn.__cg_attached) {
         playAgainBtn.__cg_attached = true;
         playAgainBtn.addEventListener('click', () => {
-          console.log('[ChatGuessr] Streamer clicked Play Again button!');
+          console.log('[MabarBang] Streamer clicked Play Again button!');
           latestStreamerGuess = null;
           clearViewerPins();
           lastRoundResults = null;
@@ -188443,7 +188443,7 @@ var embeddedUserscript = `// ==UserScript==
       lastHandledGuessesCount = guessesCount;
       lastHandledRound = finishedRound;
 
-      console.log(\`[ChatGuessr] Round \${finishedRound} FINISHED! Forwarding results with Streamer score to server...\`, {
+      console.log(\`[MabarBang] Round \${finishedRound} FINISHED! Forwarding results with Streamer score to server...\`, {
         token,
         round: finishedRound,
         location: finishedLocation,
@@ -188472,7 +188472,7 @@ var embeddedUserscript = `// ==UserScript==
       if (currentRound !== lastHandledRound && currentLoc) {
         lastHandledRound = currentRound;
         latestStreamerGuess = null;
-        console.log(\`[ChatGuessr] Round \${currentRound} PLAYING! Opening guesses...\`, {
+        console.log(\`[MabarBang] Round \${currentRound} PLAYING! Opening guesses...\`, {
           token,
           round: currentRound,
           location: currentLoc
@@ -188536,7 +188536,7 @@ var embeddedUserscript = `// ==UserScript==
 
   function initSocket() {
     if (typeof io === 'undefined') {
-      console.warn('[ChatGuessr] Socket.IO library not yet loaded, retrying...');
+      console.warn('[MabarBang] Socket.IO library not yet loaded, retrying...');
       setTimeout(initSocket, 1000);
       return;
     }
@@ -188546,7 +188546,7 @@ var embeddedUserscript = `// ==UserScript==
       socket = io(serverUrl, { transports: ['websocket', 'polling'] });
 
       socket.on('connect', () => {
-        console.log('[ChatGuessr] Connected to Socket.IO server at', serverUrl);
+        console.log('[MabarBang] Connected to Socket.IO server at', serverUrl);
         if (streamerId) {
           socket.emit('join-streamer', streamerId, 'In-Game Overlay');
         } else {
@@ -188556,7 +188556,7 @@ var embeddedUserscript = `// ==UserScript==
       });
 
       socket.on('disconnect', () => {
-        console.log('[ChatGuessr] Disconnected from Socket.IO server');
+        console.log('[MabarBang] Disconnected from Socket.IO server');
         updateBadgeStatus(false);
       });
 
@@ -188594,7 +188594,7 @@ var embeddedUserscript = `// ==UserScript==
         if (countEl) countEl.textContent = \`\${totalGuesses} Guesses\`;
       });
     } catch (e) {
-      console.error('[ChatGuessr] Socket.IO initialization error:', e);
+      console.error('[MabarBang] Socket.IO initialization error:', e);
     }
   }
 
@@ -190638,7 +190638,7 @@ app.get(["/dashboard", "/dashboard/"], (_req, res) => {
     res.setHeader("Content-Type", "text/html; charset=utf-8").send(embeddedDashboardHtml);
   }
 });
-app.get(["/chatguessr.user.js", "/userscript"], (_req, res) => {
+app.get(["/mabarbang.user.js", "/chatguessr.user.js", "/userscript"], (_req, res) => {
   const scriptCandidates = [
     import_path3.default.resolve(__dirname, "../../userscript/chatguessr-connector.user.js"),
     import_path3.default.join(process.cwd(), "userscript/chatguessr-connector.user.js"),

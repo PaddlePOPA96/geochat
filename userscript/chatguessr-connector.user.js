@@ -207,7 +207,7 @@
     if (!map) return;
     const isNewMap = map !== globalMap;
     globalMap = map;
-    console.log('[ChatGuessr] Map instance hooked:', map, 'isNewMap:', isNewMap);
+    console.log('[MabarBang] Map instance hooked:', map, 'isNewMap:', isNewMap);
 
     if (
       showPinsEnabled &&
@@ -238,7 +238,7 @@
         }
       };
       g.maps.Map.prototype = OriginalMap.prototype;
-      console.log('[ChatGuessr] Google Maps successfully hooked for Viewer Pins!');
+      console.log('[MabarBang] Google Maps successfully hooked for Viewer Pins!');
     } else {
       setTimeout(hookGoogleMaps, 300);
     }
@@ -280,7 +280,7 @@
         try {
           marker = new OverlayClass(p.position, markerContent, globalMap);
         } catch (err) {
-          console.warn('[ChatGuessr] CustomMarkerOverlay failed, falling back:', err);
+          console.warn('[MabarBang] CustomMarkerOverlay failed, falling back:', err);
         }
       }
 
@@ -337,7 +337,7 @@
       }
     });
 
-    console.log(`[ChatGuessr] Placed ${guessMarkers.length} viewer pins on map!`);
+    console.log(`[MabarBang] Placed ${guessMarkers.length} viewer pins on map!`);
   }
 
   function clearViewerPins() {
@@ -500,7 +500,7 @@
           })
           .catch(() => { });
       } catch (err) {
-        console.error('[ChatGuessr] Error parsing fetch response:', err);
+        console.error('[MabarBang] Error parsing fetch response:', err);
       }
     }
 
@@ -536,7 +536,7 @@
       const gameId = match[2];
       if (gameId !== activeGameId) {
         activeGameId = gameId;
-        console.log('[ChatGuessr] Detected active game URL:', gameId);
+        console.log('[MabarBang] Detected active game URL:', gameId);
         fetchGameData(gameId);
       }
       if (!pollingInterval) {
@@ -573,7 +573,7 @@
       if (nextBtn && !nextBtn.__cg_attached) {
         nextBtn.__cg_attached = true;
         nextBtn.addEventListener('click', () => {
-          console.log('[ChatGuessr] Streamer clicked Next Round button!');
+          console.log('[MabarBang] Streamer clicked Next Round button!');
           latestStreamerGuess = null;
           clearViewerPins();
           lastRoundResults = null;
@@ -589,7 +589,7 @@
       if (playAgainBtn && !playAgainBtn.__cg_attached) {
         playAgainBtn.__cg_attached = true;
         playAgainBtn.addEventListener('click', () => {
-          console.log('[ChatGuessr] Streamer clicked Play Again button!');
+          console.log('[MabarBang] Streamer clicked Play Again button!');
           latestStreamerGuess = null;
           clearViewerPins();
           lastRoundResults = null;
@@ -696,7 +696,7 @@
       lastHandledGuessesCount = guessesCount;
       lastHandledRound = finishedRound;
 
-      console.log(`[ChatGuessr] Round ${finishedRound} FINISHED! Forwarding results with Streamer score to server...`, {
+      console.log(`[MabarBang] Round ${finishedRound} FINISHED! Forwarding results with Streamer score to server...`, {
         token,
         round: finishedRound,
         location: finishedLocation,
@@ -725,7 +725,7 @@
       if (currentRound !== lastHandledRound && currentLoc) {
         lastHandledRound = currentRound;
         latestStreamerGuess = null;
-        console.log(`[ChatGuessr] Round ${currentRound} PLAYING! Opening guesses...`, {
+        console.log(`[MabarBang] Round ${currentRound} PLAYING! Opening guesses...`, {
           token,
           round: currentRound,
           location: currentLoc
@@ -789,7 +789,7 @@
 
   function initSocket() {
     if (typeof io === 'undefined') {
-      console.warn('[ChatGuessr] Socket.IO library not yet loaded, retrying...');
+      console.warn('[MabarBang] Socket.IO library not yet loaded, retrying...');
       setTimeout(initSocket, 1000);
       return;
     }
@@ -799,7 +799,7 @@
       socket = io(serverUrl, { transports: ['websocket', 'polling'] });
 
       socket.on('connect', () => {
-        console.log('[ChatGuessr] Connected to Socket.IO server at', serverUrl);
+        console.log('[MabarBang] Connected to Socket.IO server at', serverUrl);
         if (streamerId) {
           socket.emit('join-streamer', streamerId, 'In-Game Overlay');
         } else {
@@ -809,7 +809,7 @@
       });
 
       socket.on('disconnect', () => {
-        console.log('[ChatGuessr] Disconnected from Socket.IO server');
+        console.log('[MabarBang] Disconnected from Socket.IO server');
         updateBadgeStatus(false);
       });
 
@@ -847,7 +847,7 @@
         if (countEl) countEl.textContent = `${totalGuesses} Guesses`;
       });
     } catch (e) {
-      console.error('[ChatGuessr] Socket.IO initialization error:', e);
+      console.error('[MabarBang] Socket.IO initialization error:', e);
     }
   }
 
