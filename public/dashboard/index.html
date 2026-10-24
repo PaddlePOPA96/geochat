@@ -1458,8 +1458,9 @@
         else if (rank === 3) rankClass = 'rank-3';
 
         const rankBadge = `<span class="rank-pill ${rankClass}">${rank}</span>`;
-        const avatar = item.avatar 
-          ? `<img class="avatar-circle" src="${item.avatar}" alt="" />` 
+        const isSafeAvatar = item.avatar && /^(https?:\/\/|data:image\/)/i.test(item.avatar.trim());
+        const avatar = isSafeAvatar 
+          ? `<img class="avatar-circle" src="${escapeHtml(item.avatar.trim())}" alt="" />` 
           : `<div class="avatar-circle">👤</div>`;
         const distance = currentView === 'round' 
           ? `${item.distance} km` 
@@ -1627,7 +1628,12 @@
 
     function escapeHtml(str) {
       if (!str) return '';
-      return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
     }
 
     // =========================================================================

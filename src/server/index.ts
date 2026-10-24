@@ -35,15 +35,41 @@ import { saveSessionLeaderboard, verifySupabaseUser, getStreamerLeaderboardHisto
 export { resolveLocation, parseCoordinates }
 
 const app = express()
+const isAllowedOrigin = (origin: string | undefined): boolean => {
+  if (!origin) return true
+  try {
+    const parsed = new URL(origin)
+    const hostname = parsed.hostname.toLowerCase()
+    if (hostname === 'localhost' || hostname === '127.0.0.1') return true
+    if (/^(192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+|172\.(1[6-9]|2\d|3[0-1])\.\d+\.\d+)$/.test(hostname)) return true
+    if (hostname === 'geoguessr.com' || hostname.endsWith('.geoguessr.com')) return true
+    return false
+  } catch (_) {
+    return false
+  }
+}
+
 const server = http.createServer(app)
 const io = new SocketIOServer(server, {
   cors: {
-    origin: '*',
+    origin: (origin, callback) => {
+      callback(null, isAllowedOrigin(origin))
+    },
     methods: ['GET', 'POST']
   }
 })
 
-app.use(cors())
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      if (isAllowedOrigin(origin)) {
+        callback(null, true)
+      } else {
+        callback(new Error('Akses diblokir oleh kebijakan keamanan CORS MabarBang.'))
+      }
+    }
+  })
+)
 app.use(express.json({ limit: '50mb' }))
 app.use(express.urlencoded({ extended: true, limit: '50mb' }))
 
@@ -770,10 +796,11 @@ app.get('/api/state', (req, res) => {
 // Provide Supabase config from .env to frontend
 app.get('/api/auth/config', (_req, res) => {
   const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || ''
-  const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || process.env.SUPABASE_KEY || ''
+  const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || ''
   res.json({
     supabaseUrl,
-    supabaseAnonKey
+    supabaseAnonKey,
+    configured: !!(supabaseUrl && supabaseAnonKey)
   })
 })
 
@@ -991,8 +1018,12 @@ app.post('/api/game/toggle-coordinates', (req, res) => {
   res.json({ success: true, allowCoordinates: mgr.allowCoordinates })
 })
 
-// Test Bulk Pins Injection Endpoint (for stress test 1k / 10k pins)
+// Test Bulk Pins Injection Endpoint (for stress test 1k / 10k pins, disabled in production)
 app.post('/api/test/inject-pins', (req, res) => {
+  if (process.env.NODE_ENV === 'production') {
+    res.status(403).json({ error: 'Endpoint uji coba dinonaktifkan di mode produksi' })
+    return
+  }
   const { pins, location, round, mapName, streamerId } = req.body
   if (!Array.isArray(pins) || pins.length === 0) {
     res.status(400).json({ error: 'pins array is required' })
@@ -1300,47 +1331,7 @@ ${cPurple}geoguessr interactive program${cReset}
       console.log(`📥 Download Link  : ${update.downloadUrl}`)
       console.log(`🔗 Catatan Rilis  : ${update.releaseUrl}`)
 
-      // Otomatis download & update installer di background jika user memakai Windows (dengan auto-delete tanpa sampah)
-      if (process.platform === 'win32' && update.downloadUrl.endsWith('.exe')) {
-        console.log(`🚀 Men-download update otomatis di background...`)
-        try {
-          const tempDir = os.tmpdir()
-          const installerPath = path.join(tempDir, `MabarBang-Update-${update.latestVersion}.exe`)
-          
-          // Bersihkan file installer lama di folder temp agar tidak menumpuk
-          try {
-            const files = fs.readdirSync(tempDir)
-            for (const file of files) {
-              if (file.startsWith('MabarBang-Update-') && file.endsWith('.exe') && file !== path.basename(installerPath)) {
-                try { fs.unlinkSync(path.join(tempDir, file)) } catch (_) {}
-              }
-            }
-          } catch (_) {}
-
-          fetch(update.downloadUrl).then(async (downloadRes) => {
-            if (!downloadRes.ok) throw new Error(`HTTP ${downloadRes.status}`)
-            const buffer = Buffer.from(await downloadRes.arrayBuffer())
-            fs.writeFileSync(installerPath, buffer)
-            console.log(`\n================================================================================`)
-            console.log(`✨ UPDATE v${update.latestVersion} SIAP DI-INSTALL!`)
-            console.log(`💡 Menjalankan installer dan membersihkan file sementara otomatis...`)
-            console.log(`================================================================================\n`)
-            
-            // Jalankan installer /VERYSILENT /SUPPRESSMSGBOXES lalu otomatis hapus file installer setelah selesai
-            exec(`start /wait "" "${installerPath}" /VERYSILENT /SUPPRESSMSGBOXES && del /f /q "${installerPath}"`, () => {
-              try {
-                if (fs.existsSync(installerPath)) {
-                  fs.unlinkSync(installerPath)
-                }
-              } catch (_) {}
-            })
-          }).catch(err => {
-            console.warn(`⚠️ Gagal download update otomatis (${err.message}). Silakan unduh manual: ${update.downloadUrl}`)
-          })
-        } catch (e) {
-          // ignore background update error
-        }
-      }
+      console.log(`💡 Streamer dapat mengunduh installer resmi langsung melalui Dashboard atau tautan di atas.`)
     } else {
       console.log(`✅ Aplikasi sudah menggunakan versi terbaru (v${APP_VERSION})`)
     }

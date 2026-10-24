@@ -492,121 +492,6 @@ var require_browser = __commonJS({
   }
 });
 
-// node_modules/has-flag/index.js
-var require_has_flag = __commonJS({
-  "node_modules/has-flag/index.js"(exports2, module2) {
-    "use strict";
-    module2.exports = (flag, argv = process.argv) => {
-      const prefix = flag.startsWith("-") ? "" : flag.length === 1 ? "-" : "--";
-      const position = argv.indexOf(prefix + flag);
-      const terminatorPosition = argv.indexOf("--");
-      return position !== -1 && (terminatorPosition === -1 || position < terminatorPosition);
-    };
-  }
-});
-
-// node_modules/supports-color/index.js
-var require_supports_color = __commonJS({
-  "node_modules/supports-color/index.js"(exports2, module2) {
-    "use strict";
-    var os4 = require("os");
-    var tty = require("tty");
-    var hasFlag = require_has_flag();
-    var { env } = process;
-    var forceColor;
-    if (hasFlag("no-color") || hasFlag("no-colors") || hasFlag("color=false") || hasFlag("color=never")) {
-      forceColor = 0;
-    } else if (hasFlag("color") || hasFlag("colors") || hasFlag("color=true") || hasFlag("color=always")) {
-      forceColor = 1;
-    }
-    if ("FORCE_COLOR" in env) {
-      if (env.FORCE_COLOR === "true") {
-        forceColor = 1;
-      } else if (env.FORCE_COLOR === "false") {
-        forceColor = 0;
-      } else {
-        forceColor = env.FORCE_COLOR.length === 0 ? 1 : Math.min(parseInt(env.FORCE_COLOR, 10), 3);
-      }
-    }
-    function translateLevel(level) {
-      if (level === 0) {
-        return false;
-      }
-      return {
-        level,
-        hasBasic: true,
-        has256: level >= 2,
-        has16m: level >= 3
-      };
-    }
-    function supportsColor(haveStream, streamIsTTY) {
-      if (forceColor === 0) {
-        return 0;
-      }
-      if (hasFlag("color=16m") || hasFlag("color=full") || hasFlag("color=truecolor")) {
-        return 3;
-      }
-      if (hasFlag("color=256")) {
-        return 2;
-      }
-      if (haveStream && !streamIsTTY && forceColor === void 0) {
-        return 0;
-      }
-      const min = forceColor || 0;
-      if (env.TERM === "dumb") {
-        return min;
-      }
-      if (process.platform === "win32") {
-        const osRelease = os4.release().split(".");
-        if (Number(osRelease[0]) >= 10 && Number(osRelease[2]) >= 10586) {
-          return Number(osRelease[2]) >= 14931 ? 3 : 2;
-        }
-        return 1;
-      }
-      if ("CI" in env) {
-        if (["TRAVIS", "CIRCLECI", "APPVEYOR", "GITLAB_CI", "GITHUB_ACTIONS", "BUILDKITE"].some((sign) => sign in env) || env.CI_NAME === "codeship") {
-          return 1;
-        }
-        return min;
-      }
-      if ("TEAMCITY_VERSION" in env) {
-        return /^(9\.(0*[1-9]\d*)\.|\d{2,}\.)/.test(env.TEAMCITY_VERSION) ? 1 : 0;
-      }
-      if (env.COLORTERM === "truecolor") {
-        return 3;
-      }
-      if ("TERM_PROGRAM" in env) {
-        const version2 = parseInt((env.TERM_PROGRAM_VERSION || "").split(".")[0], 10);
-        switch (env.TERM_PROGRAM) {
-          case "iTerm.app":
-            return version2 >= 3 ? 3 : 2;
-          case "Apple_Terminal":
-            return 2;
-        }
-      }
-      if (/-256(color)?$/i.test(env.TERM)) {
-        return 2;
-      }
-      if (/^screen|^xterm|^vt100|^vt220|^rxvt|color|ansi|cygwin|linux/i.test(env.TERM)) {
-        return 1;
-      }
-      if ("COLORTERM" in env) {
-        return 1;
-      }
-      return min;
-    }
-    function getSupportLevel(stream5) {
-      const level = supportsColor(stream5, stream5 && stream5.isTTY);
-      return translateLevel(level);
-    }
-    module2.exports = {
-      supportsColor: getSupportLevel,
-      stdout: translateLevel(supportsColor(true, tty.isatty(1))),
-      stderr: translateLevel(supportsColor(true, tty.isatty(2)))
-    };
-  }
-});
-
 // node_modules/debug/src/node.js
 var require_node = __commonJS({
   "node_modules/debug/src/node.js"(exports2, module2) {
@@ -625,7 +510,7 @@ var require_node = __commonJS({
     );
     exports2.colors = [6, 2, 3, 4, 5, 1];
     try {
-      const supportsColor = require_supports_color();
+      const supportsColor = require("supports-color");
       if (supportsColor && (supportsColor.stderr || supportsColor).level >= 2) {
         exports2.colors = [
           20,
@@ -19266,23 +19151,187 @@ var require_type_is = __commonJS({
   }
 });
 
-// node_modules/body-parser/lib/utils.js
-var require_utils = __commonJS({
-  "node_modules/body-parser/lib/utils.js"(exports2, module2) {
+// node_modules/body-parser/lib/read.js
+var require_read = __commonJS({
+  "node_modules/body-parser/lib/read.js"(exports2, module2) {
     "use strict";
-    var bytes = require_bytes();
+    var createError = require_http_errors();
+    var getBody = require_raw_body();
+    var iconv = require_lib2();
+    var onFinished = require_on_finished();
+    var zlib4 = require("node:zlib");
+    var hasBody = require_type_is().hasBody;
     var contentType = require_dist();
-    var typeis = require_type_is();
-    module2.exports = {
-      getCharset,
-      normalizeOptions: normalizeOptions2,
-      passthrough
-    };
+    module2.exports = read;
+    var hasZstandardSupport = "createZstdDecompress" in zlib4;
+    function read(req, res, next, parse3, debug2, options) {
+      if (onFinished.isFinished(req)) {
+        debug2("body already parsed");
+        next();
+        return;
+      }
+      if (!("body" in req)) {
+        req.body = void 0;
+      }
+      if (!hasBody(req)) {
+        debug2("skip empty body");
+        next();
+        return;
+      }
+      debug2("content-type %j", req.headers["content-type"]);
+      if (!options.shouldParse(req)) {
+        debug2("skip parsing");
+        next();
+        return;
+      }
+      let encoding = null;
+      if (options?.skipCharset !== true) {
+        encoding = getCharset(req) || options.defaultCharset;
+        if (!!options?.isValidCharset && !options.isValidCharset(encoding)) {
+          debug2("invalid charset");
+          next(createError(415, 'unsupported charset "' + encoding.toUpperCase() + '"', {
+            charset: encoding,
+            type: "charset.unsupported"
+          }));
+          return;
+        }
+      }
+      let length;
+      let stream5;
+      const verify = options.verify;
+      if (verify && encoding !== null && !iconv.encodingExists(encoding)) {
+        return next(createError(415, 'unsupported charset "' + encoding.toUpperCase() + '"', {
+          charset: encoding.toLowerCase(),
+          type: "charset.unsupported"
+        }));
+      }
+      try {
+        const contentEncoding = (req.headers["content-encoding"] || "identity").toLowerCase();
+        debug2('content-encoding "%s"', contentEncoding);
+        if (options.inflate === false && contentEncoding !== "identity") {
+          throw createError(415, "content encoding unsupported", {
+            encoding: contentEncoding,
+            type: "encoding.unsupported"
+          });
+        }
+        if (contentEncoding === "identity") {
+          length = req.headers["content-length"];
+          stream5 = req;
+        } else {
+          stream5 = createDecompressionStream(contentEncoding, debug2);
+          req.pipe(stream5);
+        }
+      } catch (err2) {
+        return next(err2);
+      }
+      const rawBodyOptions = {
+        length,
+        encoding: verify ? null : encoding,
+        limit: options.limit
+      };
+      debug2("read body");
+      getBody(stream5, rawBodyOptions, function(error2, body) {
+        if (error2) {
+          let _error;
+          if (error2.type === "encoding.unsupported") {
+            _error = createError(415, 'unsupported charset "' + encoding.toUpperCase() + '"', {
+              charset: encoding.toLowerCase(),
+              type: "charset.unsupported"
+            });
+          } else {
+            _error = createError(400, error2);
+          }
+          if (stream5 !== req) {
+            req.unpipe();
+            stream5.destroy();
+          }
+          dump(req, function onfinished() {
+            next(createError(400, _error));
+          });
+          return;
+        }
+        if (stream5 !== req) {
+          req.unpipe(stream5);
+          stream5.on("error", () => {
+          });
+          stream5.destroy();
+          req.resume();
+        }
+        if (verify) {
+          try {
+            debug2("verify body");
+            verify(req, res, body, encoding);
+          } catch (err2) {
+            next(createError(403, err2, {
+              body,
+              type: err2.type || "entity.verify.failed"
+            }));
+            return;
+          }
+        }
+        let str = body;
+        try {
+          debug2("parse body");
+          str = typeof body !== "string" && encoding !== null ? iconv.decode(body, encoding) : body;
+          req.body = parse3(str, encoding);
+        } catch (err2) {
+          next(createError(400, err2, {
+            body: str,
+            type: err2.type || "entity.parse.failed"
+          }));
+          return;
+        }
+        next();
+      });
+    }
+    function createDecompressionStream(encoding, debug2) {
+      switch (encoding) {
+        case "deflate":
+          debug2("inflate body");
+          return zlib4.createInflate();
+        case "gzip":
+          debug2("gunzip body");
+          return zlib4.createGunzip();
+        case "br":
+          debug2("brotli decompress body");
+          return zlib4.createBrotliDecompress();
+        case "zstd":
+          if (hasZstandardSupport) {
+            debug2("zstd decompress body");
+            return zlib4.createZstdDecompress();
+          }
+      }
+      throw createError(415, 'unsupported content encoding "' + encoding + '"', {
+        encoding,
+        type: "encoding.unsupported"
+      });
+    }
+    function dump(req, callback) {
+      if (onFinished.isFinished(req)) {
+        callback(null);
+      } else {
+        onFinished(req, callback);
+        req.resume();
+      }
+    }
     function getCharset(req) {
       const header = req.headers["content-type"];
       if (!header) return void 0;
       return contentType.parse(header).parameters.charset?.toLowerCase();
     }
+  }
+});
+
+// node_modules/body-parser/lib/utils.js
+var require_utils = __commonJS({
+  "node_modules/body-parser/lib/utils.js"(exports2, module2) {
+    "use strict";
+    var bytes = require_bytes();
+    var typeis = require_type_is();
+    module2.exports = {
+      normalizeOptions: normalizeOptions2,
+      passthrough
+    };
     function typeChecker(type) {
       return function checkType(req) {
         return Boolean(typeis(req, type));
@@ -19318,164 +19367,6 @@ var require_utils = __commonJS({
   }
 });
 
-// node_modules/body-parser/lib/read.js
-var require_read = __commonJS({
-  "node_modules/body-parser/lib/read.js"(exports2, module2) {
-    "use strict";
-    var createError = require_http_errors();
-    var getBody = require_raw_body();
-    var iconv = require_lib2();
-    var onFinished = require_on_finished();
-    var zlib4 = require("node:zlib");
-    var hasBody = require_type_is().hasBody;
-    var { getCharset } = require_utils();
-    module2.exports = read;
-    function read(req, res, next, parse3, debug2, options) {
-      if (onFinished.isFinished(req)) {
-        debug2("body already parsed");
-        next();
-        return;
-      }
-      if (!("body" in req)) {
-        req.body = void 0;
-      }
-      if (!hasBody(req)) {
-        debug2("skip empty body");
-        next();
-        return;
-      }
-      debug2("content-type %j", req.headers["content-type"]);
-      if (!options.shouldParse(req)) {
-        debug2("skip parsing");
-        next();
-        return;
-      }
-      let encoding = null;
-      if (options?.skipCharset !== true) {
-        encoding = getCharset(req) || options.defaultCharset;
-        if (!!options?.isValidCharset && !options.isValidCharset(encoding)) {
-          debug2("invalid charset");
-          next(createError(415, 'unsupported charset "' + encoding.toUpperCase() + '"', {
-            charset: encoding,
-            type: "charset.unsupported"
-          }));
-          return;
-        }
-      }
-      let length;
-      const opts = options;
-      let stream5;
-      const verify = opts.verify;
-      try {
-        stream5 = contentstream(req, debug2, opts.inflate);
-        length = stream5.length;
-        stream5.length = void 0;
-      } catch (err2) {
-        return next(err2);
-      }
-      opts.length = length;
-      opts.encoding = verify ? null : encoding;
-      if (opts.encoding === null && encoding !== null && !iconv.encodingExists(encoding)) {
-        return next(createError(415, 'unsupported charset "' + encoding.toUpperCase() + '"', {
-          charset: encoding.toLowerCase(),
-          type: "charset.unsupported"
-        }));
-      }
-      debug2("read body");
-      getBody(stream5, opts, function(error2, body) {
-        if (error2) {
-          let _error;
-          if (error2.type === "encoding.unsupported") {
-            _error = createError(415, 'unsupported charset "' + encoding.toUpperCase() + '"', {
-              charset: encoding.toLowerCase(),
-              type: "charset.unsupported"
-            });
-          } else {
-            _error = createError(400, error2);
-          }
-          if (stream5 !== req) {
-            req.unpipe();
-            stream5.destroy();
-          }
-          dump(req, function onfinished() {
-            next(createError(400, _error));
-          });
-          return;
-        }
-        if (verify) {
-          try {
-            debug2("verify body");
-            verify(req, res, body, encoding);
-          } catch (err2) {
-            next(createError(403, err2, {
-              body,
-              type: err2.type || "entity.verify.failed"
-            }));
-            return;
-          }
-        }
-        let str = body;
-        try {
-          debug2("parse body");
-          str = typeof body !== "string" && encoding !== null ? iconv.decode(body, encoding) : body;
-          req.body = parse3(str, encoding);
-        } catch (err2) {
-          next(createError(400, err2, {
-            body: str,
-            type: err2.type || "entity.parse.failed"
-          }));
-          return;
-        }
-        next();
-      });
-    }
-    function contentstream(req, debug2, inflate) {
-      const encoding = (req.headers["content-encoding"] || "identity").toLowerCase();
-      const length = req.headers["content-length"];
-      debug2('content-encoding "%s"', encoding);
-      if (inflate === false && encoding !== "identity") {
-        throw createError(415, "content encoding unsupported", {
-          encoding,
-          type: "encoding.unsupported"
-        });
-      }
-      if (encoding === "identity") {
-        req.length = length;
-        return req;
-      }
-      const stream5 = createDecompressionStream(encoding, debug2);
-      req.pipe(stream5);
-      return stream5;
-    }
-    function createDecompressionStream(encoding, debug2) {
-      switch (encoding) {
-        case "deflate":
-          debug2("inflate body");
-          return zlib4.createInflate();
-        case "gzip":
-          debug2("gunzip body");
-          return zlib4.createGunzip();
-        case "br":
-          debug2("brotli decompress body");
-          return zlib4.createBrotliDecompress();
-        default:
-          throw createError(415, 'unsupported content encoding "' + encoding + '"', {
-            encoding,
-            type: "encoding.unsupported"
-          });
-      }
-    }
-    function dump(req, callback) {
-      if (onFinished.isFinished(req)) {
-        callback(null);
-      } else {
-        onFinished(req, callback);
-        req.resume();
-      }
-    }
-  }
-});
-
 // node_modules/body-parser/lib/types/json.js
 var require_json = __commonJS({
   "node_modules/body-parser/lib/types/json.js"(exports2, module2) {
@@ -19484,7 +19375,7 @@ var require_json = __commonJS({
     var read = require_read();
     var { normalizeOptions: normalizeOptions2 } = require_utils();
     module2.exports = json;
-    var FIRST_CHAR_REGEXP = /^[\x20\x09\x0a\x0d]*([^\x20\x09\x0a\x0d])/;
+    var FIRST_NON_WHITESPACE_REGEXP = /^[\x20\x09\x0a\x0d]*([^\x20\x09\x0a\x0d]|$)/;
     var JSON_SYNTAX_CHAR = "#";
     var JSON_SYNTAX_REGEXP = /#+/g;
     function json(options) {
@@ -19507,10 +19398,12 @@ var require_json = __commonJS({
           if (body.length === 0) {
             return {};
           }
-          const first = firstchar(body);
-          if (first !== "{" && first !== "[") {
-            debug2("strict violation");
-            throw createStrictSyntaxError(body, first);
+          if (body[0] !== "{" && body[0] !== "[") {
+            const first = firstNonWhitespaceChar(body);
+            if (first !== "{" && first !== "[") {
+              debug2("strict violation");
+              throw createStrictSyntaxError(body, first);
+            }
           }
           try {
             debug2("parse json");
@@ -19556,9 +19449,9 @@ var require_json = __commonJS({
         });
       }
     }
-    function firstchar(str) {
-      const match = FIRST_CHAR_REGEXP.exec(str);
-      return match ? match[1] : void 0;
+    function firstNonWhitespaceChar(str) {
+      const match = FIRST_NON_WHITESPACE_REGEXP.exec(str);
+      return match && match[1] ? match[1] : void 0;
     }
     function normalizeJsonSyntaxError(error2, obj) {
       const keys = Object.getOwnPropertyNames(error2);
@@ -20749,7 +20642,7 @@ var require_get_intrinsic = __commonJS({
     var throwTypeError = function() {
       throw new $TypeError();
     };
-    var ThrowTypeError = $gOPD ? function() {
+    var ThrowTypeError = $gOPD ? (function() {
       try {
         arguments.callee;
         return throwTypeError;
@@ -20760,7 +20653,7 @@ var require_get_intrinsic = __commonJS({
           return throwTypeError;
         }
       }
-    }() : throwTypeError;
+    })() : throwTypeError;
     var hasSymbols = require_has_symbols()();
     var getProto = require_get_proto();
     var $ObjectGPO = require_Object_getPrototypeOf();
@@ -21024,7 +20917,7 @@ var require_get_intrinsic = __commonJS({
             if (!allowMissing) {
               throw new $TypeError("base intrinsic for " + name + " exists, but the property is not available.");
             }
-            return void 0;
+            return void undefined2;
           }
           if ($gOPD && i2 + 1 >= parts.length) {
             var desc = $gOPD(value, part);
@@ -21289,13 +21182,24 @@ var require_utils2 = __commonJS({
     var setMaxIndex = function setMaxIndex2(obj, maxIndex) {
       overflowChannel.set(obj, maxIndex);
     };
-    var hexTable = function() {
+    var conflictChannel = getSideChannel();
+    var markConflict = function markConflict2(obj, maxIndex) {
+      conflictChannel.set(obj, maxIndex);
+      return obj;
+    };
+    var isConflict = function isConflict2(obj) {
+      return conflictChannel.has(obj);
+    };
+    var getConflictIndex = function getConflictIndex2(obj) {
+      return conflictChannel.get(obj);
+    };
+    var hexTable = (function() {
       var array = [];
       for (var i2 = 0; i2 < 256; ++i2) {
         array[array.length] = "%" + ((i2 < 16 ? "0" : "") + i2.toString(16)).toUpperCase();
       }
       return array;
-    }();
+    })();
     var compactQueue = function compactQueue2(queue) {
       while (queue.length > 1) {
         var item = queue.pop();
@@ -21332,6 +21236,27 @@ var require_utils2 = __commonJS({
         obj[key] = value;
       }
     };
+    var maxNumericIndex = function maxNumericIndex2(obj, min) {
+      var max2 = min;
+      var keys = Object.keys(obj);
+      for (var i2 = 0; i2 < keys.length; ++i2) {
+        var num = parseInt(keys[i2], 10);
+        if (String(num) === keys[i2] && num > max2) {
+          max2 = num;
+        }
+      }
+      return max2;
+    };
+    var limitedPair = function limitedPair2(first, second, options) {
+      var pair = [first, second];
+      if (options && typeof options.arrayLimit === "number" && pair.length > options.arrayLimit) {
+        if (options.throwOnLimitExceeded) {
+          throw new RangeError("Array limit exceeded. Only " + options.arrayLimit + " element" + (options.arrayLimit === 1 ? "" : "s") + " allowed in an array.");
+        }
+        return markOverflow(arrayToObject2(pair, options), 1);
+      }
+      return pair;
+    };
     var merge2 = function merge3(target, source, options) {
       if (!source) {
         return target;
@@ -21351,13 +21276,21 @@ var require_utils2 = __commonJS({
             var newIndex = getMaxIndex(target) + 1;
             target[newIndex] = source;
             setMaxIndex(target, newIndex);
+          } else if (options && options.strictMerge && isConflict(target)) {
+            var nextConflict = getConflictIndex(target) + 1;
+            if (options.throwOnLimitExceeded && typeof options.arrayLimit === "number" && nextConflict >= options.arrayLimit) {
+              throw new RangeError("Array limit exceeded. Only " + options.arrayLimit + " element" + (options.arrayLimit === 1 ? "" : "s") + " allowed in an array.");
+            }
+            target[nextConflict] = source;
+            markConflict(target, nextConflict);
           } else if (options && options.strictMerge) {
-            return [target, source];
+            var conflict = limitedPair(target, source, options);
+            return isArray3(conflict) ? markConflict(conflict, 1) : conflict;
           } else if (options && (options.plainObjects || options.allowPrototypes) || !has.call(Object.prototype, source)) {
             target[source] = true;
           }
         } else {
-          return [target, source];
+          return limitedPair(target, source, options);
         }
         return target;
       }
@@ -21383,6 +21316,9 @@ var require_utils2 = __commonJS({
       var mergeTarget = target;
       if (isArray3(target) && !isArray3(source)) {
         mergeTarget = arrayToObject2(target, options);
+        if (isConflict(target)) {
+          markConflict(mergeTarget, target.length - 1);
+        }
       }
       if (isArray3(target) && isArray3(source)) {
         source.forEach(function(item, i2) {
@@ -21413,12 +21349,18 @@ var require_utils2 = __commonJS({
           setProperty(acc, key, value);
         }
         if (isOverflow(source) && !isOverflow(acc)) {
-          markOverflow(acc, getMaxIndex(source));
+          markOverflow(acc, maxNumericIndex(acc, getMaxIndex(source)));
         }
         if (isOverflow(acc)) {
           var keyNum = parseInt(key, 10);
           if (String(keyNum) === key && keyNum >= 0 && keyNum > getMaxIndex(acc)) {
             setMaxIndex(acc, keyNum);
+          }
+        }
+        if (isConflict(acc)) {
+          var conflictKey = parseInt(key, 10);
+          if (String(conflictKey) === key && conflictKey > getConflictIndex(acc)) {
+            markConflict(acc, conflictKey);
           }
         }
         return acc;
@@ -21431,6 +21373,9 @@ var require_utils2 = __commonJS({
       }, target);
     };
     var decode = function(str, defaultDecoder, charset) {
+      if (typeof str === "string" && str.indexOf("%") === -1) {
+        return str.indexOf("+") === -1 ? str : str.replace(/\+/g, " ");
+      }
       var strWithoutPlus = str.replace(/\+/g, " ");
       if (charset === "iso-8859-1") {
         return strWithoutPlus.replace(/%[0-9a-f]{2}/gi, unescape);
@@ -21441,6 +21386,52 @@ var require_utils2 = __commonJS({
         return strWithoutPlus;
       }
     };
+    var hasToPrimitive = typeof Symbol === "function" && typeof Symbol.toPrimitive === "symbol";
+    var arrayJoin = Array.prototype.join;
+    var arrayToString = Array.prototype.toString;
+    var objectToString3 = Object.prototype.toString;
+    var toCoercible = function toCoercible2(value, joining) {
+      if (!value || typeof value !== "object" && typeof value !== "function") {
+        return value;
+      }
+      if (hasToPrimitive && value[Symbol.toPrimitive] != null) {
+        return value;
+      }
+      if (isArray3(value) && value.toString === arrayToString && value.join === arrayJoin) {
+        var ancestors = joining || getSideChannel();
+        if (ancestors.has(value)) {
+          return "";
+        }
+        ancestors.set(value, true);
+        var copy;
+        for (var i2 = 0; i2 < value.length; i2 += 1) {
+          var item = value[i2];
+          var coerced = toCoercible2(item, ancestors);
+          if (!copy && coerced !== item) {
+            copy = [];
+            for (var j = 0; j < i2; j += 1) {
+              copy[j] = value[j];
+            }
+          }
+          if (copy) {
+            copy[i2] = coerced;
+          }
+        }
+        ancestors["delete"](value);
+        return copy || value;
+      }
+      if (typeof value.toString === "function") {
+        return value;
+      }
+      var valueOf = value.valueOf;
+      if (typeof valueOf === "function") {
+        var primitive = valueOf.call(value);
+        if (!primitive || typeof primitive !== "object" && typeof primitive !== "function") {
+          return String(primitive);
+        }
+      }
+      return objectToString3.call(value);
+    };
     var limit = 1024;
     var encode3 = function encode4(str, defaultEncoder, charset, kind, format) {
       if (str.length === 0) {
@@ -21450,12 +21441,12 @@ var require_utils2 = __commonJS({
       if (typeof str === "symbol") {
         string = Symbol.prototype.toString.call(str);
       } else if (typeof str !== "string") {
-        string = String(str);
+        string = String(toCoercible(str));
       }
       if (charset === "iso-8859-1") {
         return escape(string).replace(/%u[0-9a-f]{4}/gi, function($0) {
           return "%26%23" + parseInt($0.slice(2), 16) + "%3B";
-        });
+        }).replace(/\+/g, "%2B");
       }
       var out = "";
       for (var j = 0; j < string.length; j += limit) {
@@ -21567,7 +21558,8 @@ var require_utils2 = __commonJS({
       isRegExp: isRegExp3,
       markOverflow,
       maybeMap,
-      merge: merge2
+      merge: merge2,
+      toCoercible
     };
   }
 });
@@ -21682,17 +21674,17 @@ var require_stringify = __commonJS({
       if (generateArrayPrefix === "comma" && isArray3(obj)) {
         if (encodeValuesOnly && encoder) {
           obj = utils.maybeMap(obj, function(v) {
-            return v == null ? v : encoder(v);
+            return v == null ? v : encoder(v, defaults3.encoder, charset, "value", format);
           });
         }
-        objKeys = [{ value: obj.length > 0 ? obj.join(",") || null : void 0 }];
+        objKeys = [{ value: obj.length > 0 ? utils.toCoercible(obj).join(",") || null : void 0 }];
       } else if (isArray3(filter2)) {
         objKeys = filter2;
       } else {
         var keys = Object.keys(obj);
         objKeys = sort ? keys.sort(sort) : keys;
       }
-      var encodedPrefix = encodeDotInKeys ? String(prefix).replace(/\./g, "%2E") : String(prefix);
+      var encodedPrefix = String(prefix);
       var adjustedPrefix = commaRoundTrip && isArray3(obj) && obj.length === 1 ? encodedPrefix + "[]" : encodedPrefix;
       if (allowEmptyArrays && isArray3(obj) && obj.length === 0 && Object.keys(obj).length === 0) {
         return adjustedPrefix + "[]";
@@ -21763,7 +21755,7 @@ var require_stringify = __commonJS({
         filter2 = opts.filter;
       }
       var arrayFormat;
-      if (opts.arrayFormat in arrayPrefixGenerators) {
+      if (has.call(arrayPrefixGenerators, opts.arrayFormat)) {
         arrayFormat = opts.arrayFormat;
       } else if ("indices" in opts) {
         arrayFormat = opts.indices ? "indices" : "repeat";
@@ -21873,9 +21865,53 @@ var require_stringify = __commonJS({
 var require_parse = __commonJS({
   "node_modules/qs/lib/parse.js"(exports2, module2) {
     "use strict";
+    var getSideChannel = require_side_channel();
     var utils = require_utils2();
     var has = Object.prototype.hasOwnProperty;
     var isArray3 = Array.isArray;
+    var getPrototypeOf2 = Object.getPrototypeOf;
+    var isPlainContainer = function isPlainContainer2(value) {
+      if (!value || typeof value !== "object") {
+        return false;
+      }
+      if (isArray3(value)) {
+        return true;
+      }
+      var proto = getPrototypeOf2(value);
+      return proto === Object.prototype || proto === null;
+    };
+    var emptyCopyOf = function emptyCopyOf2(value) {
+      if (isArray3(value)) {
+        var arr = [];
+        arr.length = value.length;
+        return arr;
+      }
+      return getPrototypeOf2(value) === null ? { __proto__: null } : {};
+    };
+    var copyInput = function copyInput2(input) {
+      var copies = getSideChannel();
+      var result = {};
+      var queue = [{ source: input, target: result }];
+      for (var i2 = 0; i2 < queue.length; ++i2) {
+        var source = queue[i2].source;
+        var target = queue[i2].target;
+        var keys = Object.keys(source);
+        for (var j = 0; j < keys.length; ++j) {
+          var value = source[keys[j]];
+          if (isPlainContainer(value)) {
+            if (!copies.has(value)) {
+              var copy = emptyCopyOf(value);
+              copies.set(value, copy);
+              queue[queue.length] = { source: value, target: copy };
+            }
+            target[keys[j]] = copies.get(value);
+          } else {
+            target[keys[j]] = value;
+          }
+        }
+      }
+      return result;
+    };
     var defaults3 = {
       allowDots: false,
       allowEmptyArrays: false,
@@ -21962,6 +21998,7 @@ var require_parse = __commonJS({
         var part = parts[i2];
         var bracketEqualsPos = part.indexOf("]=");
         var pos = bracketEqualsPos === -1 ? part.indexOf("=") : bracketEqualsPos + 1;
+        var isEmptyBracketKey = pos > 1 && part.slice(pos - 2, pos) === "[]";
         var key;
         var val;
         if (pos === -1) {
@@ -21985,7 +22022,7 @@ var require_parse = __commonJS({
         if (val && options.interpretNumericEntities && charset === "iso-8859-1") {
           val = interpretNumericEntities(String(val));
         }
-        if (part.indexOf("[]=") > -1) {
+        if (isEmptyBracketKey) {
           val = isArray3(val) ? [val] : val;
         }
         if (options.comma && isArray3(val) && val.length > options.arrayLimit) {
@@ -21993,7 +22030,7 @@ var require_parse = __commonJS({
         }
         if (key !== null) {
           var existing = has.call(obj, key);
-          if (existing && (options.duplicates === "combine" || part.indexOf("[]=") > -1)) {
+          if (existing && (options.duplicates === "combine" || isEmptyBracketKey)) {
             obj[key] = utils.combine(
               obj[key],
               val,
@@ -22054,8 +22091,35 @@ var require_parse = __commonJS({
       }
       return leaf;
     };
+    var topLevelDotsToBrackets = function topLevelDotsToBrackets2(key) {
+      var result = "";
+      var depth = 0;
+      for (var i2 = 0; i2 < key.length; i2 += 1) {
+        var cu = key.charCodeAt(i2);
+        if (cu === 91) {
+          depth += 1;
+          result += "[";
+        } else if (cu === 93) {
+          if (depth > 0) {
+            depth -= 1;
+          }
+          result += "]";
+        } else if (cu === 46 && depth === 0 && i2 + 1 < key.length && key.charCodeAt(i2 + 1) !== 46 && key.charCodeAt(i2 + 1) !== 91) {
+          var start = i2 + 1;
+          var j = start;
+          while (j < key.length && key.charCodeAt(j) !== 46 && key.charCodeAt(j) !== 91) {
+            j += 1;
+          }
+          result += "[" + key.slice(start, j) + "]";
+          i2 = j - 1;
+        } else {
+          result += key.charAt(i2);
+        }
+      }
+      return result;
+    };
     var splitKeyIntoSegments = function splitKeyIntoSegments2(originalKey, options) {
-      var key = options.allowDots ? originalKey.replace(/\.([^.[]+)/g, "[$1]") : originalKey;
+      var key = options.allowDots ? topLevelDotsToBrackets(originalKey) : originalKey;
       if (options.depth <= 0) {
         if (!options.plainObjects && has.call(Object.prototype, key)) {
           if (!options.allowPrototypes) {
@@ -22181,7 +22245,7 @@ var require_parse = __commonJS({
       if (str === "" || str === null || typeof str === "undefined") {
         return options.plainObjects ? { __proto__: null } : {};
       }
-      var tempObj = typeof str === "string" ? parseValues(str, options) : str;
+      var tempObj = typeof str === "string" ? parseValues(str, options) : copyInput(str);
       var obj = options.plainObjects ? { __proto__: null } : {};
       var keys = Object.keys(tempObj);
       for (var i2 = 0; i2 < keys.length; ++i2) {
@@ -22450,11 +22514,17 @@ var require_parseurl = __commonJS({
             }
             break;
           case 9:
+          /* \t */
           case 10:
+          /* \n */
           case 12:
+          /* \f */
           case 13:
+          /* \r */
           case 32:
+          /*    */
           case 35:
+          /* #  */
           case 160:
           case 65279:
             return parse3(str);
@@ -32343,7 +32413,7 @@ var require_ipaddr = __commonJS({
         }
         return defaultName;
       };
-      ipaddr.IPv4 = function() {
+      ipaddr.IPv4 = (function() {
         function IPv4(octets) {
           var k, len, octet;
           if (octets.length !== 4) {
@@ -32428,7 +32498,7 @@ var require_ipaddr = __commonJS({
           return 32 - cidr;
         };
         return IPv4;
-      }();
+      })();
       ipv4Part = "(0?\\d+|0x[a-f0-9]+)";
       ipv4Regexes = {
         fourOctet: new RegExp("^" + ipv4Part + "\\." + ipv4Part + "\\." + ipv4Part + "\\." + ipv4Part + "$", "i"),
@@ -32444,7 +32514,7 @@ var require_ipaddr = __commonJS({
           }
         };
         if (match = string.match(ipv4Regexes.fourOctet)) {
-          return function() {
+          return (function() {
             var k, len, ref, results;
             ref = match.slice(1, 6);
             results = [];
@@ -32453,25 +32523,25 @@ var require_ipaddr = __commonJS({
               results.push(parseIntAuto(part));
             }
             return results;
-          }();
+          })();
         } else if (match = string.match(ipv4Regexes.longValue)) {
           value = parseIntAuto(match[1]);
           if (value > 4294967295 || value < 0) {
             throw new Error("ipaddr: address outside defined range");
           }
-          return function() {
+          return (function() {
             var k, results;
             results = [];
             for (shift = k = 0; k <= 24; shift = k += 8) {
               results.push(value >> shift & 255);
             }
             return results;
-          }().reverse();
+          })().reverse();
         } else {
           return null;
         }
       };
-      ipaddr.IPv6 = function() {
+      ipaddr.IPv6 = (function() {
         function IPv6(parts, zoneId) {
           var i2, k, l, len, part, ref;
           if (parts.length === 16) {
@@ -32531,7 +32601,7 @@ var require_ipaddr = __commonJS({
         };
         IPv6.prototype.toNormalizedString = function() {
           var addr, part, suffix;
-          addr = function() {
+          addr = (function() {
             var k, len, ref, results;
             ref = this.parts;
             results = [];
@@ -32540,7 +32610,7 @@ var require_ipaddr = __commonJS({
               results.push(part.toString(16));
             }
             return results;
-          }.call(this).join(":");
+          }).call(this).join(":");
           suffix = "";
           if (this.zoneId) {
             suffix = "%" + this.zoneId;
@@ -32549,7 +32619,7 @@ var require_ipaddr = __commonJS({
         };
         IPv6.prototype.toFixedLengthString = function() {
           var addr, part, suffix;
-          addr = function() {
+          addr = (function() {
             var k, len, ref, results;
             ref = this.parts;
             results = [];
@@ -32558,7 +32628,7 @@ var require_ipaddr = __commonJS({
               results.push(part.toString(16).padStart(4, "0"));
             }
             return results;
-          }.call(this).join(":");
+          }).call(this).join(":");
           suffix = "";
           if (this.zoneId) {
             suffix = "%" + this.zoneId;
@@ -32643,7 +32713,7 @@ var require_ipaddr = __commonJS({
           return 128 - cidr;
         };
         return IPv6;
-      }();
+      })();
       ipv6Part = "(?:[0-9a-f]+::?)+";
       zoneIndex = "%[0-9a-z]{1,}";
       ipv6Regexes = {
@@ -32687,7 +32757,7 @@ var require_ipaddr = __commonJS({
         if (string[string.length - 1] === ":") {
           string = string.slice(0, -1);
         }
-        parts = function() {
+        parts = (function() {
           var k, len, ref, results;
           ref = string.split(":");
           results = [];
@@ -32696,7 +32766,7 @@ var require_ipaddr = __commonJS({
             results.push(parseInt(part, 16));
           }
           return results;
-        }();
+        })();
         return {
           parts,
           zoneId
@@ -55525,6 +55595,7 @@ var require_response = __commonJS({
       var req = this.req;
       var app2 = this.app;
       switch (typeof chunk2) {
+        // string defaulting to html
         case "string":
           encoding = "utf8";
           const type = this.get("Content-Type");
@@ -55926,6 +55997,7 @@ var require_response = __commonJS({
               return "\\u003e";
             case 38:
               return "\\u0026";
+            /* istanbul ignore next: unreachable default */
             default:
               return c3;
           }
@@ -66099,7 +66171,7 @@ var require_parser_v3 = __commonJS({
 var require_transport = __commonJS({
   "node_modules/engine.io/build/transport.js"(exports2) {
     "use strict";
-    var __createBinding = exports2 && exports2.__createBinding || (Object.create ? function(o2, m, k, k2) {
+    var __createBinding = exports2 && exports2.__createBinding || (Object.create ? (function(o2, m, k, k2) {
       if (k2 === void 0) k2 = k;
       var desc = Object.getOwnPropertyDescriptor(m, k);
       if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
@@ -66108,16 +66180,16 @@ var require_transport = __commonJS({
         } };
       }
       Object.defineProperty(o2, k2, desc);
-    } : function(o2, m, k, k2) {
+    }) : (function(o2, m, k, k2) {
       if (k2 === void 0) k2 = k;
       o2[k2] = m[k];
-    });
-    var __setModuleDefault = exports2 && exports2.__setModuleDefault || (Object.create ? function(o2, v) {
+    }));
+    var __setModuleDefault = exports2 && exports2.__setModuleDefault || (Object.create ? (function(o2, v) {
       Object.defineProperty(o2, "default", { enumerable: true, value: v });
-    } : function(o2, v) {
+    }) : function(o2, v) {
       o2["default"] = v;
     });
-    var __importStar = exports2 && exports2.__importStar || /* @__PURE__ */ function() {
+    var __importStar = exports2 && exports2.__importStar || /* @__PURE__ */ (function() {
       var ownKeys = function(o2) {
         ownKeys = Object.getOwnPropertyNames || function(o3) {
           var ar = [];
@@ -66135,7 +66207,7 @@ var require_transport = __commonJS({
         __setModuleDefault(result, mod);
         return result;
       };
-    }();
+    })();
     var __importDefault = exports2 && exports2.__importDefault || function(mod) {
       return mod && mod.__esModule ? mod : { "default": mod };
     };
@@ -67152,7 +67224,7 @@ var require_polling = __commonJS({
 var require_polling_jsonp = __commonJS({
   "node_modules/engine.io/build/transports/polling-jsonp.js"(exports2) {
     "use strict";
-    var __createBinding = exports2 && exports2.__createBinding || (Object.create ? function(o2, m, k, k2) {
+    var __createBinding = exports2 && exports2.__createBinding || (Object.create ? (function(o2, m, k, k2) {
       if (k2 === void 0) k2 = k;
       var desc = Object.getOwnPropertyDescriptor(m, k);
       if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
@@ -67161,16 +67233,16 @@ var require_polling_jsonp = __commonJS({
         } };
       }
       Object.defineProperty(o2, k2, desc);
-    } : function(o2, m, k, k2) {
+    }) : (function(o2, m, k, k2) {
       if (k2 === void 0) k2 = k;
       o2[k2] = m[k];
-    });
-    var __setModuleDefault = exports2 && exports2.__setModuleDefault || (Object.create ? function(o2, v) {
+    }));
+    var __setModuleDefault = exports2 && exports2.__setModuleDefault || (Object.create ? (function(o2, v) {
       Object.defineProperty(o2, "default", { enumerable: true, value: v });
-    } : function(o2, v) {
+    }) : function(o2, v) {
       o2["default"] = v;
     });
-    var __importStar = exports2 && exports2.__importStar || /* @__PURE__ */ function() {
+    var __importStar = exports2 && exports2.__importStar || /* @__PURE__ */ (function() {
       var ownKeys = function(o2) {
         ownKeys = Object.getOwnPropertyNames || function(o3) {
           var ar = [];
@@ -67188,7 +67260,7 @@ var require_polling_jsonp = __commonJS({
         __setModuleDefault(result, mod);
         return result;
       };
-    }();
+    })();
     Object.defineProperty(exports2, "__esModule", { value: true });
     exports2.JSONP = void 0;
     var polling_1 = require_polling();
@@ -73551,7 +73623,7 @@ var require_userver = __commonJS({
 var require_engine_io = __commonJS({
   "node_modules/engine.io/build/engine.io.js"(exports2) {
     "use strict";
-    var __createBinding = exports2 && exports2.__createBinding || (Object.create ? function(o2, m, k, k2) {
+    var __createBinding = exports2 && exports2.__createBinding || (Object.create ? (function(o2, m, k, k2) {
       if (k2 === void 0) k2 = k;
       var desc = Object.getOwnPropertyDescriptor(m, k);
       if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
@@ -73560,16 +73632,16 @@ var require_engine_io = __commonJS({
         } };
       }
       Object.defineProperty(o2, k2, desc);
-    } : function(o2, m, k, k2) {
+    }) : (function(o2, m, k, k2) {
       if (k2 === void 0) k2 = k;
       o2[k2] = m[k];
-    });
-    var __setModuleDefault = exports2 && exports2.__setModuleDefault || (Object.create ? function(o2, v) {
+    }));
+    var __setModuleDefault = exports2 && exports2.__setModuleDefault || (Object.create ? (function(o2, v) {
       Object.defineProperty(o2, "default", { enumerable: true, value: v });
-    } : function(o2, v) {
+    }) : function(o2, v) {
       o2["default"] = v;
     });
-    var __importStar = exports2 && exports2.__importStar || /* @__PURE__ */ function() {
+    var __importStar = exports2 && exports2.__importStar || /* @__PURE__ */ (function() {
       var ownKeys = function(o2) {
         ownKeys = Object.getOwnPropertyNames || function(o3) {
           var ar = [];
@@ -73587,7 +73659,7 @@ var require_engine_io = __commonJS({
         __setModuleDefault(result, mod);
         return result;
       };
-    }();
+    })();
     var __importDefault = exports2 && exports2.__importDefault || function(mod) {
       return mod && mod.__esModule ? mod : { "default": mod };
     };
@@ -77021,9 +77093,13 @@ var require_cluster_adapter = __commonJS({
             this.nsp._onServerSideEmit([...packet, callback]);
             break;
           }
+          // @ts-ignore
           case MessageType2.BROADCAST_CLIENT_COUNT:
+          // @ts-ignore
           case MessageType2.BROADCAST_ACK:
+          // @ts-ignore
           case MessageType2.FETCH_SOCKETS_RESPONSE:
+          // @ts-ignore
           case MessageType2.SERVER_SIDE_EMIT_RESPONSE:
             this.onResponse(message);
             break;
@@ -77833,7 +77909,7 @@ var require_package = __commonJS({
 var require_dist5 = __commonJS({
   "node_modules/socket.io/dist/index.js"(exports2, module2) {
     "use strict";
-    var __createBinding = exports2 && exports2.__createBinding || (Object.create ? function(o2, m, k, k2) {
+    var __createBinding = exports2 && exports2.__createBinding || (Object.create ? (function(o2, m, k, k2) {
       if (k2 === void 0) k2 = k;
       var desc = Object.getOwnPropertyDescriptor(m, k);
       if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
@@ -77842,16 +77918,16 @@ var require_dist5 = __commonJS({
         } };
       }
       Object.defineProperty(o2, k2, desc);
-    } : function(o2, m, k, k2) {
+    }) : (function(o2, m, k, k2) {
       if (k2 === void 0) k2 = k;
       o2[k2] = m[k];
-    });
-    var __setModuleDefault = exports2 && exports2.__setModuleDefault || (Object.create ? function(o2, v) {
+    }));
+    var __setModuleDefault = exports2 && exports2.__setModuleDefault || (Object.create ? (function(o2, v) {
       Object.defineProperty(o2, "default", { enumerable: true, value: v });
-    } : function(o2, v) {
+    }) : function(o2, v) {
       o2["default"] = v;
     });
-    var __importStar = exports2 && exports2.__importStar || /* @__PURE__ */ function() {
+    var __importStar = exports2 && exports2.__importStar || /* @__PURE__ */ (function() {
       var ownKeys = function(o2) {
         ownKeys = Object.getOwnPropertyNames || function(o3) {
           var ar = [];
@@ -77869,7 +77945,7 @@ var require_dist5 = __commonJS({
         __setModuleDefault(result, mod);
         return result;
       };
-    }();
+    })();
     var __importDefault = exports2 && exports2.__importDefault || function(mod) {
       return mod && mod.__esModule ? mod : { "default": mod };
     };
@@ -78812,12 +78888,13 @@ var require_http_cache_semantics = __commonJS({
       }
       /**
        * @param {{headers: Record<string, string>, synchronous: boolean}|undefined} revalidation - Revalidation information, if any.
-       * @returns {{response: {headers: Record<string, string>}, revalidation: {headers: Record<string, string>, synchronous: boolean}|undefined}} An object with a cached response headers and revalidation info.
+       * @returns {{response: HttpResponse, revalidation: {headers: Record<string, string>, synchronous: boolean}|undefined}} An object with a cached response headers and revalidation info.
        */
       _evaluateRequestHitResult(revalidation) {
         return {
           response: {
-            headers: this.responseHeaders()
+            headers: this.responseHeaders(),
+            status: this._status
           },
           revalidation
         };
@@ -78862,9 +78939,9 @@ var require_http_cache_semantics = __commonJS({
        * }
        * ```
        * @param {HttpRequest} req - new incoming HTTP request
-       * @returns {{response: {headers: Record<string, string>}|undefined, revalidation: {headers: Record<string, string>, synchronous: boolean}|undefined}} An object containing keys:
+       * @returns {{response: HttpResponse|undefined, revalidation: {headers: Record<string, string>, synchronous: boolean}|undefined}} An object containing keys:
        *   - revalidation: { headers: Record<string, string>, synchronous: boolean } Set if you should send this to the origin server
-       *   - response: { headers: Record<string, string> } Set if you can respond to the client with these cached headers
+       *   - response: HttpResponse Set if you can respond to the client with these cached headers
        */
       evaluateRequest(req) {
         this._assertRequestHasHeaders(req);
@@ -78922,12 +78999,22 @@ var require_http_cache_semantics = __commonJS({
         if (!this._resHeaders.vary) {
           return true;
         }
-        if (this._resHeaders.vary === "*") {
-          return false;
-        }
         const fields = this._resHeaders.vary.trim().toLowerCase().split(/\s*,\s*/);
         for (const name of fields) {
-          if (req.headers[name] !== this._reqHeaders[name]) return false;
+          if (name === "*") {
+            return false;
+          }
+          const newReq = Object.prototype.hasOwnProperty.call(
+            req.headers,
+            name
+          ) && req.headers[name];
+          const cachedReq = Object.prototype.hasOwnProperty.call(
+            this._reqHeaders,
+            name
+          ) && this._reqHeaders[name];
+          if (newReq !== cachedReq) {
+            return false;
+          }
         }
         return true;
       }
@@ -78974,6 +79061,13 @@ var require_http_cache_semantics = __commonJS({
         headers.age = `${Math.round(age)}`;
         headers.date = new Date(this.now()).toUTCString();
         return headers;
+      }
+      /**
+       * Returns the status code of the cached response.
+       * @returns {number} The response status code.
+       */
+      status() {
+        return this._status;
       }
       /**
        * Returns the Date header value from the response or the current time if invalid.
@@ -82730,6 +82824,12 @@ var require_follow_redirects = __commonJS({
     RedirectableRequest.prototype._sanitizeOptions = function(options) {
       if (!options.headers) {
         options.headers = {};
+      } else if (Array.isArray(options.headers)) {
+        var headerList = options.headers;
+        options.headers = {};
+        for (var i2 = 0; i2 < headerList.length; i2 += 2) {
+          options.headers[headerList[i2]] = headerList[i2 + 1];
+        }
       }
       if (!isArray3(options.sensitiveHeaders)) {
         options.sensitiveHeaders = [];
@@ -83004,7 +83104,7 @@ var require_follow_redirects = __commonJS({
       return URL3 && value instanceof URL3;
     }
     function escapeRegex(regex) {
-      return regex.replace(/[\]\\/()*+?.$]/g, "\\$&");
+      return regex.replace(/[[\]\\/()*+?.^$|]/g, "\\$&");
     }
     module2.exports = wrap({ http: http6, https: https4 });
     module2.exports.wrap = wrap;
@@ -83012,8 +83112,8 @@ var require_follow_redirects = __commonJS({
 });
 
 // src/server/index.ts
-var server_exports = {};
-__export(server_exports, {
+var index_exports = {};
+__export(index_exports, {
   APP_VERSION: () => APP_VERSION,
   GITHUB_REPO: () => GITHUB_REPO,
   calculateScore: () => calculateScore,
@@ -83023,7 +83123,7 @@ __export(server_exports, {
   parseCoordinates: () => parseCoordinates,
   resolveLocation: () => resolveLocation
 });
-module.exports = __toCommonJS(server_exports);
+module.exports = __toCommonJS(index_exports);
 var import_express = __toESM(require_express2());
 var import_http5 = __toESM(require("http"));
 
@@ -85705,7 +85805,7 @@ for (i2 = 0; i2 < 32768; ++i2) {
 }
 var x;
 var i2;
-var hMap = function(cd, mb, r) {
+var hMap = (function(cd, mb, r) {
   var s = cd.length;
   var i2 = 0;
   var l = new u16(mb);
@@ -85740,7 +85840,7 @@ var hMap = function(cd, mb, r) {
     }
   }
   return co;
-};
+});
 var flt = new u8(288);
 for (i2 = 0; i2 < 144; ++i2)
   flt[i2] = 8;
@@ -86257,7 +86357,7 @@ var dflt = function(dat, lvl, plvl, pre, post, st) {
   }
   return slc(o2, 0, pre + shft(pos) + post);
 };
-var crct = /* @__PURE__ */ function() {
+var crct = /* @__PURE__ */ (function() {
   var t = new Int32Array(256);
   for (var i2 = 0; i2 < 256; ++i2) {
     var c3 = i2, k = 9;
@@ -86266,7 +86366,7 @@ var crct = /* @__PURE__ */ function() {
     t[i2] = c3;
   }
   return t;
-}();
+})();
 var crc = function() {
   var c3 = -1;
   return {
@@ -87093,6 +87193,7 @@ var BinaryReader = class {
         while (this.buf[this.pos++] & 128) {
         }
         break;
+      // @ts-ignore TS7029: Fallthrough case in switch -- ignore instead of expect-error for compiler settings without noFallthroughCasesInSwitch: true
       case WireType.Bit64:
         this.pos += 4;
       case WireType.Bit32:
@@ -97315,6 +97416,9 @@ var JsAnalyzer = class {
     walkAst(rootNode, {
       enter: (n2, parent) => {
         switch (n2.type) {
+          // Note for anybody debugging this in the future:
+          // *DO NOT* add MethodDefinition here.
+          // MethodDefinition.value is a FunctionExpression, so it is already handled...
           case "FunctionDeclaration":
           case "FunctionExpression":
           case "ArrowFunctionExpression": {
@@ -97589,6 +97693,7 @@ var JsExtractor = class {
         }
         return false;
       }
+      // @todo: check for more?
       default:
         return false;
     }
@@ -123736,7 +123841,7 @@ var TimerDetailAuditInfo = {
     return message;
   }
 };
-var ActionButtonType = /* @__PURE__ */ function(ActionButtonType2) {
+var ActionButtonType = /* @__PURE__ */ (function(ActionButtonType2) {
   ActionButtonType2[ActionButtonType2["UNKNOWN"] = 0] = "UNKNOWN";
   ActionButtonType2[ActionButtonType2["FOLLOW"] = 1] = "FOLLOW";
   ActionButtonType2[ActionButtonType2["SET_GOAL"] = 2] = "SET_GOAL";
@@ -123758,15 +123863,15 @@ var ActionButtonType = /* @__PURE__ */ function(ActionButtonType2) {
   ActionButtonType2[ActionButtonType2["INVITE_ON_MIC"] = 18] = "INVITE_ON_MIC";
   ActionButtonType2[ActionButtonType2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return ActionButtonType2;
-}({});
-var AffiliatedInfoStickerShowScene = /* @__PURE__ */ function(AffiliatedInfoStickerShowScene2) {
+})({});
+var AffiliatedInfoStickerShowScene = /* @__PURE__ */ (function(AffiliatedInfoStickerShowScene2) {
   AffiliatedInfoStickerShowScene2[AffiliatedInfoStickerShowScene2["NORMAL"] = 0] = "NORMAL";
   AffiliatedInfoStickerShowScene2[AffiliatedInfoStickerShowScene2["SETTLING"] = 1] = "SETTLING";
   AffiliatedInfoStickerShowScene2[AffiliatedInfoStickerShowScene2["SETTLED"] = 2] = "SETTLED";
   AffiliatedInfoStickerShowScene2[AffiliatedInfoStickerShowScene2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return AffiliatedInfoStickerShowScene2;
-}({});
-var AuditStatus = /* @__PURE__ */ function(AuditStatus2) {
+})({});
+var AuditStatus = /* @__PURE__ */ (function(AuditStatus2) {
   AuditStatus2[AuditStatus2["AUDIT_STATUS_UNKNOWN"] = 0] = "AUDIT_STATUS_UNKNOWN";
   AuditStatus2[AuditStatus2["PASS"] = 1] = "PASS";
   AuditStatus2[AuditStatus2["FAILED"] = 2] = "FAILED";
@@ -123774,14 +123879,14 @@ var AuditStatus = /* @__PURE__ */ function(AuditStatus2) {
   AuditStatus2[AuditStatus2["FORBIDDEN"] = 4] = "FORBIDDEN";
   AuditStatus2[AuditStatus2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return AuditStatus2;
-}({});
-var AuditTaskType = /* @__PURE__ */ function(AuditTaskType2) {
+})({});
+var AuditTaskType = /* @__PURE__ */ (function(AuditTaskType2) {
   AuditTaskType2[AuditTaskType2["DEFAULT"] = 0] = "DEFAULT";
   AuditTaskType2[AuditTaskType2["APPEAL"] = 1] = "APPEAL";
   AuditTaskType2[AuditTaskType2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return AuditTaskType2;
-}({});
-var BadgeDisplayType = /* @__PURE__ */ function(BadgeDisplayType2) {
+})({});
+var BadgeDisplayType = /* @__PURE__ */ (function(BadgeDisplayType2) {
   BadgeDisplayType2[BadgeDisplayType2["BADGE_DISPLAY_TYPE_UNKNOWN"] = 0] = "BADGE_DISPLAY_TYPE_UNKNOWN";
   BadgeDisplayType2[BadgeDisplayType2["IMAGE"] = 1] = "IMAGE";
   BadgeDisplayType2[BadgeDisplayType2["TEXT"] = 2] = "TEXT";
@@ -123789,14 +123894,14 @@ var BadgeDisplayType = /* @__PURE__ */ function(BadgeDisplayType2) {
   BadgeDisplayType2[BadgeDisplayType2["COMBINE"] = 4] = "COMBINE";
   BadgeDisplayType2[BadgeDisplayType2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return BadgeDisplayType2;
-}({});
-var BadgeExhibitionType = /* @__PURE__ */ function(BadgeExhibitionType2) {
+})({});
+var BadgeExhibitionType = /* @__PURE__ */ (function(BadgeExhibitionType2) {
   BadgeExhibitionType2[BadgeExhibitionType2["BADGE"] = 0] = "BADGE";
   BadgeExhibitionType2[BadgeExhibitionType2["IDENTITY_LABEL"] = 1] = "IDENTITY_LABEL";
   BadgeExhibitionType2[BadgeExhibitionType2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return BadgeExhibitionType2;
-}({});
-var BadgePriorityType = /* @__PURE__ */ function(BadgePriorityType2) {
+})({});
+var BadgePriorityType = /* @__PURE__ */ (function(BadgePriorityType2) {
   BadgePriorityType2[BadgePriorityType2["BADGE_PRIORITY_TYPE_UNKNOWN"] = 0] = "BADGE_PRIORITY_TYPE_UNKNOWN";
   BadgePriorityType2[BadgePriorityType2["STRONG_RELATION"] = 10] = "STRONG_RELATION";
   BadgePriorityType2[BadgePriorityType2["PLATFORM"] = 20] = "PLATFORM";
@@ -123805,8 +123910,8 @@ var BadgePriorityType = /* @__PURE__ */ function(BadgePriorityType2) {
   BadgePriorityType2[BadgePriorityType2["RANK_LIST"] = 50] = "RANK_LIST";
   BadgePriorityType2[BadgePriorityType2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return BadgePriorityType2;
-}({});
-var BadgeSceneType = /* @__PURE__ */ function(BadgeSceneType2) {
+})({});
+var BadgeSceneType = /* @__PURE__ */ (function(BadgeSceneType2) {
   BadgeSceneType2[BadgeSceneType2["BADGE_SCENE_TYPE_UNKNOWN"] = 0] = "BADGE_SCENE_TYPE_UNKNOWN";
   BadgeSceneType2[BadgeSceneType2["ADMIN"] = 1] = "ADMIN";
   BadgeSceneType2[BadgeSceneType2["FIRST_RECHARGE"] = 2] = "FIRST_RECHARGE";
@@ -123824,15 +123929,15 @@ var BadgeSceneType = /* @__PURE__ */ function(BadgeSceneType2) {
   BadgeSceneType2[BadgeSceneType2["ENIGMA"] = 14] = "ENIGMA";
   BadgeSceneType2[BadgeSceneType2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return BadgeSceneType2;
-}({});
-var BadgeTextPosition = /* @__PURE__ */ function(BadgeTextPosition2) {
+})({});
+var BadgeTextPosition = /* @__PURE__ */ (function(BadgeTextPosition2) {
   BadgeTextPosition2[BadgeTextPosition2["BADGE_TEXT_POSITION_UNKNOWN"] = 0] = "BADGE_TEXT_POSITION_UNKNOWN";
   BadgeTextPosition2[BadgeTextPosition2["RIGHT"] = 1] = "RIGHT";
   BadgeTextPosition2[BadgeTextPosition2["BELOW"] = 2] = "BELOW";
   BadgeTextPosition2[BadgeTextPosition2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return BadgeTextPosition2;
-}({});
-var BattleABTestType = /* @__PURE__ */ function(BattleABTestType2) {
+})({});
+var BattleABTestType = /* @__PURE__ */ (function(BattleABTestType2) {
   BattleABTestType2[BattleABTestType2["UNKNOWN_AB_TEST_TYPE"] = 0] = "UNKNOWN_AB_TEST_TYPE";
   BattleABTestType2[BattleABTestType2["MEANWHILE_INVITE"] = 1] = "MEANWHILE_INVITE";
   BattleABTestType2[BattleABTestType2["SPECIFIED_GIFT"] = 2] = "SPECIFIED_GIFT";
@@ -123847,8 +123952,8 @@ var BattleABTestType = /* @__PURE__ */ function(BattleABTestType2) {
   BattleABTestType2[BattleABTestType2["MATCH_ICE_SHOWDOWN"] = 11] = "MATCH_ICE_SHOWDOWN";
   BattleABTestType2[BattleABTestType2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return BattleABTestType2;
-}({});
-var BattleInviteType = /* @__PURE__ */ function(BattleInviteType2) {
+})({});
+var BattleInviteType = /* @__PURE__ */ (function(BattleInviteType2) {
   BattleInviteType2[BattleInviteType2["BATTLE_INVITE_TYPE_NORMAL"] = 0] = "BATTLE_INVITE_TYPE_NORMAL";
   BattleInviteType2[BattleInviteType2["AGAIN"] = 1] = "AGAIN";
   BattleInviteType2[BattleInviteType2["TEAM_PAIR_INVITE_R"] = 2] = "TEAM_PAIR_INVITE_R";
@@ -123856,21 +123961,21 @@ var BattleInviteType = /* @__PURE__ */ function(BattleInviteType2) {
   BattleInviteType2[BattleInviteType2["TEAM_PAIR_QUICK_RECOMMEND_SOLO_INVITEE"] = 4] = "TEAM_PAIR_QUICK_RECOMMEND_SOLO_INVITEE";
   BattleInviteType2[BattleInviteType2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return BattleInviteType2;
-}({});
-var BattleResultResult = /* @__PURE__ */ function(BattleResultResult2) {
+})({});
+var BattleResultResult = /* @__PURE__ */ (function(BattleResultResult2) {
   BattleResultResult2[BattleResultResult2["WIN"] = 0] = "WIN";
   BattleResultResult2[BattleResultResult2["LOSE"] = 1] = "LOSE";
   BattleResultResult2[BattleResultResult2["DRAW"] = 2] = "DRAW";
   BattleResultResult2[BattleResultResult2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return BattleResultResult2;
-}({});
-var BattleScene = /* @__PURE__ */ function(BattleScene2) {
+})({});
+var BattleScene = /* @__PURE__ */ (function(BattleScene2) {
   BattleScene2[BattleScene2["BATTLE_SCENE_NORMAL"] = 0] = "BATTLE_SCENE_NORMAL";
   BattleScene2[BattleScene2["TEAM_PAIR"] = 1] = "TEAM_PAIR";
   BattleScene2[BattleScene2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return BattleScene2;
-}({});
-var BattleSettingsBattleStatus = /* @__PURE__ */ function(BattleSettingsBattleStatus2) {
+})({});
+var BattleSettingsBattleStatus = /* @__PURE__ */ (function(BattleSettingsBattleStatus2) {
   BattleSettingsBattleStatus2[BattleSettingsBattleStatus2["BATTLE_NOT_STARTED"] = 0] = "BATTLE_NOT_STARTED";
   BattleSettingsBattleStatus2[BattleSettingsBattleStatus2["BATTLE_STARTED"] = 1] = "BATTLE_STARTED";
   BattleSettingsBattleStatus2[BattleSettingsBattleStatus2["BATTLE_FINISHED"] = 2] = "BATTLE_FINISHED";
@@ -123878,8 +123983,8 @@ var BattleSettingsBattleStatus = /* @__PURE__ */ function(BattleSettingsBattleSt
   BattleSettingsBattleStatus2[BattleSettingsBattleStatus2["BATTLE_PUNISH_FINISHED"] = 4] = "BATTLE_PUNISH_FINISHED";
   BattleSettingsBattleStatus2[BattleSettingsBattleStatus2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return BattleSettingsBattleStatus2;
-}({});
-var BattleType = /* @__PURE__ */ function(BattleType2) {
+})({});
+var BattleType = /* @__PURE__ */ (function(BattleType2) {
   BattleType2[BattleType2["UNKNOWN_BATTLE_TYPE"] = 0] = "UNKNOWN_BATTLE_TYPE";
   BattleType2[BattleType2["NORMAL_BATTLE"] = 1] = "NORMAL_BATTLE";
   BattleType2[BattleType2["TEAM_BATTLE"] = 2] = "TEAM_BATTLE";
@@ -123891,8 +123996,8 @@ var BattleType = /* @__PURE__ */ function(BattleType2) {
   BattleType2[BattleType2["GROUP_RANK_LIST"] = 54] = "GROUP_RANK_LIST";
   BattleType2[BattleType2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return BattleType2;
-}({});
-var ClassType = /* @__PURE__ */ function(ClassType2) {
+})({});
+var ClassType = /* @__PURE__ */ (function(ClassType2) {
   ClassType2[ClassType2["NONE"] = 0] = "NONE";
   ClassType2[ClassType2["D_5"] = 100] = "D_5";
   ClassType2[ClassType2["D_4"] = 200] = "D_4";
@@ -123917,15 +124022,15 @@ var ClassType = /* @__PURE__ */ function(ClassType2) {
   ClassType2[ClassType2["S"] = 2100] = "S";
   ClassType2[ClassType2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return ClassType2;
-}({});
-var CoHostPermissoinType = /* @__PURE__ */ function(CoHostPermissoinType2) {
+})({});
+var CoHostPermissoinType = /* @__PURE__ */ (function(CoHostPermissoinType2) {
   CoHostPermissoinType2[CoHostPermissoinType2["NO_PERM"] = 0] = "NO_PERM";
   CoHostPermissoinType2[CoHostPermissoinType2["COHOST_PERM"] = 1] = "COHOST_PERM";
   CoHostPermissoinType2[CoHostPermissoinType2["MULTI_HOST_PERM"] = 2] = "MULTI_HOST_PERM";
   CoHostPermissoinType2[CoHostPermissoinType2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return CoHostPermissoinType2;
-}({});
-var CohostABTestType = /* @__PURE__ */ function(CohostABTestType2) {
+})({});
+var CohostABTestType = /* @__PURE__ */ (function(CohostABTestType2) {
   CohostABTestType2[CohostABTestType2["COHOST_AB_TEST_TYPE_UNKNOWN"] = 0] = "COHOST_AB_TEST_TYPE_UNKNOWN";
   CohostABTestType2[CohostABTestType2["LINK_TIME_OUT_STRATEGY"] = 1] = "LINK_TIME_OUT_STRATEGY";
   CohostABTestType2[CohostABTestType2["COHOST_RESERVATION"] = 2] = "COHOST_RESERVATION";
@@ -123933,28 +124038,28 @@ var CohostABTestType = /* @__PURE__ */ function(CohostABTestType2) {
   CohostABTestType2[CohostABTestType2["COHOST_INVITATION_TEXT"] = 4] = "COHOST_INVITATION_TEXT";
   CohostABTestType2[CohostABTestType2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return CohostABTestType2;
-}({});
-var CohostLayoutMode = /* @__PURE__ */ function(CohostLayoutMode2) {
+})({});
+var CohostLayoutMode = /* @__PURE__ */ (function(CohostLayoutMode2) {
   CohostLayoutMode2[CohostLayoutMode2["COHOST_LAYOUT_MODE_NORMAL"] = 0] = "COHOST_LAYOUT_MODE_NORMAL";
   CohostLayoutMode2[CohostLayoutMode2["SCREEN_SHARE"] = 1] = "SCREEN_SHARE";
   CohostLayoutMode2[CohostLayoutMode2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return CohostLayoutMode2;
-}({});
-var CohostNudgeInfo = /* @__PURE__ */ function(CohostNudgeInfo2) {
+})({});
+var CohostNudgeInfo = /* @__PURE__ */ (function(CohostNudgeInfo2) {
   CohostNudgeInfo2[CohostNudgeInfo2["COHOST_NUDGE_INFO_NONE"] = 0] = "COHOST_NUDGE_INFO_NONE";
   CohostNudgeInfo2[CohostNudgeInfo2["YOUR_NUDGE"] = 1] = "YOUR_NUDGE";
   CohostNudgeInfo2[CohostNudgeInfo2["NUDGED_YOU"] = 2] = "NUDGED_YOU";
   CohostNudgeInfo2[CohostNudgeInfo2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return CohostNudgeInfo2;
-}({});
-var ContentSource = /* @__PURE__ */ function(ContentSource2) {
+})({});
+var ContentSource = /* @__PURE__ */ (function(ContentSource2) {
   ContentSource2[ContentSource2["CONTENT_SOURCE_UNKNOWN"] = 0] = "CONTENT_SOURCE_UNKNOWN";
   ContentSource2[ContentSource2["CONTENT_SOURCE_NORMAL"] = 1] = "CONTENT_SOURCE_NORMAL";
   ContentSource2[ContentSource2["CAMERA"] = 2] = "CAMERA";
   ContentSource2[ContentSource2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return ContentSource2;
-}({});
-var DetailBlockReason = /* @__PURE__ */ function(DetailBlockReason2) {
+})({});
+var DetailBlockReason = /* @__PURE__ */ (function(DetailBlockReason2) {
   DetailBlockReason2[DetailBlockReason2["BLOCK_REASON_NONE"] = 0] = "BLOCK_REASON_NONE";
   DetailBlockReason2[DetailBlockReason2["IN_LINKMIC"] = 100] = "IN_LINKMIC";
   DetailBlockReason2[DetailBlockReason2["MULTI_HOST_FULL"] = 101] = "MULTI_HOST_FULL";
@@ -124012,8 +124117,8 @@ var DetailBlockReason = /* @__PURE__ */ function(DetailBlockReason2) {
   DetailBlockReason2[DetailBlockReason2["ROOM_FILTER_ERROR"] = 401] = "ROOM_FILTER_ERROR";
   DetailBlockReason2[DetailBlockReason2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return DetailBlockReason2;
-}({});
-var DisplayControlHorizontalOnclickTriggerType = /* @__PURE__ */ function(DisplayControlHorizontalOnclickTriggerType2) {
+})({});
+var DisplayControlHorizontalOnclickTriggerType = /* @__PURE__ */ (function(DisplayControlHorizontalOnclickTriggerType2) {
   DisplayControlHorizontalOnclickTriggerType2[DisplayControlHorizontalOnclickTriggerType2["ONCLICK_TRIGGER_TYPE_UNKNOWN"] = 0] = "ONCLICK_TRIGGER_TYPE_UNKNOWN";
   DisplayControlHorizontalOnclickTriggerType2[DisplayControlHorizontalOnclickTriggerType2["ONCLICK_TRIGGER_TYPE_LEFT"] = 1] = "ONCLICK_TRIGGER_TYPE_LEFT";
   DisplayControlHorizontalOnclickTriggerType2[DisplayControlHorizontalOnclickTriggerType2["ONCLICK_TRIGGER_TYPE_MIDDLE"] = 2] = "ONCLICK_TRIGGER_TYPE_MIDDLE";
@@ -124021,43 +124126,43 @@ var DisplayControlHorizontalOnclickTriggerType = /* @__PURE__ */ function(Displa
   DisplayControlHorizontalOnclickTriggerType2[DisplayControlHorizontalOnclickTriggerType2["ONCLICK_TRIGGER_TYPE_ALL_AREA"] = 4] = "ONCLICK_TRIGGER_TYPE_ALL_AREA";
   DisplayControlHorizontalOnclickTriggerType2[DisplayControlHorizontalOnclickTriggerType2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return DisplayControlHorizontalOnclickTriggerType2;
-}({});
-var DisplayStatus = /* @__PURE__ */ function(DisplayStatus2) {
+})({});
+var DisplayStatus = /* @__PURE__ */ (function(DisplayStatus2) {
   DisplayStatus2[DisplayStatus2["DISPLAY_STATUS_NORMAL"] = 0] = "DISPLAY_STATUS_NORMAL";
   DisplayStatus2[DisplayStatus2["SHADOW"] = 1] = "SHADOW";
   DisplayStatus2[DisplayStatus2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return DisplayStatus2;
-}({});
-var EmotePrivateType = /* @__PURE__ */ function(EmotePrivateType2) {
+})({});
+var EmotePrivateType = /* @__PURE__ */ (function(EmotePrivateType2) {
   EmotePrivateType2[EmotePrivateType2["EMOTE_PRIVATE_TYPE_NORMAL"] = 0] = "EMOTE_PRIVATE_TYPE_NORMAL";
   EmotePrivateType2[EmotePrivateType2["SUB_WAVE"] = 1] = "SUB_WAVE";
   EmotePrivateType2[EmotePrivateType2["GUESSING"] = 101] = "GUESSING";
   EmotePrivateType2[EmotePrivateType2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return EmotePrivateType2;
-}({});
-var EmoteScene = /* @__PURE__ */ function(EmoteScene2) {
+})({});
+var EmoteScene = /* @__PURE__ */ (function(EmoteScene2) {
   EmoteScene2[EmoteScene2["SUBSCRIPTION"] = 0] = "SUBSCRIPTION";
   EmoteScene2[EmoteScene2["GAME"] = 1] = "GAME";
   EmoteScene2[EmoteScene2["FANS_CLUB"] = 2] = "FANS_CLUB";
   EmoteScene2[EmoteScene2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return EmoteScene2;
-}({});
-var EmoteType = /* @__PURE__ */ function(EmoteType2) {
+})({});
+var EmoteType = /* @__PURE__ */ (function(EmoteType2) {
   EmoteType2[EmoteType2["EMOTE_TYPE_NORMAL"] = 0] = "EMOTE_TYPE_NORMAL";
   EmoteType2[EmoteType2["WITH_STICKER"] = 1] = "WITH_STICKER";
   EmoteType2[EmoteType2["EMOTE_TYPE_FANS"] = 2] = "EMOTE_TYPE_FANS";
   EmoteType2[EmoteType2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return EmoteType2;
-}({});
-var EntranceGroupType = /* @__PURE__ */ function(EntranceGroupType2) {
+})({});
+var EntranceGroupType = /* @__PURE__ */ (function(EntranceGroupType2) {
   EntranceGroupType2[EntranceGroupType2["ENTRANCE_GROUP_TYPE_DEFAULT"] = 0] = "ENTRANCE_GROUP_TYPE_DEFAULT";
   EntranceGroupType2[EntranceGroupType2["GIFT"] = 1] = "GIFT";
   EntranceGroupType2[EntranceGroupType2["E_COMMERCE"] = 2] = "E_COMMERCE";
   EntranceGroupType2[EntranceGroupType2["ENTRANCE_GROUP_TYPE_GAME"] = 3] = "ENTRANCE_GROUP_TYPE_GAME";
   EntranceGroupType2[EntranceGroupType2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return EntranceGroupType2;
-}({});
-var EnvelopeBusinessType = /* @__PURE__ */ function(EnvelopeBusinessType2) {
+})({});
+var EnvelopeBusinessType = /* @__PURE__ */ (function(EnvelopeBusinessType2) {
   EnvelopeBusinessType2[EnvelopeBusinessType2["BUSINESS_TYPE_UNKNOWN"] = 0] = "BUSINESS_TYPE_UNKNOWN";
   EnvelopeBusinessType2[EnvelopeBusinessType2["BUSINESS_TYPE_USER_DIAMOND"] = 1] = "BUSINESS_TYPE_USER_DIAMOND";
   EnvelopeBusinessType2[EnvelopeBusinessType2["BUSINESS_TYPE_PLATFORM_DIAMOND"] = 2] = "BUSINESS_TYPE_PLATFORM_DIAMOND";
@@ -124075,30 +124180,30 @@ var EnvelopeBusinessType = /* @__PURE__ */ function(EnvelopeBusinessType2) {
   EnvelopeBusinessType2[EnvelopeBusinessType2["SUPER_FAN_BOX"] = 19] = "SUPER_FAN_BOX";
   EnvelopeBusinessType2[EnvelopeBusinessType2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return EnvelopeBusinessType2;
-}({});
-var EnvelopeDisplay = /* @__PURE__ */ function(EnvelopeDisplay2) {
+})({});
+var EnvelopeDisplay = /* @__PURE__ */ (function(EnvelopeDisplay2) {
   EnvelopeDisplay2[EnvelopeDisplay2["ENVELOPE_DISPLAY_UNKNOWN"] = 0] = "ENVELOPE_DISPLAY_UNKNOWN";
   EnvelopeDisplay2[EnvelopeDisplay2["NEW"] = 1] = "NEW";
   EnvelopeDisplay2[EnvelopeDisplay2["HIDE"] = 2] = "HIDE";
   EnvelopeDisplay2[EnvelopeDisplay2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return EnvelopeDisplay2;
-}({});
-var EnvelopeFollowShowStatus = /* @__PURE__ */ function(EnvelopeFollowShowStatus2) {
+})({});
+var EnvelopeFollowShowStatus = /* @__PURE__ */ (function(EnvelopeFollowShowStatus2) {
   EnvelopeFollowShowStatus2[EnvelopeFollowShowStatus2["ENVELOPE_FOLLOW_SHOW_UNKNOWN"] = 0] = "ENVELOPE_FOLLOW_SHOW_UNKNOWN";
   EnvelopeFollowShowStatus2[EnvelopeFollowShowStatus2["ENVELOPE_FOLLOW_SHOW"] = 1] = "ENVELOPE_FOLLOW_SHOW";
   EnvelopeFollowShowStatus2[EnvelopeFollowShowStatus2["ENVELOPE_FOLLOW_NOT_SHOW"] = 2] = "ENVELOPE_FOLLOW_NOT_SHOW";
   EnvelopeFollowShowStatus2[EnvelopeFollowShowStatus2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return EnvelopeFollowShowStatus2;
-}({});
-var GamepadTaskType = /* @__PURE__ */ function(GamepadTaskType2) {
+})({});
+var GamepadTaskType = /* @__PURE__ */ (function(GamepadTaskType2) {
   GamepadTaskType2[GamepadTaskType2["PARTNERSHIP"] = 0] = "PARTNERSHIP";
   GamepadTaskType2[GamepadTaskType2["PUBLISHER"] = 1] = "PUBLISHER";
   GamepadTaskType2[GamepadTaskType2["EVENT"] = 2] = "EVENT";
   GamepadTaskType2[GamepadTaskType2["ORG"] = 3] = "ORG";
   GamepadTaskType2[GamepadTaskType2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return GamepadTaskType2;
-}({});
-var GiftPanelBeaconBubbleType = /* @__PURE__ */ function(GiftPanelBeaconBubbleType2) {
+})({});
+var GiftPanelBeaconBubbleType = /* @__PURE__ */ (function(GiftPanelBeaconBubbleType2) {
   GiftPanelBeaconBubbleType2[GiftPanelBeaconBubbleType2["GIFT_PANEL_BEACON_BUBBLE_TYPE_UNKNOWN"] = 0] = "GIFT_PANEL_BEACON_BUBBLE_TYPE_UNKNOWN";
   GiftPanelBeaconBubbleType2[GiftPanelBeaconBubbleType2["GIFT_PANEL_BEACON_BUBBLE_TYPE_DEFAULT"] = 1] = "GIFT_PANEL_BEACON_BUBBLE_TYPE_DEFAULT";
   GiftPanelBeaconBubbleType2[GiftPanelBeaconBubbleType2["LYNX_DEFAULT"] = 2] = "LYNX_DEFAULT";
@@ -124109,8 +124214,8 @@ var GiftPanelBeaconBubbleType = /* @__PURE__ */ function(GiftPanelBeaconBubbleTy
   GiftPanelBeaconBubbleType2[GiftPanelBeaconBubbleType2["VIEWER_PICKS"] = 7] = "VIEWER_PICKS";
   GiftPanelBeaconBubbleType2[GiftPanelBeaconBubbleType2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return GiftPanelBeaconBubbleType2;
-}({});
-var GiftPermissionType = /* @__PURE__ */ function(GiftPermissionType2) {
+})({});
+var GiftPermissionType = /* @__PURE__ */ (function(GiftPermissionType2) {
   GiftPermissionType2[GiftPermissionType2["UNKNOWN_TYPE"] = 0] = "UNKNOWN_TYPE";
   GiftPermissionType2[GiftPermissionType2["NO_GIFT_PERMISSION"] = 1] = "NO_GIFT_PERMISSION";
   GiftPermissionType2[GiftPermissionType2["ANCHOR_CLOSE"] = 2] = "ANCHOR_CLOSE";
@@ -124118,27 +124223,27 @@ var GiftPermissionType = /* @__PURE__ */ function(GiftPermissionType2) {
   GiftPermissionType2[GiftPermissionType2["ANCHOR_BANNED"] = 4] = "ANCHOR_BANNED";
   GiftPermissionType2[GiftPermissionType2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return GiftPermissionType2;
-}({});
-var GiftShowType = /* @__PURE__ */ function(GiftShowType2) {
+})({});
+var GiftShowType = /* @__PURE__ */ (function(GiftShowType2) {
   GiftShowType2[GiftShowType2["GIFT_SHOW_DEFAULT"] = 0] = "GIFT_SHOW_DEFAULT";
   GiftShowType2[GiftShowType2["GIFT_SHOW_NAME"] = 1] = "GIFT_SHOW_NAME";
   GiftShowType2[GiftShowType2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return GiftShowType2;
-}({});
-var GiftStructSchemeGiftType = /* @__PURE__ */ function(GiftStructSchemeGiftType2) {
+})({});
+var GiftStructSchemeGiftType = /* @__PURE__ */ (function(GiftStructSchemeGiftType2) {
   GiftStructSchemeGiftType2[GiftStructSchemeGiftType2["SCHEME_GIFT_TYPE_NONE"] = 0] = "SCHEME_GIFT_TYPE_NONE";
   GiftStructSchemeGiftType2[GiftStructSchemeGiftType2["SCHEME_GIFT_TYPE_MAGIC"] = 1] = "SCHEME_GIFT_TYPE_MAGIC";
   GiftStructSchemeGiftType2[GiftStructSchemeGiftType2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return GiftStructSchemeGiftType2;
-}({});
-var GiftTrayStyle = /* @__PURE__ */ function(GiftTrayStyle2) {
+})({});
+var GiftTrayStyle = /* @__PURE__ */ (function(GiftTrayStyle2) {
   GiftTrayStyle2[GiftTrayStyle2["GIFT_TRAY_STYLE_DEFAULT"] = 0] = "GIFT_TRAY_STYLE_DEFAULT";
   GiftTrayStyle2[GiftTrayStyle2["GALLERY_REPURCHASE_FULL"] = 1] = "GALLERY_REPURCHASE_FULL";
   GiftTrayStyle2[GiftTrayStyle2["GALLERY_REPURCHASE_BACKGROUND"] = 2] = "GALLERY_REPURCHASE_BACKGROUND";
   GiftTrayStyle2[GiftTrayStyle2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return GiftTrayStyle2;
-}({});
-var GoalMessageSource = /* @__PURE__ */ function(GoalMessageSource2) {
+})({});
+var GoalMessageSource = /* @__PURE__ */ (function(GoalMessageSource2) {
   GoalMessageSource2[GoalMessageSource2["GOAL_MESSAGE_SOURCE_UNKNOWN"] = 0] = "GOAL_MESSAGE_SOURCE_UNKNOWN";
   GoalMessageSource2[GoalMessageSource2["COMMIT"] = 1] = "COMMIT";
   GoalMessageSource2[GoalMessageSource2["PROGRESS_UPDATE"] = 2] = "PROGRESS_UPDATE";
@@ -124149,8 +124254,8 @@ var GoalMessageSource = /* @__PURE__ */ function(GoalMessageSource2) {
   GoalMessageSource2[GoalMessageSource2["CHALLENGE_PROMPT"] = 7] = "CHALLENGE_PROMPT";
   GoalMessageSource2[GoalMessageSource2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return GoalMessageSource2;
-}({});
-var GuestMicCameraChangeScene = /* @__PURE__ */ function(GuestMicCameraChangeScene2) {
+})({});
+var GuestMicCameraChangeScene = /* @__PURE__ */ (function(GuestMicCameraChangeScene2) {
   GuestMicCameraChangeScene2[GuestMicCameraChangeScene2["CHANGE_SCENE_UNKNOWN"] = 0] = "CHANGE_SCENE_UNKNOWN";
   GuestMicCameraChangeScene2[GuestMicCameraChangeScene2["LIVE_SHOW_BY_ANCHOR_AUTO"] = 1] = "LIVE_SHOW_BY_ANCHOR_AUTO";
   GuestMicCameraChangeScene2[GuestMicCameraChangeScene2["LIVE_SHOW_BY_SERVER_NORMAL"] = 2] = "LIVE_SHOW_BY_SERVER_NORMAL";
@@ -124158,8 +124263,8 @@ var GuestMicCameraChangeScene = /* @__PURE__ */ function(GuestMicCameraChangeSce
   GuestMicCameraChangeScene2[GuestMicCameraChangeScene2["COHOST_WITH_GUEST"] = 4] = "COHOST_WITH_GUEST";
   GuestMicCameraChangeScene2[GuestMicCameraChangeScene2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return GuestMicCameraChangeScene2;
-}({});
-var GuestMicCameraManageOp = /* @__PURE__ */ function(GuestMicCameraManageOp2) {
+})({});
+var GuestMicCameraManageOp = /* @__PURE__ */ (function(GuestMicCameraManageOp2) {
   GuestMicCameraManageOp2[GuestMicCameraManageOp2["OPEN_MIC"] = 0] = "OPEN_MIC";
   GuestMicCameraManageOp2[GuestMicCameraManageOp2["OPEN_CAMERA"] = 1] = "OPEN_CAMERA";
   GuestMicCameraManageOp2[GuestMicCameraManageOp2["CLOSE_MIC"] = 2] = "CLOSE_MIC";
@@ -124167,27 +124272,27 @@ var GuestMicCameraManageOp = /* @__PURE__ */ function(GuestMicCameraManageOp2) {
   GuestMicCameraManageOp2[GuestMicCameraManageOp2["CLOSE_MIC_PUNISH"] = 4] = "CLOSE_MIC_PUNISH";
   GuestMicCameraManageOp2[GuestMicCameraManageOp2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return GuestMicCameraManageOp2;
-}({});
-var HashtagNamespace = /* @__PURE__ */ function(HashtagNamespace2) {
+})({});
+var HashtagNamespace = /* @__PURE__ */ (function(HashtagNamespace2) {
   HashtagNamespace2[HashtagNamespace2["GLOBAL"] = 0] = "GLOBAL";
   HashtagNamespace2[HashtagNamespace2["GAMING"] = 1] = "GAMING";
   HashtagNamespace2[HashtagNamespace2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return HashtagNamespace2;
-}({});
-var HorizontalPaddingRule = /* @__PURE__ */ function(HorizontalPaddingRule2) {
+})({});
+var HorizontalPaddingRule = /* @__PURE__ */ (function(HorizontalPaddingRule2) {
   HorizontalPaddingRule2[HorizontalPaddingRule2["USE_MIDDLE_AND_WIDTH"] = 0] = "USE_MIDDLE_AND_WIDTH";
   HorizontalPaddingRule2[HorizontalPaddingRule2["USE_LEFT_AND_MIDDLE_AND_RIGHT"] = 1] = "USE_LEFT_AND_MIDDLE_AND_RIGHT";
   HorizontalPaddingRule2[HorizontalPaddingRule2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return HorizontalPaddingRule2;
-}({});
-var IceShowdownSetting = /* @__PURE__ */ function(IceShowdownSetting2) {
+})({});
+var IceShowdownSetting = /* @__PURE__ */ (function(IceShowdownSetting2) {
   IceShowdownSetting2[IceShowdownSetting2["ICE_SHOWDOWN_OFF"] = 0] = "ICE_SHOWDOWN_OFF";
   IceShowdownSetting2[IceShowdownSetting2["ICE_SHOWDOWN_MANUAL"] = 1] = "ICE_SHOWDOWN_MANUAL";
   IceShowdownSetting2[IceShowdownSetting2["ICE_SHOWDOWN_SYSTEM"] = 2] = "ICE_SHOWDOWN_SYSTEM";
   IceShowdownSetting2[IceShowdownSetting2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return IceShowdownSetting2;
-}({});
-var LinkListStatus = /* @__PURE__ */ function(LinkListStatus2) {
+})({});
+var LinkListStatus = /* @__PURE__ */ (function(LinkListStatus2) {
   LinkListStatus2[LinkListStatus2["STATUS_UN_KOWN"] = 0] = "STATUS_UN_KOWN";
   LinkListStatus2[LinkListStatus2["STATUS_WAITING"] = 1] = "STATUS_WAITING";
   LinkListStatus2[LinkListStatus2["STATUS_LINKED"] = 2] = "STATUS_LINKED";
@@ -124195,8 +124300,8 @@ var LinkListStatus = /* @__PURE__ */ function(LinkListStatus2) {
   LinkListStatus2[LinkListStatus2["STATUS_WAITING_OR_LINKED"] = 4] = "STATUS_WAITING_OR_LINKED";
   LinkListStatus2[LinkListStatus2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return LinkListStatus2;
-}({});
-var LinkRoleType = /* @__PURE__ */ function(LinkRoleType2) {
+})({});
+var LinkRoleType = /* @__PURE__ */ (function(LinkRoleType2) {
   LinkRoleType2[LinkRoleType2["TYPE_ROLE_TYPE_UN_KOWN"] = 0] = "TYPE_ROLE_TYPE_UN_KOWN";
   LinkRoleType2[LinkRoleType2["TYPE_LEADER"] = 1] = "TYPE_LEADER";
   LinkRoleType2[LinkRoleType2["TYPE_PLAYER"] = 2] = "TYPE_PLAYER";
@@ -124204,48 +124309,48 @@ var LinkRoleType = /* @__PURE__ */ function(LinkRoleType2) {
   LinkRoleType2[LinkRoleType2["TYPE_APP_LIER"] = 4] = "TYPE_APP_LIER";
   LinkRoleType2[LinkRoleType2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return LinkRoleType2;
-}({});
-var LinkSilenceStatus = /* @__PURE__ */ function(LinkSilenceStatus2) {
+})({});
+var LinkSilenceStatus = /* @__PURE__ */ (function(LinkSilenceStatus2) {
   LinkSilenceStatus2[LinkSilenceStatus2["STATUS_UN_SILENCE"] = 0] = "STATUS_UN_SILENCE";
   LinkSilenceStatus2[LinkSilenceStatus2["STATUS_SILENCE_BY_SELF"] = 1] = "STATUS_SILENCE_BY_SELF";
   LinkSilenceStatus2[LinkSilenceStatus2["STATUS_SILENCE_BY_OWNER"] = 2] = "STATUS_SILENCE_BY_OWNER";
   LinkSilenceStatus2[LinkSilenceStatus2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return LinkSilenceStatus2;
-}({});
-var LinkType = /* @__PURE__ */ function(LinkType2) {
+})({});
+var LinkType = /* @__PURE__ */ (function(LinkType2) {
   LinkType2[LinkType2["TYPE_UNKNOWN"] = 0] = "TYPE_UNKNOWN";
   LinkType2[LinkType2["TYPE_VIDEO"] = 1] = "TYPE_VIDEO";
   LinkType2[LinkType2["TYPE_AUDIO"] = 2] = "TYPE_AUDIO";
   LinkType2[LinkType2["TYPE_VIRTUAL"] = 3] = "TYPE_VIRTUAL";
   LinkType2[LinkType2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return LinkType2;
-}({});
-var LinkUserType = /* @__PURE__ */ function(LinkUserType2) {
+})({});
+var LinkUserType = /* @__PURE__ */ (function(LinkUserType2) {
   LinkUserType2[LinkUserType2["LINK_USER_TYPE_DEFAULT"] = 0] = "LINK_USER_TYPE_DEFAULT";
   LinkUserType2[LinkUserType2["KARAOKE"] = 1] = "KARAOKE";
   LinkUserType2[LinkUserType2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return LinkUserType2;
-}({});
-var LinkmicApplierSortSetting = /* @__PURE__ */ function(LinkmicApplierSortSetting2) {
+})({});
+var LinkmicApplierSortSetting = /* @__PURE__ */ (function(LinkmicApplierSortSetting2) {
   LinkmicApplierSortSetting2[LinkmicApplierSortSetting2["LINKMIC_APP_LIER_SORT_SETTING_NONE"] = 0] = "LINKMIC_APP_LIER_SORT_SETTING_NONE";
   LinkmicApplierSortSetting2[LinkmicApplierSortSetting2["LINKMIC_APP_LIER_SORT_SETTING_BY_GIFT_SCORE"] = 1] = "LINKMIC_APP_LIER_SORT_SETTING_BY_GIFT_SCORE";
   LinkmicApplierSortSetting2[LinkmicApplierSortSetting2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return LinkmicApplierSortSetting2;
-}({});
-var LinkmicGiftExpressionStrategy = /* @__PURE__ */ function(LinkmicGiftExpressionStrategy2) {
+})({});
+var LinkmicGiftExpressionStrategy = /* @__PURE__ */ (function(LinkmicGiftExpressionStrategy2) {
   LinkmicGiftExpressionStrategy2[LinkmicGiftExpressionStrategy2["CONTROL_V1"] = 0] = "CONTROL_V1";
   LinkmicGiftExpressionStrategy2[LinkmicGiftExpressionStrategy2["EXPERIMENT_V1"] = 1] = "EXPERIMENT_V1";
   LinkmicGiftExpressionStrategy2[LinkmicGiftExpressionStrategy2["EXPERIMENT_V2"] = 2] = "EXPERIMENT_V2";
   LinkmicGiftExpressionStrategy2[LinkmicGiftExpressionStrategy2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return LinkmicGiftExpressionStrategy2;
-}({});
-var LinkmicMultiLiveEnum = /* @__PURE__ */ function(LinkmicMultiLiveEnum2) {
+})({});
+var LinkmicMultiLiveEnum = /* @__PURE__ */ (function(LinkmicMultiLiveEnum2) {
   LinkmicMultiLiveEnum2[LinkmicMultiLiveEnum2["LINKMIC_MULTI_LIVE_ENUM_DEFAULT"] = 0] = "LINKMIC_MULTI_LIVE_ENUM_DEFAULT";
   LinkmicMultiLiveEnum2[LinkmicMultiLiveEnum2["ANCHOR_USE_NEW_LAYOUT"] = 1] = "ANCHOR_USE_NEW_LAYOUT";
   LinkmicMultiLiveEnum2[LinkmicMultiLiveEnum2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return LinkmicMultiLiveEnum2;
-}({});
-var LinkmicPlayType = /* @__PURE__ */ function(LinkmicPlayType2) {
+})({});
+var LinkmicPlayType = /* @__PURE__ */ (function(LinkmicPlayType2) {
   LinkmicPlayType2[LinkmicPlayType2["PLAY_TYPE_INVITE"] = 0] = "PLAY_TYPE_INVITE";
   LinkmicPlayType2[LinkmicPlayType2["PLAY_TYPE_APPLY"] = 1] = "PLAY_TYPE_APPLY";
   LinkmicPlayType2[LinkmicPlayType2["PLAY_TYPE_RESERVE"] = 2] = "PLAY_TYPE_RESERVE";
@@ -124253,22 +124358,22 @@ var LinkmicPlayType = /* @__PURE__ */ function(LinkmicPlayType2) {
   LinkmicPlayType2[LinkmicPlayType2["PLAY_TYPE_OFFLINE"] = 4] = "PLAY_TYPE_OFFLINE";
   LinkmicPlayType2[LinkmicPlayType2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return LinkmicPlayType2;
-}({});
-var LinkmicReplyType = /* @__PURE__ */ function(LinkmicReplyType2) {
+})({});
+var LinkmicReplyType = /* @__PURE__ */ (function(LinkmicReplyType2) {
   LinkmicReplyType2[LinkmicReplyType2["RT_UNKNOWN"] = 0] = "RT_UNKNOWN";
   LinkmicReplyType2[LinkmicReplyType2["RT_AGREE"] = 1] = "RT_AGREE";
   LinkmicReplyType2[LinkmicReplyType2["RT_REJECT"] = 2] = "RT_REJECT";
   LinkmicReplyType2[LinkmicReplyType2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return LinkmicReplyType2;
-}({});
-var LinkmicShareRevenueSetting = /* @__PURE__ */ function(LinkmicShareRevenueSetting2) {
+})({});
+var LinkmicShareRevenueSetting = /* @__PURE__ */ (function(LinkmicShareRevenueSetting2) {
   LinkmicShareRevenueSetting2[LinkmicShareRevenueSetting2["LINKMIC_SHARE_REVENUE_NOT_SET"] = 0] = "LINKMIC_SHARE_REVENUE_NOT_SET";
   LinkmicShareRevenueSetting2[LinkmicShareRevenueSetting2["LINKMIC_SHARE_REVENUE_OPEN"] = 1] = "LINKMIC_SHARE_REVENUE_OPEN";
   LinkmicShareRevenueSetting2[LinkmicShareRevenueSetting2["LINKMIC_SHARE_REVENUE_CLOSE"] = 2] = "LINKMIC_SHARE_REVENUE_CLOSE";
   LinkmicShareRevenueSetting2[LinkmicShareRevenueSetting2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return LinkmicShareRevenueSetting2;
-}({});
-var LinkmicStatus = /* @__PURE__ */ function(LinkmicStatus2) {
+})({});
+var LinkmicStatus = /* @__PURE__ */ (function(LinkmicStatus2) {
   LinkmicStatus2[LinkmicStatus2["DISABLE"] = 0] = "DISABLE";
   LinkmicStatus2[LinkmicStatus2["ENABLE"] = 1] = "ENABLE";
   LinkmicStatus2[LinkmicStatus2["JUST_FOLLOWING"] = 2] = "JUST_FOLLOWING";
@@ -124276,8 +124381,8 @@ var LinkmicStatus = /* @__PURE__ */ function(LinkmicStatus2) {
   LinkmicStatus2[LinkmicStatus2["MULTI_LINKING_ONLY_FOLLOWING"] = 4] = "MULTI_LINKING_ONLY_FOLLOWING";
   LinkmicStatus2[LinkmicStatus2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return LinkmicStatus2;
-}({});
-var LinkmicUserSettingDisableVideoLinkmic = /* @__PURE__ */ function(LinkmicUserSettingDisableVideoLinkmic2) {
+})({});
+var LinkmicUserSettingDisableVideoLinkmic = /* @__PURE__ */ (function(LinkmicUserSettingDisableVideoLinkmic2) {
   LinkmicUserSettingDisableVideoLinkmic2[LinkmicUserSettingDisableVideoLinkmic2["UN_SET"] = 0] = "UN_SET";
   LinkmicUserSettingDisableVideoLinkmic2[LinkmicUserSettingDisableVideoLinkmic2["OPEN_AND_SHOW"] = 1] = "OPEN_AND_SHOW";
   LinkmicUserSettingDisableVideoLinkmic2[LinkmicUserSettingDisableVideoLinkmic2["CLOSE_AND_SHOW"] = 2] = "CLOSE_AND_SHOW";
@@ -124285,14 +124390,14 @@ var LinkmicUserSettingDisableVideoLinkmic = /* @__PURE__ */ function(LinkmicUser
   LinkmicUserSettingDisableVideoLinkmic2[LinkmicUserSettingDisableVideoLinkmic2["CLOSE_AND_HIDE"] = 4] = "CLOSE_AND_HIDE";
   LinkmicUserSettingDisableVideoLinkmic2[LinkmicUserSettingDisableVideoLinkmic2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return LinkmicUserSettingDisableVideoLinkmic2;
-}({});
-var LinkmicUserSettingLayout = /* @__PURE__ */ function(LinkmicUserSettingLayout2) {
+})({});
+var LinkmicUserSettingLayout = /* @__PURE__ */ (function(LinkmicUserSettingLayout2) {
   LinkmicUserSettingLayout2[LinkmicUserSettingLayout2["GRID"] = 0] = "GRID";
   LinkmicUserSettingLayout2[LinkmicUserSettingLayout2["FLOATING"] = 1] = "FLOATING";
   LinkmicUserSettingLayout2[LinkmicUserSettingLayout2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return LinkmicUserSettingLayout2;
-}({});
-var LinkmicUserSettingMultiGuestApplyAutoApprove = /* @__PURE__ */ function(LinkmicUserSettingMultiGuestApplyAutoApprove2) {
+})({});
+var LinkmicUserSettingMultiGuestApplyAutoApprove = /* @__PURE__ */ (function(LinkmicUserSettingMultiGuestApplyAutoApprove2) {
   LinkmicUserSettingMultiGuestApplyAutoApprove2[LinkmicUserSettingMultiGuestApplyAutoApprove2["NOT_SET"] = 0] = "NOT_SET";
   LinkmicUserSettingMultiGuestApplyAutoApprove2[LinkmicUserSettingMultiGuestApplyAutoApprove2["ALL_AUDIENCE"] = 1] = "ALL_AUDIENCE";
   LinkmicUserSettingMultiGuestApplyAutoApprove2[LinkmicUserSettingMultiGuestApplyAutoApprove2["ONLY_FOLLOWER"] = 2] = "ONLY_FOLLOWER";
@@ -124300,8 +124405,8 @@ var LinkmicUserSettingMultiGuestApplyAutoApprove = /* @__PURE__ */ function(Link
   LinkmicUserSettingMultiGuestApplyAutoApprove2[LinkmicUserSettingMultiGuestApplyAutoApprove2["ONLY_GIFT_ER"] = 4] = "ONLY_GIFT_ER";
   LinkmicUserSettingMultiGuestApplyAutoApprove2[LinkmicUserSettingMultiGuestApplyAutoApprove2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return LinkmicUserSettingMultiGuestApplyAutoApprove2;
-}({});
-var LinkmicUserSettingShowAction = /* @__PURE__ */ function(LinkmicUserSettingShowAction2) {
+})({});
+var LinkmicUserSettingShowAction = /* @__PURE__ */ (function(LinkmicUserSettingShowAction2) {
   LinkmicUserSettingShowAction2[LinkmicUserSettingShowAction2["CHECKED"] = 0] = "CHECKED";
   LinkmicUserSettingShowAction2[LinkmicUserSettingShowAction2["NOT_CHECKED"] = 1] = "NOT_CHECKED";
   LinkmicUserSettingShowAction2[LinkmicUserSettingShowAction2["LINKMIC_USER_SETTING_SHOW_ACTION_HIDE"] = 2] = "LINKMIC_USER_SETTING_SHOW_ACTION_HIDE";
@@ -124309,30 +124414,30 @@ var LinkmicUserSettingShowAction = /* @__PURE__ */ function(LinkmicUserSettingSh
   LinkmicUserSettingShowAction2[LinkmicUserSettingShowAction2["CLOSE"] = 4] = "CLOSE";
   LinkmicUserSettingShowAction2[LinkmicUserSettingShowAction2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return LinkmicUserSettingShowAction2;
-}({});
-var LinkmicUserStatus = /* @__PURE__ */ function(LinkmicUserStatus2) {
+})({});
+var LinkmicUserStatus = /* @__PURE__ */ (function(LinkmicUserStatus2) {
   LinkmicUserStatus2[LinkmicUserStatus2["USER_STATUS_NONE"] = 0] = "USER_STATUS_NONE";
   LinkmicUserStatus2[LinkmicUserStatus2["USER_STATUS_LINKED"] = 1] = "USER_STATUS_LINKED";
   LinkmicUserStatus2[LinkmicUserStatus2["USER_STATUS_APPLYING"] = 2] = "USER_STATUS_APPLYING";
   LinkmicUserStatus2[LinkmicUserStatus2["USER_STATUS_INVITING"] = 3] = "USER_STATUS_INVITING";
   LinkmicUserStatus2[LinkmicUserStatus2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return LinkmicUserStatus2;
-}({});
-var LiveEventInfoEventPayMethod = /* @__PURE__ */ function(LiveEventInfoEventPayMethod2) {
+})({});
+var LiveEventInfoEventPayMethod = /* @__PURE__ */ (function(LiveEventInfoEventPayMethod2) {
   LiveEventInfoEventPayMethod2[LiveEventInfoEventPayMethod2["EVENT_PAY_METHOD_INVALID"] = 0] = "EVENT_PAY_METHOD_INVALID";
   LiveEventInfoEventPayMethod2[LiveEventInfoEventPayMethod2["EVENT_PAY_METHOD_COINS"] = 1] = "EVENT_PAY_METHOD_COINS";
   LiveEventInfoEventPayMethod2[LiveEventInfoEventPayMethod2["EVENT_PAY_METHOD_CASH"] = 2] = "EVENT_PAY_METHOD_CASH";
   LiveEventInfoEventPayMethod2[LiveEventInfoEventPayMethod2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return LiveEventInfoEventPayMethod2;
-}({});
-var MatchGameplayOption = /* @__PURE__ */ function(MatchGameplayOption2) {
+})({});
+var MatchGameplayOption = /* @__PURE__ */ (function(MatchGameplayOption2) {
   MatchGameplayOption2[MatchGameplayOption2["MATCH_OPTION_UNKNOWN"] = 0] = "MATCH_OPTION_UNKNOWN";
   MatchGameplayOption2[MatchGameplayOption2["MATCH_OPTION_SPECIFIC_GIFT"] = 1] = "MATCH_OPTION_SPECIFIC_GIFT";
   MatchGameplayOption2[MatchGameplayOption2["MATCH_OPTION_ICE_SHOWDOWN"] = 2] = "MATCH_OPTION_ICE_SHOWDOWN";
   MatchGameplayOption2[MatchGameplayOption2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return MatchGameplayOption2;
-}({});
-var MatchInfoMultiplierType = /* @__PURE__ */ function(MatchInfoMultiplierType2) {
+})({});
+var MatchInfoMultiplierType = /* @__PURE__ */ (function(MatchInfoMultiplierType2) {
   MatchInfoMultiplierType2[MatchInfoMultiplierType2["UNSPECIFIED"] = 0] = "UNSPECIFIED";
   MatchInfoMultiplierType2[MatchInfoMultiplierType2["CRITICAL_STRIKE"] = 1] = "CRITICAL_STRIKE";
   MatchInfoMultiplierType2[MatchInfoMultiplierType2["TOP_2"] = 2] = "TOP_2";
@@ -124340,23 +124445,23 @@ var MatchInfoMultiplierType = /* @__PURE__ */ function(MatchInfoMultiplierType2)
   MatchInfoMultiplierType2[MatchInfoMultiplierType2["VAULT_GLOVE"] = 4] = "VAULT_GLOVE";
   MatchInfoMultiplierType2[MatchInfoMultiplierType2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return MatchInfoMultiplierType2;
-}({});
-var MultiGuestOutsideRoomInviteSource = /* @__PURE__ */ function(MultiGuestOutsideRoomInviteSource2) {
+})({});
+var MultiGuestOutsideRoomInviteSource = /* @__PURE__ */ (function(MultiGuestOutsideRoomInviteSource2) {
   MultiGuestOutsideRoomInviteSource2[MultiGuestOutsideRoomInviteSource2["OUTSIDE_ROOM_INVITE_SOURCE_UNKNOWN"] = 0] = "OUTSIDE_ROOM_INVITE_SOURCE_UNKNOWN";
   MultiGuestOutsideRoomInviteSource2[MultiGuestOutsideRoomInviteSource2["OUTSIDE_ROOM_INVITE_SOURCE_PANEL"] = 1] = "OUTSIDE_ROOM_INVITE_SOURCE_PANEL";
   MultiGuestOutsideRoomInviteSource2[MultiGuestOutsideRoomInviteSource2["OUTSIDE_ROOM_INVITE_SOURCE_CAPSULE"] = 2] = "OUTSIDE_ROOM_INVITE_SOURCE_CAPSULE";
   MultiGuestOutsideRoomInviteSource2[MultiGuestOutsideRoomInviteSource2["OUTSIDE_ROOM_INVITE_SOURCE_EMPTY_POSITION"] = 3] = "OUTSIDE_ROOM_INVITE_SOURCE_EMPTY_POSITION";
   MultiGuestOutsideRoomInviteSource2[MultiGuestOutsideRoomInviteSource2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return MultiGuestOutsideRoomInviteSource2;
-}({});
-var OptPairStatus = /* @__PURE__ */ function(OptPairStatus2) {
+})({});
+var OptPairStatus = /* @__PURE__ */ (function(OptPairStatus2) {
   OptPairStatus2[OptPairStatus2["OPT_PAIR_STATUS_UNKNOWN"] = 0] = "OPT_PAIR_STATUS_UNKNOWN";
   OptPairStatus2[OptPairStatus2["OFFLINE"] = 1] = "OFFLINE";
   OptPairStatus2[OptPairStatus2["FINISHED"] = 2] = "FINISHED";
   OptPairStatus2[OptPairStatus2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return OptPairStatus2;
-}({});
-var PerceptionDialogIconType = /* @__PURE__ */ function(PerceptionDialogIconType2) {
+})({});
+var PerceptionDialogIconType = /* @__PURE__ */ (function(PerceptionDialogIconType2) {
   PerceptionDialogIconType2[PerceptionDialogIconType2["ICON_TYPE_NONE"] = 0] = "ICON_TYPE_NONE";
   PerceptionDialogIconType2[PerceptionDialogIconType2["ICON_TYPE_WARNING"] = 1] = "ICON_TYPE_WARNING";
   PerceptionDialogIconType2[PerceptionDialogIconType2["ICON_TYPE_LINKMIC"] = 2] = "ICON_TYPE_LINKMIC";
@@ -124378,8 +124483,8 @@ var PerceptionDialogIconType = /* @__PURE__ */ function(PerceptionDialogIconType
   PerceptionDialogIconType2[PerceptionDialogIconType2["ICON_TYPE_COMMON"] = 18] = "ICON_TYPE_COMMON";
   PerceptionDialogIconType2[PerceptionDialogIconType2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return PerceptionDialogIconType2;
-}({});
-var PinCardType = /* @__PURE__ */ function(PinCardType2) {
+})({});
+var PinCardType = /* @__PURE__ */ (function(PinCardType2) {
   PinCardType2[PinCardType2["UNKNOWN_PIN_CARD_TYPE"] = 0] = "UNKNOWN_PIN_CARD_TYPE";
   PinCardType2[PinCardType2["CUSTOMIZED_BENEFIT_E_NUM"] = 1] = "CUSTOMIZED_BENEFIT_E_NUM";
   PinCardType2[PinCardType2["SUB_GOAL_E_NUM"] = 2] = "SUB_GOAL_E_NUM";
@@ -124389,23 +124494,23 @@ var PinCardType = /* @__PURE__ */ function(PinCardType2) {
   PinCardType2[PinCardType2["SMB_COURSE"] = 6] = "SMB_COURSE";
   PinCardType2[PinCardType2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return PinCardType2;
-}({});
-var PollAppealStatus = /* @__PURE__ */ function(PollAppealStatus2) {
+})({});
+var PollAppealStatus = /* @__PURE__ */ (function(PollAppealStatus2) {
   PollAppealStatus2[PollAppealStatus2["POLL_APPEAL_STATUS_UNKNOWN"] = 0] = "POLL_APPEAL_STATUS_UNKNOWN";
   PollAppealStatus2[PollAppealStatus2["POLL_APPEAL_STATUS_PASS"] = 1] = "POLL_APPEAL_STATUS_PASS";
   PollAppealStatus2[PollAppealStatus2["FAIL"] = 2] = "FAIL";
   PollAppealStatus2[PollAppealStatus2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return PollAppealStatus2;
-}({});
-var PollEndType = /* @__PURE__ */ function(PollEndType2) {
+})({});
+var PollEndType = /* @__PURE__ */ (function(PollEndType2) {
   PollEndType2[PollEndType2["POLL_END_BY_TIME"] = 0] = "POLL_END_BY_TIME";
   PollEndType2[PollEndType2["POLL_END_BY_OWNER"] = 1] = "POLL_END_BY_OWNER";
   PollEndType2[PollEndType2["POLL_END_BY_OTHER"] = 2] = "POLL_END_BY_OTHER";
   PollEndType2[PollEndType2["POLL_END_BY_ADMIN"] = 3] = "POLL_END_BY_ADMIN";
   PollEndType2[PollEndType2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return PollEndType2;
-}({});
-var PollKind = /* @__PURE__ */ function(PollKind2) {
+})({});
+var PollKind = /* @__PURE__ */ (function(PollKind2) {
   PollKind2[PollKind2["POLL_KIND_NORMAL"] = 0] = "POLL_KIND_NORMAL";
   PollKind2[PollKind2["POLL_KIND_GIFT"] = 1] = "POLL_KIND_GIFT";
   PollKind2[PollKind2["CUSTOMIZABLE"] = 2] = "CUSTOMIZABLE";
@@ -124414,23 +124519,23 @@ var PollKind = /* @__PURE__ */ function(PollKind2) {
   PollKind2[PollKind2["EMOTE"] = 5] = "EMOTE";
   PollKind2[PollKind2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return PollKind2;
-}({});
-var PollTemplateStatus = /* @__PURE__ */ function(PollTemplateStatus2) {
+})({});
+var PollTemplateStatus = /* @__PURE__ */ (function(PollTemplateStatus2) {
   PollTemplateStatus2[PollTemplateStatus2["TO_BE_REVIEWED"] = 0] = "TO_BE_REVIEWED";
   PollTemplateStatus2[PollTemplateStatus2["UNDER_REVIEW"] = 1] = "UNDER_REVIEW";
   PollTemplateStatus2[PollTemplateStatus2["REVIEWED"] = 2] = "REVIEWED";
   PollTemplateStatus2[PollTemplateStatus2["REFUSED"] = 3] = "REFUSED";
   PollTemplateStatus2[PollTemplateStatus2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return PollTemplateStatus2;
-}({});
-var Position = /* @__PURE__ */ function(Position2) {
+})({});
+var Position = /* @__PURE__ */ (function(Position2) {
   Position2[Position2["POSITION_UNKNOWN"] = 0] = "POSITION_UNKNOWN";
   Position2[Position2["LEFT"] = 1] = "LEFT";
   Position2[Position2["POSITION_RIGHT"] = 2] = "POSITION_RIGHT";
   Position2[Position2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return Position2;
-}({});
-var ProfitRankType = /* @__PURE__ */ function(ProfitRankType2) {
+})({});
+var ProfitRankType = /* @__PURE__ */ (function(ProfitRankType2) {
   ProfitRankType2[ProfitRankType2["TYPE_HOURLY_RANK"] = 0] = "TYPE_HOURLY_RANK";
   ProfitRankType2[ProfitRankType2["TYPE_WEEKLY_RANK"] = 1] = "TYPE_WEEKLY_RANK";
   ProfitRankType2[ProfitRankType2["TYPE_HOURLY_STAR_RANK"] = 2] = "TYPE_HOURLY_STAR_RANK";
@@ -124460,8 +124565,8 @@ var ProfitRankType = /* @__PURE__ */ function(ProfitRankType2) {
   ProfitRankType2[ProfitRankType2["TYPE_CAMPAIGN_LEAGUEMATCH_RANK"] = 101] = "TYPE_CAMPAIGN_LEAGUEMATCH_RANK";
   ProfitRankType2[ProfitRankType2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return ProfitRankType2;
-}({});
-var PunishTypeId = /* @__PURE__ */ function(PunishTypeId2) {
+})({});
+var PunishTypeId = /* @__PURE__ */ (function(PunishTypeId2) {
   PunishTypeId2[PunishTypeId2["PUNISH_TYPE_IDUN_KNOWN"] = 0] = "PUNISH_TYPE_IDUN_KNOWN";
   PunishTypeId2[PunishTypeId2["BAN_LINKMIC"] = 9] = "BAN_LINKMIC";
   PunishTypeId2[PunishTypeId2["BAN_GAME_PARTNERSHIP"] = 25] = "BAN_GAME_PARTNERSHIP";
@@ -124474,28 +124579,28 @@ var PunishTypeId = /* @__PURE__ */ function(PunishTypeId2) {
   PunishTypeId2[PunishTypeId2["LIVE_CONSOLE_BAN"] = 76] = "LIVE_CONSOLE_BAN";
   PunishTypeId2[PunishTypeId2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return PunishTypeId2;
-}({});
-var ReserveReplyStatus = /* @__PURE__ */ function(ReserveReplyStatus2) {
+})({});
+var ReserveReplyStatus = /* @__PURE__ */ (function(ReserveReplyStatus2) {
   ReserveReplyStatus2[ReserveReplyStatus2["RESERVE_REPLY_STATUS_UNKNOWN"] = 0] = "RESERVE_REPLY_STATUS_UNKNOWN";
   ReserveReplyStatus2[ReserveReplyStatus2["WAIT_FORME"] = 1] = "WAIT_FORME";
   ReserveReplyStatus2[ReserveReplyStatus2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return ReserveReplyStatus2;
-}({});
-var RewardCondition = /* @__PURE__ */ function(RewardCondition2) {
+})({});
+var RewardCondition = /* @__PURE__ */ (function(RewardCondition2) {
   RewardCondition2[RewardCondition2["REWARD_CONDITION_SUBSCRIPTION"] = 0] = "REWARD_CONDITION_SUBSCRIPTION";
   RewardCondition2[RewardCondition2["SUB_WAVE_CUSTOM"] = 1] = "SUB_WAVE_CUSTOM";
   RewardCondition2[RewardCondition2["REWARD_CONDITION_FANS_CLUB"] = 2] = "REWARD_CONDITION_FANS_CLUB";
   RewardCondition2[RewardCondition2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return RewardCondition2;
-}({});
-var RivalExtraInfoAnchorLayer = /* @__PURE__ */ function(RivalExtraInfoAnchorLayer2) {
+})({});
+var RivalExtraInfoAnchorLayer = /* @__PURE__ */ (function(RivalExtraInfoAnchorLayer2) {
   RivalExtraInfoAnchorLayer2[RivalExtraInfoAnchorLayer2["ANCHOR_LAYER_UNKNOWN"] = 0] = "ANCHOR_LAYER_UNKNOWN";
   RivalExtraInfoAnchorLayer2[RivalExtraInfoAnchorLayer2["ANCHOR_LAYER_TOP"] = 1] = "ANCHOR_LAYER_TOP";
   RivalExtraInfoAnchorLayer2[RivalExtraInfoAnchorLayer2["ANCHOR_LAYER_SMALL"] = 2] = "ANCHOR_LAYER_SMALL";
   RivalExtraInfoAnchorLayer2[RivalExtraInfoAnchorLayer2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return RivalExtraInfoAnchorLayer2;
-}({});
-var RivalExtraInfoBattleInfoBattleInfoType = /* @__PURE__ */ function(RivalExtraInfoBattleInfoBattleInfoType2) {
+})({});
+var RivalExtraInfoBattleInfoBattleInfoType = /* @__PURE__ */ (function(RivalExtraInfoBattleInfoBattleInfoType2) {
   RivalExtraInfoBattleInfoBattleInfoType2[RivalExtraInfoBattleInfoBattleInfoType2["BATTLE_INFO_TYPE_NONE"] = 0] = "BATTLE_INFO_TYPE_NONE";
   RivalExtraInfoBattleInfoBattleInfoType2[RivalExtraInfoBattleInfoBattleInfoType2["BATTLE_INFO_TYPE_AVERAGE_SCORE"] = 1] = "BATTLE_INFO_TYPE_AVERAGE_SCORE";
   RivalExtraInfoBattleInfoBattleInfoType2[RivalExtraInfoBattleInfoBattleInfoType2["BATTLE_INFO_TYPE_MAX_SCORE"] = 2] = "BATTLE_INFO_TYPE_MAX_SCORE";
@@ -124503,8 +124608,8 @@ var RivalExtraInfoBattleInfoBattleInfoType = /* @__PURE__ */ function(RivalExtra
   RivalExtraInfoBattleInfoBattleInfoType2[RivalExtraInfoBattleInfoBattleInfoType2["BATTLE_INFO_TYPE_WIN_STREAK"] = 4] = "BATTLE_INFO_TYPE_WIN_STREAK";
   RivalExtraInfoBattleInfoBattleInfoType2[RivalExtraInfoBattleInfoBattleInfoType2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return RivalExtraInfoBattleInfoBattleInfoType2;
-}({});
-var RivalExtraInfoInviteBlockReason = /* @__PURE__ */ function(RivalExtraInfoInviteBlockReason2) {
+})({});
+var RivalExtraInfoInviteBlockReason = /* @__PURE__ */ (function(RivalExtraInfoInviteBlockReason2) {
   RivalExtraInfoInviteBlockReason2[RivalExtraInfoInviteBlockReason2["RIVAL_EXTRA_INFO_INVITE_BLOCK_REASON_NONE"] = 0] = "RIVAL_EXTRA_INFO_INVITE_BLOCK_REASON_NONE";
   RivalExtraInfoInviteBlockReason2[RivalExtraInfoInviteBlockReason2["IS_LINKING"] = 1] = "IS_LINKING";
   RivalExtraInfoInviteBlockReason2[RivalExtraInfoInviteBlockReason2["INVITATION_DENIED"] = 2] = "INVITATION_DENIED";
@@ -124517,8 +124622,8 @@ var RivalExtraInfoInviteBlockReason = /* @__PURE__ */ function(RivalExtraInfoInv
   RivalExtraInfoInviteBlockReason2[RivalExtraInfoInviteBlockReason2["RIVAL_EXTRA_INFO_INVITE_BLOCK_REASON_REGIONAL_BLOCK"] = 9] = "RIVAL_EXTRA_INFO_INVITE_BLOCK_REASON_REGIONAL_BLOCK";
   RivalExtraInfoInviteBlockReason2[RivalExtraInfoInviteBlockReason2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return RivalExtraInfoInviteBlockReason2;
-}({});
-var RivalExtraInfoTextType = /* @__PURE__ */ function(RivalExtraInfoTextType2) {
+})({});
+var RivalExtraInfoTextType = /* @__PURE__ */ (function(RivalExtraInfoTextType2) {
   RivalExtraInfoTextType2[RivalExtraInfoTextType2["TEXT_TYPE_UNKNOWN"] = 0] = "TEXT_TYPE_UNKNOWN";
   RivalExtraInfoTextType2[RivalExtraInfoTextType2["CURRO_OMF_AN_TICKET"] = 1] = "CURRO_OMF_AN_TICKET";
   RivalExtraInfoTextType2[RivalExtraInfoTextType2["TOTAL_DIAMOND_COUNT"] = 2] = "TOTAL_DIAMOND_COUNT";
@@ -124526,15 +124631,15 @@ var RivalExtraInfoTextType = /* @__PURE__ */ function(RivalExtraInfoTextType2) {
   RivalExtraInfoTextType2[RivalExtraInfoTextType2["DISTANCE_CITY"] = 4] = "DISTANCE_CITY";
   RivalExtraInfoTextType2[RivalExtraInfoTextType2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return RivalExtraInfoTextType2;
-}({});
-var SOVLockInfoType = /* @__PURE__ */ function(SOVLockInfoType2) {
+})({});
+var SOVLockInfoType = /* @__PURE__ */ (function(SOVLockInfoType2) {
   SOVLockInfoType2[SOVLockInfoType2["SOV_LOCK_INFO_TYPE_NONE"] = 0] = "SOV_LOCK_INFO_TYPE_NONE";
   SOVLockInfoType2[SOVLockInfoType2["LOCK"] = 1] = "LOCK";
   SOVLockInfoType2[SOVLockInfoType2["PREVIEW"] = 2] = "PREVIEW";
   SOVLockInfoType2[SOVLockInfoType2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return SOVLockInfoType2;
-}({});
-var SOVMaskInfoType = /* @__PURE__ */ function(SOVMaskInfoType2) {
+})({});
+var SOVMaskInfoType = /* @__PURE__ */ (function(SOVMaskInfoType2) {
   SOVMaskInfoType2[SOVMaskInfoType2["SOV_MASK_INFO_TYPE_NONE"] = 0] = "SOV_MASK_INFO_TYPE_NONE";
   SOVMaskInfoType2[SOVMaskInfoType2["SENSITIVE"] = 1] = "SENSITIVE";
   SOVMaskInfoType2[SOVMaskInfoType2["VIOLATION"] = 2] = "VIOLATION";
@@ -124542,37 +124647,37 @@ var SOVMaskInfoType = /* @__PURE__ */ function(SOVMaskInfoType2) {
   SOVMaskInfoType2[SOVMaskInfoType2["UNAVAILABLE"] = 4] = "UNAVAILABLE";
   SOVMaskInfoType2[SOVMaskInfoType2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return SOVMaskInfoType2;
-}({});
-var SOVStatus = /* @__PURE__ */ function(SOVStatus2) {
+})({});
+var SOVStatus = /* @__PURE__ */ (function(SOVStatus2) {
   SOVStatus2[SOVStatus2["SOV_STATUS_UNKNOWN"] = 0] = "SOV_STATUS_UNKNOWN";
   SOVStatus2[SOVStatus2["ON"] = 1] = "ON";
   SOVStatus2[SOVStatus2["OFF"] = 2] = "OFF";
   SOVStatus2[SOVStatus2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return SOVStatus2;
-}({});
-var SubPinCardTextTextType = /* @__PURE__ */ function(SubPinCardTextTextType2) {
+})({});
+var SubPinCardTextTextType = /* @__PURE__ */ (function(SubPinCardTextTextType2) {
   SubPinCardTextTextType2[SubPinCardTextTextType2["SUB_PIN_CARD_TEXT_TEXT_TYPE_TEXT_TYPE_UNKNOWN"] = 0] = "SUB_PIN_CARD_TEXT_TEXT_TYPE_TEXT_TYPE_UNKNOWN";
   SubPinCardTextTextType2[SubPinCardTextTextType2["TEXT_TYPE_ORIGINAL"] = 1] = "TEXT_TYPE_ORIGINAL";
   SubPinCardTextTextType2[SubPinCardTextTextType2["TEXT_TYPE_STARLING_KEY"] = 2] = "TEXT_TYPE_STARLING_KEY";
   SubPinCardTextTextType2[SubPinCardTextTextType2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return SubPinCardTextTextType2;
-}({});
-var SubPinCardTextTextType_2 = /* @__PURE__ */ function(SubPinCardTextTextType_22) {
+})({});
+var SubPinCardTextTextType_2 = /* @__PURE__ */ (function(SubPinCardTextTextType_22) {
   SubPinCardTextTextType_22[SubPinCardTextTextType_22["UNKNOWN_TEXT_TYPE"] = 0] = "UNKNOWN_TEXT_TYPE";
   SubPinCardTextTextType_22[SubPinCardTextTextType_22["ORIGINAL_TEXT"] = 1] = "ORIGINAL_TEXT";
   SubPinCardTextTextType_22[SubPinCardTextTextType_22["STARLING_KEY"] = 2] = "STARLING_KEY";
   SubPinCardTextTextType_22[SubPinCardTextTextType_22["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return SubPinCardTextTextType_22;
-}({});
-var SubSplitPeriod = /* @__PURE__ */ function(SubSplitPeriod2) {
+})({});
+var SubSplitPeriod = /* @__PURE__ */ (function(SubSplitPeriod2) {
   SubSplitPeriod2[SubSplitPeriod2["SUB_SPLIT_PERIOD_UNKNOWN"] = 0] = "SUB_SPLIT_PERIOD_UNKNOWN";
   SubSplitPeriod2[SubSplitPeriod2["ANNOUNCEMENT"] = 1] = "ANNOUNCEMENT";
   SubSplitPeriod2[SubSplitPeriod2["TRANSITION"] = 2] = "TRANSITION";
   SubSplitPeriod2[SubSplitPeriod2["OFFICIAL"] = 3] = "OFFICIAL";
   SubSplitPeriod2[SubSplitPeriod2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return SubSplitPeriod2;
-}({});
-var TagType = /* @__PURE__ */ function(TagType2) {
+})({});
+var TagType = /* @__PURE__ */ (function(TagType2) {
   TagType2[TagType2["CREATOR_CRM_TAG_TYPE_UNKNOWN"] = 0] = "CREATOR_CRM_TAG_TYPE_UNKNOWN";
   TagType2[TagType2["CREATOR_CRM_TAG_TYPE_USER_GRADE"] = 1] = "CREATOR_CRM_TAG_TYPE_USER_GRADE";
   TagType2[TagType2["CREATOR_CRM_TAG_TYPE_FANS_LEVEL"] = 2] = "CREATOR_CRM_TAG_TYPE_FANS_LEVEL";
@@ -124624,8 +124729,8 @@ var TagType = /* @__PURE__ */ function(TagType2) {
   TagType2[TagType2["FANS_HIGHLIGHT"] = 100] = "FANS_HIGHLIGHT";
   TagType2[TagType2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return TagType2;
-}({});
-var TagV2TagClassification = /* @__PURE__ */ function(TagV2TagClassification2) {
+})({});
+var TagV2TagClassification = /* @__PURE__ */ (function(TagV2TagClassification2) {
   TagV2TagClassification2[TagV2TagClassification2["TAG_V2_TAG_CLASSIFICATION_UNKNOWN"] = 0] = "TAG_V2_TAG_CLASSIFICATION_UNKNOWN";
   TagV2TagClassification2[TagV2TagClassification2["COHOST_HISTORY"] = 1] = "COHOST_HISTORY";
   TagV2TagClassification2[TagV2TagClassification2["FIRST_DEGREE_RELATION"] = 2] = "FIRST_DEGREE_RELATION";
@@ -124634,14 +124739,14 @@ var TagV2TagClassification = /* @__PURE__ */ function(TagV2TagClassification2) {
   TagV2TagClassification2[TagV2TagClassification2["SIMILAR_INTERESTS"] = 5] = "SIMILAR_INTERESTS";
   TagV2TagClassification2[TagV2TagClassification2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return TagV2TagClassification2;
-}({});
-var TimerDetailAntidirtStatus = /* @__PURE__ */ function(TimerDetailAntidirtStatus2) {
+})({});
+var TimerDetailAntidirtStatus = /* @__PURE__ */ (function(TimerDetailAntidirtStatus2) {
   TimerDetailAntidirtStatus2[TimerDetailAntidirtStatus2["TIMER_DETAIL_ANTIDIRT_STATUS_PASS"] = 0] = "TIMER_DETAIL_ANTIDIRT_STATUS_PASS";
   TimerDetailAntidirtStatus2[TimerDetailAntidirtStatus2["TIMER_DETAIL_ANTIDIRT_STATUS_FAILED"] = 1] = "TIMER_DETAIL_ANTIDIRT_STATUS_FAILED";
   TimerDetailAntidirtStatus2[TimerDetailAntidirtStatus2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return TimerDetailAntidirtStatus2;
-}({});
-var TimerDetailAuditStatus = /* @__PURE__ */ function(TimerDetailAuditStatus2) {
+})({});
+var TimerDetailAuditStatus = /* @__PURE__ */ (function(TimerDetailAuditStatus2) {
   TimerDetailAuditStatus2[TimerDetailAuditStatus2["TIMER_DETAIL_AUDIT_STATUS_AUDIT_STATUS_UNKNOWN"] = 0] = "TIMER_DETAIL_AUDIT_STATUS_AUDIT_STATUS_UNKNOWN";
   TimerDetailAuditStatus2[TimerDetailAuditStatus2["AUDIT_STATUS_PASS"] = 1] = "AUDIT_STATUS_PASS";
   TimerDetailAuditStatus2[TimerDetailAuditStatus2["AUDIT_STATUS_FAILED"] = 2] = "AUDIT_STATUS_FAILED";
@@ -124649,14 +124754,14 @@ var TimerDetailAuditStatus = /* @__PURE__ */ function(TimerDetailAuditStatus2) {
   TimerDetailAuditStatus2[TimerDetailAuditStatus2["AUDIT_STATUS_FORBIDDEN"] = 4] = "AUDIT_STATUS_FORBIDDEN";
   TimerDetailAuditStatus2[TimerDetailAuditStatus2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return TimerDetailAuditStatus2;
-}({});
-var TimerDetailAuditTaskType = /* @__PURE__ */ function(TimerDetailAuditTaskType2) {
+})({});
+var TimerDetailAuditTaskType = /* @__PURE__ */ (function(TimerDetailAuditTaskType2) {
   TimerDetailAuditTaskType2[TimerDetailAuditTaskType2["AUDIT_TASK_TYPE_DEFAULT"] = 0] = "AUDIT_TASK_TYPE_DEFAULT";
   TimerDetailAuditTaskType2[TimerDetailAuditTaskType2["AUDIT_TASK_TYPE_APPEAL"] = 1] = "AUDIT_TASK_TYPE_APPEAL";
   TimerDetailAuditTaskType2[TimerDetailAuditTaskType2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return TimerDetailAuditTaskType2;
-}({});
-var TimerStatus = /* @__PURE__ */ function(TimerStatus2) {
+})({});
+var TimerStatus = /* @__PURE__ */ (function(TimerStatus2) {
   TimerStatus2[TimerStatus2["NOT_STARTED"] = 0] = "NOT_STARTED";
   TimerStatus2[TimerStatus2["RUNNING"] = 1] = "RUNNING";
   TimerStatus2[TimerStatus2["PAUSED"] = 2] = "PAUSED";
@@ -124664,37 +124769,37 @@ var TimerStatus = /* @__PURE__ */ function(TimerStatus2) {
   TimerStatus2[TimerStatus2["TIMER_STATUS_FINISHED"] = 4] = "TIMER_STATUS_FINISHED";
   TimerStatus2[TimerStatus2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return TimerStatus2;
-}({});
-var TopicActionType = /* @__PURE__ */ function(TopicActionType2) {
+})({});
+var TopicActionType = /* @__PURE__ */ (function(TopicActionType2) {
   TopicActionType2[TopicActionType2["TOPIC_ACTION_TYPE_UNKNOWN"] = 0] = "TOPIC_ACTION_TYPE_UNKNOWN";
   TopicActionType2[TopicActionType2["TOPIC_ACTION_TYPE_FOLLOW"] = 1] = "TOPIC_ACTION_TYPE_FOLLOW";
   TopicActionType2[TopicActionType2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return TopicActionType2;
-}({});
-var UserEmoteUploadSource = /* @__PURE__ */ function(UserEmoteUploadSource2) {
+})({});
+var UserEmoteUploadSource = /* @__PURE__ */ (function(UserEmoteUploadSource2) {
   UserEmoteUploadSource2[UserEmoteUploadSource2["EMOTE_UPLOAD_SOURCE_ANCHOR"] = 0] = "EMOTE_UPLOAD_SOURCE_ANCHOR";
   UserEmoteUploadSource2[UserEmoteUploadSource2["EMOTE_UPLOAD_SOURCE_SUBSCRIBER"] = 1] = "EMOTE_UPLOAD_SOURCE_SUBSCRIBER";
   UserEmoteUploadSource2[UserEmoteUploadSource2["EMOTE_UPLOAD_SOURCE_MODERATOR"] = 2] = "EMOTE_UPLOAD_SOURCE_MODERATOR";
   UserEmoteUploadSource2[UserEmoteUploadSource2["EMOTE_UPLOAD_SOURCE_AI"] = 3] = "EMOTE_UPLOAD_SOURCE_AI";
   UserEmoteUploadSource2[UserEmoteUploadSource2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return UserEmoteUploadSource2;
-}({});
-var UserEcommerceEntranceCreatorType = /* @__PURE__ */ function(UserEcommerceEntranceCreatorType2) {
+})({});
+var UserEcommerceEntranceCreatorType = /* @__PURE__ */ (function(UserEcommerceEntranceCreatorType2) {
   UserEcommerceEntranceCreatorType2[UserEcommerceEntranceCreatorType2["UNDEFINED"] = 0] = "UNDEFINED";
   UserEcommerceEntranceCreatorType2[UserEcommerceEntranceCreatorType2["USER_ECOMMERCE_ENTRANCE_CREATOR_TYPE_OFFICIAL"] = 1] = "USER_ECOMMERCE_ENTRANCE_CREATOR_TYPE_OFFICIAL";
   UserEcommerceEntranceCreatorType2[UserEcommerceEntranceCreatorType2["MARKET"] = 2] = "MARKET";
   UserEcommerceEntranceCreatorType2[UserEcommerceEntranceCreatorType2["USER_ECOMMERCE_ENTRANCE_CREATOR_TYPE_NORMAL"] = 3] = "USER_ECOMMERCE_ENTRANCE_CREATOR_TYPE_NORMAL";
   UserEcommerceEntranceCreatorType2[UserEcommerceEntranceCreatorType2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return UserEcommerceEntranceCreatorType2;
-}({});
-var UserEcommerceEntranceEntranceType = /* @__PURE__ */ function(UserEcommerceEntranceEntranceType2) {
+})({});
+var UserEcommerceEntranceEntranceType = /* @__PURE__ */ (function(UserEcommerceEntranceEntranceType2) {
   UserEcommerceEntranceEntranceType2[UserEcommerceEntranceEntranceType2["PROFILE"] = 0] = "PROFILE";
   UserEcommerceEntranceEntranceType2[UserEcommerceEntranceEntranceType2["SHOWCASE"] = 1] = "SHOWCASE";
   UserEcommerceEntranceEntranceType2[UserEcommerceEntranceEntranceType2["SHOP"] = 2] = "SHOP";
   UserEcommerceEntranceEntranceType2[UserEcommerceEntranceEntranceType2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return UserEcommerceEntranceEntranceType2;
-}({});
-var UserEcommerceEntranceSellingPointLiveSellingPointType = /* @__PURE__ */ function(UserEcommerceEntranceSellingPointLiveSellingPointType2) {
+})({});
+var UserEcommerceEntranceSellingPointLiveSellingPointType = /* @__PURE__ */ (function(UserEcommerceEntranceSellingPointLiveSellingPointType2) {
   UserEcommerceEntranceSellingPointLiveSellingPointType2[UserEcommerceEntranceSellingPointLiveSellingPointType2["USER_ECOMMERCE_ENTRANCE_SELLING_POINT_LIVE_SELLING_POINT_TYPE_UNDEFINED"] = 0] = "USER_ECOMMERCE_ENTRANCE_SELLING_POINT_LIVE_SELLING_POINT_TYPE_UNDEFINED";
   UserEcommerceEntranceSellingPointLiveSellingPointType2[UserEcommerceEntranceSellingPointLiveSellingPointType2["QUALITY"] = 1] = "QUALITY";
   UserEcommerceEntranceSellingPointLiveSellingPointType2[UserEcommerceEntranceSellingPointLiveSellingPointType2["SOLD"] = 2] = "SOLD";
@@ -124704,8 +124809,8 @@ var UserEcommerceEntranceSellingPointLiveSellingPointType = /* @__PURE__ */ func
   UserEcommerceEntranceSellingPointLiveSellingPointType2[UserEcommerceEntranceSellingPointLiveSellingPointType2["TRUST_POSITIVE_REVIEW_RATE"] = 6] = "TRUST_POSITIVE_REVIEW_RATE";
   UserEcommerceEntranceSellingPointLiveSellingPointType2[UserEcommerceEntranceSellingPointLiveSellingPointType2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return UserEcommerceEntranceSellingPointLiveSellingPointType2;
-}({});
-var UserEcommerceEntranceShopEntranceInfoStoreLabelShopIdentityLabelType = /* @__PURE__ */ function(UserEcommerceEntranceShopEntranceInfoStoreLabelShopIdentityLabelType2) {
+})({});
+var UserEcommerceEntranceShopEntranceInfoStoreLabelShopIdentityLabelType = /* @__PURE__ */ (function(UserEcommerceEntranceShopEntranceInfoStoreLabelShopIdentityLabelType2) {
   UserEcommerceEntranceShopEntranceInfoStoreLabelShopIdentityLabelType2[UserEcommerceEntranceShopEntranceInfoStoreLabelShopIdentityLabelType2["USER_ECOMMERCE_ENTRANCE_SHOP_ENTRANCE_INFO_STORE_LABEL_SHOP_IDENTITY_LABEL_TYPE_UNKNOWN"] = 0] = "USER_ECOMMERCE_ENTRANCE_SHOP_ENTRANCE_INFO_STORE_LABEL_SHOP_IDENTITY_LABEL_TYPE_UNKNOWN";
   UserEcommerceEntranceShopEntranceInfoStoreLabelShopIdentityLabelType2[UserEcommerceEntranceShopEntranceInfoStoreLabelShopIdentityLabelType2["TOP_BRAND"] = 1] = "TOP_BRAND";
   UserEcommerceEntranceShopEntranceInfoStoreLabelShopIdentityLabelType2[UserEcommerceEntranceShopEntranceInfoStoreLabelShopIdentityLabelType2["OFFICIAL_SHOP"] = 2] = "OFFICIAL_SHOP";
@@ -124718,8 +124823,8 @@ var UserEcommerceEntranceShopEntranceInfoStoreLabelShopIdentityLabelType = /* @_
   UserEcommerceEntranceShopEntranceInfoStoreLabelShopIdentityLabelType2[UserEcommerceEntranceShopEntranceInfoStoreLabelShopIdentityLabelType2["NORMAL_BLUE_V"] = 1e3] = "NORMAL_BLUE_V";
   UserEcommerceEntranceShopEntranceInfoStoreLabelShopIdentityLabelType2[UserEcommerceEntranceShopEntranceInfoStoreLabelShopIdentityLabelType2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return UserEcommerceEntranceShopEntranceInfoStoreLabelShopIdentityLabelType2;
-}({});
-var UserEcommerceEntranceShopEntranceInfoStoreLabelStoreBrandLabelType = /* @__PURE__ */ function(UserEcommerceEntranceShopEntranceInfoStoreLabelStoreBrandLabelType2) {
+})({});
+var UserEcommerceEntranceShopEntranceInfoStoreLabelStoreBrandLabelType = /* @__PURE__ */ (function(UserEcommerceEntranceShopEntranceInfoStoreLabelStoreBrandLabelType2) {
   UserEcommerceEntranceShopEntranceInfoStoreLabelStoreBrandLabelType2[UserEcommerceEntranceShopEntranceInfoStoreLabelStoreBrandLabelType2["USER_ECOMMERCE_ENTRANCE_SHOP_ENTRANCE_INFO_STORE_LABEL_STORE_BRAND_LABEL_TYPE_NONE"] = 0] = "USER_ECOMMERCE_ENTRANCE_SHOP_ENTRANCE_INFO_STORE_LABEL_STORE_BRAND_LABEL_TYPE_NONE";
   UserEcommerceEntranceShopEntranceInfoStoreLabelStoreBrandLabelType2[UserEcommerceEntranceShopEntranceInfoStoreLabelStoreBrandLabelType2["USER_ECOMMERCE_ENTRANCE_SHOP_ENTRANCE_INFO_STORE_LABEL_STORE_BRAND_LABEL_TYPE_OFFICIAL"] = 1] = "USER_ECOMMERCE_ENTRANCE_SHOP_ENTRANCE_INFO_STORE_LABEL_STORE_BRAND_LABEL_TYPE_OFFICIAL";
   UserEcommerceEntranceShopEntranceInfoStoreLabelStoreBrandLabelType2[UserEcommerceEntranceShopEntranceInfoStoreLabelStoreBrandLabelType2["AUTHORIZED"] = 2] = "AUTHORIZED";
@@ -124728,21 +124833,21 @@ var UserEcommerceEntranceShopEntranceInfoStoreLabelStoreBrandLabelType = /* @__P
   UserEcommerceEntranceShopEntranceInfoStoreLabelStoreBrandLabelType2[UserEcommerceEntranceShopEntranceInfoStoreLabelStoreBrandLabelType2["STORE_BRAND_LABEL_TYPE_MALL"] = 5] = "STORE_BRAND_LABEL_TYPE_MALL";
   UserEcommerceEntranceShopEntranceInfoStoreLabelStoreBrandLabelType2[UserEcommerceEntranceShopEntranceInfoStoreLabelStoreBrandLabelType2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return UserEcommerceEntranceShopEntranceInfoStoreLabelStoreBrandLabelType2;
-}({});
-var UserEcommerceEntranceViewVersion = /* @__PURE__ */ function(UserEcommerceEntranceViewVersion2) {
+})({});
+var UserEcommerceEntranceViewVersion = /* @__PURE__ */ (function(UserEcommerceEntranceViewVersion2) {
   UserEcommerceEntranceViewVersion2[UserEcommerceEntranceViewVersion2["VIEW_VERSION_UNKNOWN"] = 0] = "VIEW_VERSION_UNKNOWN";
   UserEcommerceEntranceViewVersion2[UserEcommerceEntranceViewVersion2["VIEW_VERSION_STAR_SHOP"] = 1] = "VIEW_VERSION_STAR_SHOP";
   UserEcommerceEntranceViewVersion2[UserEcommerceEntranceViewVersion2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return UserEcommerceEntranceViewVersion2;
-}({});
-var UserFansClubFansClubDataUserFansClubStatus = /* @__PURE__ */ function(UserFansClubFansClubDataUserFansClubStatus2) {
+})({});
+var UserFansClubFansClubDataUserFansClubStatus = /* @__PURE__ */ (function(UserFansClubFansClubDataUserFansClubStatus2) {
   UserFansClubFansClubDataUserFansClubStatus2[UserFansClubFansClubDataUserFansClubStatus2["NOT_JOINED"] = 0] = "NOT_JOINED";
   UserFansClubFansClubDataUserFansClubStatus2[UserFansClubFansClubDataUserFansClubStatus2["ACTIVE"] = 1] = "ACTIVE";
   UserFansClubFansClubDataUserFansClubStatus2[UserFansClubFansClubDataUserFansClubStatus2["INACTIVE"] = 2] = "INACTIVE";
   UserFansClubFansClubDataUserFansClubStatus2[UserFansClubFansClubDataUserFansClubStatus2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return UserFansClubFansClubDataUserFansClubStatus2;
-}({});
-var UserSubscribeInfoPayStatus = /* @__PURE__ */ function(UserSubscribeInfoPayStatus2) {
+})({});
+var UserSubscribeInfoPayStatus = /* @__PURE__ */ (function(UserSubscribeInfoPayStatus2) {
   UserSubscribeInfoPayStatus2[UserSubscribeInfoPayStatus2["SUB_STATUS_UNKNOWN"] = 0] = "SUB_STATUS_UNKNOWN";
   UserSubscribeInfoPayStatus2[UserSubscribeInfoPayStatus2["SUB_STATUS_ONE_TIME"] = 1] = "SUB_STATUS_ONE_TIME";
   UserSubscribeInfoPayStatus2[UserSubscribeInfoPayStatus2["SUB_STATUS_AUTO_DEDUCTION"] = 2] = "SUB_STATUS_AUTO_DEDUCTION";
@@ -124750,13 +124855,13 @@ var UserSubscribeInfoPayStatus = /* @__PURE__ */ function(UserSubscribeInfoPaySt
   UserSubscribeInfoPayStatus2[UserSubscribeInfoPayStatus2["SUB_STATUS_REVOKE"] = 4] = "SUB_STATUS_REVOKE";
   UserSubscribeInfoPayStatus2[UserSubscribeInfoPayStatus2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return UserSubscribeInfoPayStatus2;
-}({});
-var VerticalPaddingRule = /* @__PURE__ */ function(VerticalPaddingRule2) {
+})({});
+var VerticalPaddingRule = /* @__PURE__ */ (function(VerticalPaddingRule2) {
   VerticalPaddingRule2[VerticalPaddingRule2["USE_DEFAULT"] = 0] = "USE_DEFAULT";
   VerticalPaddingRule2[VerticalPaddingRule2["USE_TOP_AND_BOTTOM"] = 1] = "USE_TOP_AND_BOTTOM";
   VerticalPaddingRule2[VerticalPaddingRule2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return VerticalPaddingRule2;
-}({});
+})({});
 function createBaseDiffInfo() {
   return {
     diffUrl: void 0,
@@ -135095,29 +135200,29 @@ var Player2 = {
     return message;
   }
 };
-var AgreeStatus = /* @__PURE__ */ function(AgreeStatus2) {
+var AgreeStatus = /* @__PURE__ */ (function(AgreeStatus2) {
   AgreeStatus2[AgreeStatus2["AGREE_UNKNOWN"] = 0] = "AGREE_UNKNOWN";
   AgreeStatus2[AgreeStatus2["AGREE"] = 1] = "AGREE";
   AgreeStatus2[AgreeStatus2["REJECT"] = 2] = "REJECT";
   AgreeStatus2[AgreeStatus2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return AgreeStatus2;
-}({});
-var ContentPositionType = /* @__PURE__ */ function(ContentPositionType2) {
+})({});
+var ContentPositionType = /* @__PURE__ */ (function(ContentPositionType2) {
   ContentPositionType2[ContentPositionType2["UNKNOWN"] = 0] = "UNKNOWN";
   ContentPositionType2[ContentPositionType2["STREAM"] = 1] = "STREAM";
   ContentPositionType2[ContentPositionType2["LIVE_STUDIO_STREAM_PORTRAIT"] = 2] = "LIVE_STUDIO_STREAM_PORTRAIT";
   ContentPositionType2[ContentPositionType2["LIVE_STUDIO_STREAM_LANDSCAPE"] = 3] = "LIVE_STUDIO_STREAM_LANDSCAPE";
   ContentPositionType2[ContentPositionType2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return ContentPositionType2;
-}({});
-var GroupStatus = /* @__PURE__ */ function(GroupStatus2) {
+})({});
+var GroupStatus = /* @__PURE__ */ (function(GroupStatus2) {
   GroupStatus2[GroupStatus2["GROUP_STATUS_UNKNOWN"] = 0] = "GROUP_STATUS_UNKNOWN";
   GroupStatus2[GroupStatus2["WAITING"] = 1] = "WAITING";
   GroupStatus2[GroupStatus2["LINKED"] = 3] = "LINKED";
   GroupStatus2[GroupStatus2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return GroupStatus2;
-}({});
-var JoinType = /* @__PURE__ */ function(JoinType2) {
+})({});
+var JoinType = /* @__PURE__ */ (function(JoinType2) {
   JoinType2[JoinType2["JOIN_TYPE_UNKNOWN"] = 0] = "JOIN_TYPE_UNKNOWN";
   JoinType2[JoinType2["CHANNEL_APPLY"] = 1] = "CHANNEL_APPLY";
   JoinType2[JoinType2["CHANNEL_INVITE"] = 2] = "CHANNEL_INVITE";
@@ -135128,8 +135233,8 @@ var JoinType = /* @__PURE__ */ function(JoinType2) {
   JoinType2[JoinType2["GROUP_OWNER_JOIN"] = 104] = "GROUP_OWNER_JOIN";
   JoinType2[JoinType2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return JoinType2;
-}({});
-var KickoutReason = /* @__PURE__ */ function(KickoutReason2) {
+})({});
+var KickoutReason = /* @__PURE__ */ (function(KickoutReason2) {
   KickoutReason2[KickoutReason2["KICK_OUT_REASON_UNKNOWN"] = 0] = "KICK_OUT_REASON_UNKNOWN";
   KickoutReason2[KickoutReason2["KICK_OUT_REASON_FIRST_FRAME_TIME_OUT"] = 1] = "KICK_OUT_REASON_FIRST_FRAME_TIME_OUT";
   KickoutReason2[KickoutReason2["KICK_OUT_REASON_BY_HOST"] = 2] = "KICK_OUT_REASON_BY_HOST";
@@ -135140,15 +135245,15 @@ var KickoutReason = /* @__PURE__ */ function(KickoutReason2) {
   KickoutReason2[KickoutReason2["KICK_OUT_REASON_ENIGMA_EXPIRE"] = 7] = "KICK_OUT_REASON_ENIGMA_EXPIRE";
   KickoutReason2[KickoutReason2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return KickoutReason2;
-}({});
-var LayoutEnlargeStatus = /* @__PURE__ */ function(LayoutEnlargeStatus2) {
+})({});
+var LayoutEnlargeStatus = /* @__PURE__ */ (function(LayoutEnlargeStatus2) {
   LayoutEnlargeStatus2[LayoutEnlargeStatus2["NONE"] = 0] = "NONE";
   LayoutEnlargeStatus2[LayoutEnlargeStatus2["SINGLE_ENLARGED"] = 1] = "SINGLE_ENLARGED";
   LayoutEnlargeStatus2[LayoutEnlargeStatus2["DOUBLE_ENLARGED"] = 2] = "DOUBLE_ENLARGED";
   LayoutEnlargeStatus2[LayoutEnlargeStatus2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return LayoutEnlargeStatus2;
-}({});
-var LayoutStyle = /* @__PURE__ */ function(LayoutStyle2) {
+})({});
+var LayoutStyle = /* @__PURE__ */ (function(LayoutStyle2) {
   LayoutStyle2[LayoutStyle2["UNDEFINED"] = 0] = "UNDEFINED";
   LayoutStyle2[LayoutStyle2["OVERLAPPING_FLOW"] = 1] = "OVERLAPPING_FLOW";
   LayoutStyle2[LayoutStyle2["OVERLAPPING_FIXED"] = 2] = "OVERLAPPING_FIXED";
@@ -135156,30 +135261,30 @@ var LayoutStyle = /* @__PURE__ */ function(LayoutStyle2) {
   LayoutStyle2[LayoutStyle2["GRID_FIXED"] = 4] = "GRID_FIXED";
   LayoutStyle2[LayoutStyle2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return LayoutStyle2;
-}({});
-var LinkMicUserAdminType = /* @__PURE__ */ function(LinkMicUserAdminType2) {
+})({});
+var LinkMicUserAdminType = /* @__PURE__ */ (function(LinkMicUserAdminType2) {
   LinkMicUserAdminType2[LinkMicUserAdminType2["UNDEFINED_TYPE"] = 0] = "UNDEFINED_TYPE";
   LinkMicUserAdminType2[LinkMicUserAdminType2["MANAGER_TYPE"] = 1] = "MANAGER_TYPE";
   LinkMicUserAdminType2[LinkMicUserAdminType2["HOST_TYPE"] = 2] = "HOST_TYPE";
   LinkMicUserAdminType2[LinkMicUserAdminType2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return LinkMicUserAdminType2;
-}({});
-var LinkerMode = /* @__PURE__ */ function(LinkerMode2) {
+})({});
+var LinkerMode = /* @__PURE__ */ (function(LinkerMode2) {
   LinkerMode2[LinkerMode2["LINKER_MODE_UNKNOWN"] = 0] = "LINKER_MODE_UNKNOWN";
   LinkerMode2[LinkerMode2["INNER"] = 1] = "INNER";
   LinkerMode2[LinkerMode2["CROSS"] = 2] = "CROSS";
   LinkerMode2[LinkerMode2["MIXED"] = 3] = "MIXED";
   LinkerMode2[LinkerMode2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return LinkerMode2;
-}({});
-var LinkerUserType = /* @__PURE__ */ function(LinkerUserType2) {
+})({});
+var LinkerUserType = /* @__PURE__ */ (function(LinkerUserType2) {
   LinkerUserType2[LinkerUserType2["LINKER_USER_TYPE_UNKNOWN"] = 0] = "LINKER_USER_TYPE_UNKNOWN";
   LinkerUserType2[LinkerUserType2["GUEST"] = 1] = "GUEST";
   LinkerUserType2[LinkerUserType2["HOST"] = 2] = "HOST";
   LinkerUserType2[LinkerUserType2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return LinkerUserType2;
-}({});
-var MediaState = /* @__PURE__ */ function(MediaState2) {
+})({});
+var MediaState = /* @__PURE__ */ (function(MediaState2) {
   MediaState2[MediaState2["MEDIA_UNDEFINED"] = 0] = "MEDIA_UNDEFINED";
   MediaState2[MediaState2["MEDIA_NORMAL"] = 1] = "MEDIA_NORMAL";
   MediaState2[MediaState2["MEDIA_MUTED"] = 2] = "MEDIA_MUTED";
@@ -135187,8 +135292,8 @@ var MediaState = /* @__PURE__ */ function(MediaState2) {
   MediaState2[MediaState2["MEDIA_MUTED_OCCUPIED"] = 4] = "MEDIA_MUTED_OCCUPIED";
   MediaState2[MediaState2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return MediaState2;
-}({});
-var NetworkState = /* @__PURE__ */ function(NetworkState2) {
+})({});
+var NetworkState = /* @__PURE__ */ (function(NetworkState2) {
   NetworkState2[NetworkState2["STATE_NETWORK_UNDEFINED"] = 0] = "STATE_NETWORK_UNDEFINED";
   NetworkState2[NetworkState2["STATE_NETWORK_EXCELLENT"] = 1] = "STATE_NETWORK_EXCELLENT";
   NetworkState2[NetworkState2["STATE_NETWORK_GOOD"] = 2] = "STATE_NETWORK_GOOD";
@@ -135198,23 +135303,23 @@ var NetworkState = /* @__PURE__ */ function(NetworkState2) {
   NetworkState2[NetworkState2["STATE_NETWORK_DOWN"] = 6] = "STATE_NETWORK_DOWN";
   NetworkState2[NetworkState2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return NetworkState2;
-}({});
-var OnlineUserState = /* @__PURE__ */ function(OnlineUserState2) {
+})({});
+var OnlineUserState = /* @__PURE__ */ (function(OnlineUserState2) {
   OnlineUserState2[OnlineUserState2["STATE_UNDEFINED"] = 0] = "STATE_UNDEFINED";
   OnlineUserState2[OnlineUserState2["STATE_NORMAL"] = 1] = "STATE_NORMAL";
   OnlineUserState2[OnlineUserState2["STATE_PAUSED"] = 2] = "STATE_PAUSED";
   OnlineUserState2[OnlineUserState2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return OnlineUserState2;
-}({});
-var PosIdentityType = /* @__PURE__ */ function(PosIdentityType2) {
+})({});
+var PosIdentityType = /* @__PURE__ */ (function(PosIdentityType2) {
   PosIdentityType2[PosIdentityType2["IDENTITY_EMPTY_SLOT"] = 0] = "IDENTITY_EMPTY_SLOT";
   PosIdentityType2[PosIdentityType2["IDENTITY_RTC_USER_ID"] = 1] = "IDENTITY_RTC_USER_ID";
   PosIdentityType2[PosIdentityType2["IDENTITY_RTC_STREAM_ID"] = 2] = "IDENTITY_RTC_STREAM_ID";
   PosIdentityType2[PosIdentityType2["IDENTITY_LIVE_USER_ID"] = 3] = "IDENTITY_LIVE_USER_ID";
   PosIdentityType2[PosIdentityType2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return PosIdentityType2;
-}({});
-var ReplyStatus = /* @__PURE__ */ function(ReplyStatus2) {
+})({});
+var ReplyStatus = /* @__PURE__ */ (function(ReplyStatus2) {
   ReplyStatus2[ReplyStatus2["REPLY_STATUS_UNKNOWN"] = 0] = "REPLY_STATUS_UNKNOWN";
   ReplyStatus2[ReplyStatus2["REPLY_STATUS_AGREE"] = 1] = "REPLY_STATUS_AGREE";
   ReplyStatus2[ReplyStatus2["REFUSE_PERSONALLY"] = 2] = "REFUSE_PERSONALLY";
@@ -135249,22 +135354,22 @@ var ReplyStatus = /* @__PURE__ */ function(ReplyStatus2) {
   ReplyStatus2[ReplyStatus2["REFUSE_IN_COHOST_WITH_GUEST"] = 31] = "REFUSE_IN_COHOST_WITH_GUEST";
   ReplyStatus2[ReplyStatus2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return ReplyStatus2;
-}({});
-var RtcConnectionState = /* @__PURE__ */ function(RtcConnectionState2) {
+})({});
+var RtcConnectionState = /* @__PURE__ */ (function(RtcConnectionState2) {
   RtcConnectionState2[RtcConnectionState2["STATE_RTC_UNDEFINED"] = 0] = "STATE_RTC_UNDEFINED";
   RtcConnectionState2[RtcConnectionState2["STATE_RTC_NORMAL"] = 1] = "STATE_RTC_NORMAL";
   RtcConnectionState2[RtcConnectionState2["STATE_RTC_DISCONNECT"] = 2] = "STATE_RTC_DISCONNECT";
   RtcConnectionState2[RtcConnectionState2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return RtcConnectionState2;
-}({});
-var Scene = /* @__PURE__ */ function(Scene2) {
+})({});
+var Scene = /* @__PURE__ */ (function(Scene2) {
   Scene2[Scene2["SCENE_UNKNOWN"] = 0] = "SCENE_UNKNOWN";
   Scene2[Scene2["CO_HOST"] = 2] = "CO_HOST";
   Scene2[Scene2["MULTI_LIVE"] = 4] = "MULTI_LIVE";
   Scene2[Scene2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return Scene2;
-}({});
-var SourceType = /* @__PURE__ */ function(SourceType2) {
+})({});
+var SourceType = /* @__PURE__ */ (function(SourceType2) {
   SourceType2[SourceType2["SOURCE_TYPE_UNKNOWN"] = 0] = "SOURCE_TYPE_UNKNOWN";
   SourceType2[SourceType2["FRIEND_LIST"] = 1] = "FRIEND_LIST";
   SourceType2[SourceType2["RECOMMEND_LIST"] = 2] = "RECOMMEND_LIST";
@@ -135325,8 +135430,8 @@ var SourceType = /* @__PURE__ */ function(SourceType2) {
   SourceType2[SourceType2["CCPK_QUICK_RE_COMMAND"] = 63] = "CCPK_QUICK_RE_COMMAND";
   SourceType2[SourceType2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return SourceType2;
-}({});
-var StateType = /* @__PURE__ */ function(StateType2) {
+})({});
+var StateType = /* @__PURE__ */ (function(StateType2) {
   StateType2[StateType2["STATE_INVALID"] = 0] = "STATE_INVALID";
   StateType2[StateType2["STATE_LAYOUT"] = 1] = "STATE_LAYOUT";
   StateType2[StateType2["STATE_ONLINE_USER_STATE"] = 2] = "STATE_ONLINE_USER_STATE";
@@ -135341,7 +135446,7 @@ var StateType = /* @__PURE__ */ function(StateType2) {
   StateType2[StateType2["STATE_REQ_BATCH_CHANGE"] = 100] = "STATE_REQ_BATCH_CHANGE";
   StateType2[StateType2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return StateType2;
-}({});
+})({});
 function createBaseAnchorLayoutSetting() {
   return {
     latestLayoutStyle: 0,
@@ -139324,7 +139429,7 @@ var ProtoMessageFetchResult_RouteParamsEntry = {
     return message;
   }
 };
-var BarrageMessageBarrageType = /* @__PURE__ */ function(BarrageMessageBarrageType2) {
+var BarrageMessageBarrageType = /* @__PURE__ */ (function(BarrageMessageBarrageType2) {
   BarrageMessageBarrageType2[BarrageMessageBarrageType2["UNKNOWN"] = 0] = "UNKNOWN";
   BarrageMessageBarrageType2[BarrageMessageBarrageType2["E_COM_ORDERING"] = 1] = "E_COM_ORDERING";
   BarrageMessageBarrageType2[BarrageMessageBarrageType2["E_COM_BUYING"] = 2] = "E_COM_BUYING";
@@ -139344,27 +139449,27 @@ var BarrageMessageBarrageType = /* @__PURE__ */ function(BarrageMessageBarrageTy
   BarrageMessageBarrageType2[BarrageMessageBarrageType2["COMMON_BARRAGE"] = 100] = "COMMON_BARRAGE";
   BarrageMessageBarrageType2[BarrageMessageBarrageType2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return BarrageMessageBarrageType2;
-}({});
-var BarrageMessageIconDisplayType = /* @__PURE__ */ function(BarrageMessageIconDisplayType2) {
+})({});
+var BarrageMessageIconDisplayType = /* @__PURE__ */ (function(BarrageMessageIconDisplayType2) {
   BarrageMessageIconDisplayType2[BarrageMessageIconDisplayType2["ICON_DISPLAY_TYPE_IMAGE"] = 0] = "ICON_DISPLAY_TYPE_IMAGE";
   BarrageMessageIconDisplayType2[BarrageMessageIconDisplayType2["ICON_DISPLAY_TYPE_BADGE"] = 1] = "ICON_DISPLAY_TYPE_BADGE";
   BarrageMessageIconDisplayType2[BarrageMessageIconDisplayType2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return BarrageMessageIconDisplayType2;
-}({});
-var BarrageMessageRenderType = /* @__PURE__ */ function(BarrageMessageRenderType2) {
+})({});
+var BarrageMessageRenderType = /* @__PURE__ */ (function(BarrageMessageRenderType2) {
   BarrageMessageRenderType2[BarrageMessageRenderType2["RENDER_TYPE_NATIVE"] = 0] = "RENDER_TYPE_NATIVE";
   BarrageMessageRenderType2[BarrageMessageRenderType2["RENDER_TYPE_HYBRID"] = 1] = "RENDER_TYPE_HYBRID";
   BarrageMessageRenderType2[BarrageMessageRenderType2["RENDER_TYPE_ALPHA"] = 2] = "RENDER_TYPE_ALPHA";
   BarrageMessageRenderType2[BarrageMessageRenderType2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return BarrageMessageRenderType2;
-}({});
-var BarrageMessageShowType = /* @__PURE__ */ function(BarrageMessageShowType2) {
+})({});
+var BarrageMessageShowType = /* @__PURE__ */ (function(BarrageMessageShowType2) {
   BarrageMessageShowType2[BarrageMessageShowType2["SHOW_TYPE_NORMAL"] = 0] = "SHOW_TYPE_NORMAL";
   BarrageMessageShowType2[BarrageMessageShowType2["SHOW_TYPE_FADE_IN_OUT"] = 1] = "SHOW_TYPE_FADE_IN_OUT";
   BarrageMessageShowType2[BarrageMessageShowType2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return BarrageMessageShowType2;
-}({});
-var BattleCardMsgType = /* @__PURE__ */ function(BattleCardMsgType2) {
+})({});
+var BattleCardMsgType = /* @__PURE__ */ (function(BattleCardMsgType2) {
   BattleCardMsgType2[BattleCardMsgType2["UNKNOWN_CARD_ACTION"] = 0] = "UNKNOWN_CARD_ACTION";
   BattleCardMsgType2[BattleCardMsgType2["CARD_OBTAIN_GUIDE"] = 1] = "CARD_OBTAIN_GUIDE";
   BattleCardMsgType2[BattleCardMsgType2["USE_CRITICAL_STRIKE_CARD"] = 2] = "USE_CRITICAL_STRIKE_CARD";
@@ -139380,29 +139485,29 @@ var BattleCardMsgType = /* @__PURE__ */ function(BattleCardMsgType2) {
   BattleCardMsgType2[BattleCardMsgType2["USE_VAULT_GLOVE_CARD"] = 12] = "USE_VAULT_GLOVE_CARD";
   BattleCardMsgType2[BattleCardMsgType2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return BattleCardMsgType2;
-}({});
-var BattleRewardSettleRewardStatus = /* @__PURE__ */ function(BattleRewardSettleRewardStatus2) {
+})({});
+var BattleRewardSettleRewardStatus = /* @__PURE__ */ (function(BattleRewardSettleRewardStatus2) {
   BattleRewardSettleRewardStatus2[BattleRewardSettleRewardStatus2["REWARD_STATUS_SUCCEED"] = 0] = "REWARD_STATUS_SUCCEED";
   BattleRewardSettleRewardStatus2[BattleRewardSettleRewardStatus2["REWARD_STATUS_FAILED"] = 1] = "REWARD_STATUS_FAILED";
   BattleRewardSettleRewardStatus2[BattleRewardSettleRewardStatus2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return BattleRewardSettleRewardStatus2;
-}({});
-var BattleTaskMessageType = /* @__PURE__ */ function(BattleTaskMessageType2) {
+})({});
+var BattleTaskMessageType = /* @__PURE__ */ (function(BattleTaskMessageType2) {
   BattleTaskMessageType2[BattleTaskMessageType2["START"] = 0] = "START";
   BattleTaskMessageType2[BattleTaskMessageType2["TASK_UPDATE"] = 1] = "TASK_UPDATE";
   BattleTaskMessageType2[BattleTaskMessageType2["TASK_SETTLE"] = 2] = "TASK_SETTLE";
   BattleTaskMessageType2[BattleTaskMessageType2["REWARD_SETTLE"] = 3] = "REWARD_SETTLE";
   BattleTaskMessageType2[BattleTaskMessageType2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return BattleTaskMessageType2;
-}({});
-var BattleTaskSettleResult = /* @__PURE__ */ function(BattleTaskSettleResult2) {
+})({});
+var BattleTaskSettleResult = /* @__PURE__ */ (function(BattleTaskSettleResult2) {
   BattleTaskSettleResult2[BattleTaskSettleResult2["SUCCEED"] = 0] = "SUCCEED";
   BattleTaskSettleResult2[BattleTaskSettleResult2["FAILED"] = 1] = "FAILED";
   BattleTaskSettleResult2[BattleTaskSettleResult2["BOTH_SUCCEED"] = 2] = "BOTH_SUCCEED";
   BattleTaskSettleResult2[BattleTaskSettleResult2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return BattleTaskSettleResult2;
-}({});
-var BizType = /* @__PURE__ */ function(BizType2) {
+})({});
+var BizType = /* @__PURE__ */ (function(BizType2) {
   BizType2[BizType2["DEFAULT"] = 0] = "DEFAULT";
   BizType2[BizType2["RETHINK_CHAT"] = 1] = "RETHINK_CHAT";
   BizType2[BizType2["RETHINK_QA"] = 2] = "RETHINK_QA";
@@ -139412,8 +139517,8 @@ var BizType = /* @__PURE__ */ function(BizType2) {
   BizType2[BizType2["PERCEPTION_CENTER"] = 6] = "PERCEPTION_CENTER";
   BizType2[BizType2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return BizType2;
-}({});
-var ContentInviteSource = /* @__PURE__ */ function(ContentInviteSource2) {
+})({});
+var ContentInviteSource = /* @__PURE__ */ (function(ContentInviteSource2) {
   ContentInviteSource2[ContentInviteSource2["INVITE_SOURCE_UNKNOWN"] = 0] = "INVITE_SOURCE_UNKNOWN";
   ContentInviteSource2[ContentInviteSource2["INVITE_SOURCE_PANEL_GO_LIVE"] = 1] = "INVITE_SOURCE_PANEL_GO_LIVE";
   ContentInviteSource2[ContentInviteSource2["INVITE_SOURCE_MUTUAL_NOTICE"] = 2] = "INVITE_SOURCE_MUTUAL_NOTICE";
@@ -139421,67 +139526,67 @@ var ContentInviteSource = /* @__PURE__ */ function(ContentInviteSource2) {
   ContentInviteSource2[ContentInviteSource2["INVITE_SOURCE_RESERVE"] = 4] = "INVITE_SOURCE_RESERVE";
   ContentInviteSource2[ContentInviteSource2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return ContentInviteSource2;
-}({});
-var DisplayStyle = /* @__PURE__ */ function(DisplayStyle2) {
+})({});
+var DisplayStyle = /* @__PURE__ */ (function(DisplayStyle2) {
   DisplayStyle2[DisplayStyle2["DISPLAY_STYLE_NORMAL"] = 0] = "DISPLAY_STYLE_NORMAL";
   DisplayStyle2[DisplayStyle2["STAY"] = 1] = "STAY";
   DisplayStyle2[DisplayStyle2["CHAT"] = 2] = "CHAT";
   DisplayStyle2[DisplayStyle2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return DisplayStyle2;
-}({});
-var ExhibitionType = /* @__PURE__ */ function(ExhibitionType2) {
+})({});
+var ExhibitionType = /* @__PURE__ */ (function(ExhibitionType2) {
   ExhibitionType2[ExhibitionType2["EXHIBITION_TYPE_DEFAULT"] = 0] = "EXHIBITION_TYPE_DEFAULT";
   ExhibitionType2[ExhibitionType2["FOLD"] = 1] = "FOLD";
   ExhibitionType2[ExhibitionType2["PUBLIC_SCREEN"] = 2] = "PUBLIC_SCREEN";
   ExhibitionType2[ExhibitionType2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return ExhibitionType2;
-}({});
-var GameActionType = /* @__PURE__ */ function(GameActionType2) {
+})({});
+var GameActionType = /* @__PURE__ */ (function(GameActionType2) {
   GameActionType2[GameActionType2["SHOW"] = 0] = "SHOW";
   GameActionType2[GameActionType2["JUMP"] = 1] = "JUMP";
   GameActionType2[GameActionType2["FOLLOW"] = 2] = "FOLLOW";
   GameActionType2[GameActionType2["COMMENT"] = 3] = "COMMENT";
   GameActionType2[GameActionType2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return GameActionType2;
-}({});
-var GameRankNotifyMessageMsgType = /* @__PURE__ */ function(GameRankNotifyMessageMsgType2) {
+})({});
+var GameRankNotifyMessageMsgType = /* @__PURE__ */ (function(GameRankNotifyMessageMsgType2) {
   GameRankNotifyMessageMsgType2[GameRankNotifyMessageMsgType2["MSG_TYPE_RANK_IN_OUT"] = 0] = "MSG_TYPE_RANK_IN_OUT";
   GameRankNotifyMessageMsgType2[GameRankNotifyMessageMsgType2["MSG_TYPE_RANK_CHANGE"] = 1] = "MSG_TYPE_RANK_CHANGE";
   GameRankNotifyMessageMsgType2[GameRankNotifyMessageMsgType2["MSG_TYPE_ANCHOR_ENCOURAGE"] = 2] = "MSG_TYPE_ANCHOR_ENCOURAGE";
   GameRankNotifyMessageMsgType2[GameRankNotifyMessageMsgType2["MSG_TYPE_UN_KNOW"] = 255] = "MSG_TYPE_UN_KNOW";
   GameRankNotifyMessageMsgType2[GameRankNotifyMessageMsgType2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return GameRankNotifyMessageMsgType2;
-}({});
-var GiftMessageIgnoreConfig = /* @__PURE__ */ function(GiftMessageIgnoreConfig2) {
+})({});
+var GiftMessageIgnoreConfig = /* @__PURE__ */ (function(GiftMessageIgnoreConfig2) {
   GiftMessageIgnoreConfig2[GiftMessageIgnoreConfig2["NOT_IGNORE"] = 0] = "NOT_IGNORE";
   GiftMessageIgnoreConfig2[GiftMessageIgnoreConfig2["IGNORE_TRAY"] = 1] = "IGNORE_TRAY";
   GiftMessageIgnoreConfig2[GiftMessageIgnoreConfig2["IGNORE_PSM"] = 2] = "IGNORE_PSM";
   GiftMessageIgnoreConfig2[GiftMessageIgnoreConfig2["IGNORE_TRAY_AND_PSM"] = 3] = "IGNORE_TRAY_AND_PSM";
   GiftMessageIgnoreConfig2[GiftMessageIgnoreConfig2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return GiftMessageIgnoreConfig2;
-}({});
-var GiftMessageVersion = /* @__PURE__ */ function(GiftMessageVersion2) {
+})({});
+var GiftMessageVersion = /* @__PURE__ */ (function(GiftMessageVersion2) {
   GiftMessageVersion2[GiftMessageVersion2["NUM_0"] = 0] = "NUM_0";
   GiftMessageVersion2[GiftMessageVersion2["NUM_1"] = 1] = "NUM_1";
   GiftMessageVersion2[GiftMessageVersion2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return GiftMessageVersion2;
-}({});
-var GiftSource = /* @__PURE__ */ function(GiftSource2) {
+})({});
+var GiftSource = /* @__PURE__ */ (function(GiftSource2) {
   GiftSource2[GiftSource2["GIFT_SOURCE_UNKNOWN"] = 0] = "GIFT_SOURCE_UNKNOWN";
   GiftSource2[GiftSource2["PLATFORM"] = 1] = "PLATFORM";
   GiftSource2[GiftSource2["USER_BUY_RANDOM"] = 2] = "USER_BUY_RANDOM";
   GiftSource2[GiftSource2["USER_BUY_SPECIFIC"] = 3] = "USER_BUY_SPECIFIC";
   GiftSource2[GiftSource2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return GiftSource2;
-}({});
-var HitABStatus = /* @__PURE__ */ function(HitABStatus2) {
+})({});
+var HitABStatus = /* @__PURE__ */ (function(HitABStatus2) {
   HitABStatus2[HitABStatus2["NO_HIT"] = 0] = "NO_HIT";
   HitABStatus2[HitABStatus2["ENTER_FROM_EXTERNAL_LINK_NEW_TEXT"] = 1] = "ENTER_FROM_EXTERNAL_LINK_NEW_TEXT";
   HitABStatus2[HitABStatus2["ENTER_FROM_RE_POST_NEW_TEXT"] = 2] = "ENTER_FROM_RE_POST_NEW_TEXT";
   HitABStatus2[HitABStatus2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return HitABStatus2;
-}({});
-var JumpPage = /* @__PURE__ */ function(JumpPage2) {
+})({});
+var JumpPage = /* @__PURE__ */ (function(JumpPage2) {
   JumpPage2[JumpPage2["GIFT_GOAL_SOURCE"] = 0] = "GIFT_GOAL_SOURCE";
   JumpPage2[JumpPage2["GIFT_ALERT_SOURCE"] = 1] = "GIFT_ALERT_SOURCE";
   JumpPage2[JumpPage2["COHOST_SETTING"] = 2] = "COHOST_SETTING";
@@ -139511,8 +139616,8 @@ var JumpPage = /* @__PURE__ */ function(JumpPage2) {
   JumpPage2[JumpPage2["RANK_STICKER_SETTING"] = 26] = "RANK_STICKER_SETTING";
   JumpPage2[JumpPage2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return JumpPage2;
-}({});
-var LinkLayerMessageType = /* @__PURE__ */ function(LinkLayerMessageType2) {
+})({});
+var LinkLayerMessageType = /* @__PURE__ */ (function(LinkLayerMessageType2) {
   LinkLayerMessageType2[LinkLayerMessageType2["LINKER_UNKNOWN"] = 0] = "LINKER_UNKNOWN";
   LinkLayerMessageType2[LinkLayerMessageType2["LINKER_CREATE"] = 1] = "LINKER_CREATE";
   LinkLayerMessageType2[LinkLayerMessageType2["LINKER_INVITE"] = 2] = "LINKER_INVITE";
@@ -139534,8 +139639,8 @@ var LinkLayerMessageType = /* @__PURE__ */ function(LinkLayerMessageType2) {
   LinkLayerMessageType2[LinkLayerMessageType2["LINKER_GROUP_CHANGE"] = 18] = "LINKER_GROUP_CHANGE";
   LinkLayerMessageType2[LinkLayerMessageType2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return LinkLayerMessageType2;
-}({});
-var LinkMicArmiesTriggerReason = /* @__PURE__ */ function(LinkMicArmiesTriggerReason2) {
+})({});
+var LinkMicArmiesTriggerReason = /* @__PURE__ */ (function(LinkMicArmiesTriggerReason2) {
   LinkMicArmiesTriggerReason2[LinkMicArmiesTriggerReason2["LINK_MIC_ARMIES_TRIGGER_REASON_UNKNOWN"] = 0] = "LINK_MIC_ARMIES_TRIGGER_REASON_UNKNOWN";
   LinkMicArmiesTriggerReason2[LinkMicArmiesTriggerReason2["SCORE_UPDATE"] = 1] = "SCORE_UPDATE";
   LinkMicArmiesTriggerReason2[LinkMicArmiesTriggerReason2["BATTLE_END"] = 2] = "BATTLE_END";
@@ -139544,14 +139649,14 @@ var LinkMicArmiesTriggerReason = /* @__PURE__ */ function(LinkMicArmiesTriggerRe
   LinkMicArmiesTriggerReason2[LinkMicArmiesTriggerReason2["EFFECT_UPDATE"] = 5] = "EFFECT_UPDATE";
   LinkMicArmiesTriggerReason2[LinkMicArmiesTriggerReason2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return LinkMicArmiesTriggerReason2;
-}({});
-var LinkMicBattlePunishFinishReason = /* @__PURE__ */ function(LinkMicBattlePunishFinishReason2) {
+})({});
+var LinkMicBattlePunishFinishReason = /* @__PURE__ */ (function(LinkMicBattlePunishFinishReason2) {
   LinkMicBattlePunishFinishReason2[LinkMicBattlePunishFinishReason2["TIME_UP"] = 0] = "TIME_UP";
   LinkMicBattlePunishFinishReason2[LinkMicBattlePunishFinishReason2["CUT_SHORT"] = 1] = "CUT_SHORT";
   LinkMicBattlePunishFinishReason2[LinkMicBattlePunishFinishReason2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return LinkMicBattlePunishFinishReason2;
-}({});
-var LinkMicBattleBattleAction = /* @__PURE__ */ function(LinkMicBattleBattleAction2) {
+})({});
+var LinkMicBattleBattleAction = /* @__PURE__ */ (function(LinkMicBattleBattleAction2) {
   LinkMicBattleBattleAction2[LinkMicBattleBattleAction2["LINK_MIC_BATTLE_BATTLE_ACTION_UNKNOWN"] = 0] = "LINK_MIC_BATTLE_BATTLE_ACTION_UNKNOWN";
   LinkMicBattleBattleAction2[LinkMicBattleBattleAction2["INVITE"] = 1] = "INVITE";
   LinkMicBattleBattleAction2[LinkMicBattleBattleAction2["REJECT"] = 2] = "REJECT";
@@ -139566,14 +139671,14 @@ var LinkMicBattleBattleAction = /* @__PURE__ */ function(LinkMicBattleBattleActi
   LinkMicBattleBattleAction2[LinkMicBattleBattleAction2["LEAVE_LINKMIC"] = 11] = "LEAVE_LINKMIC";
   LinkMicBattleBattleAction2[LinkMicBattleBattleAction2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return LinkMicBattleBattleAction2;
-}({});
-var MessageDisplayStyle = /* @__PURE__ */ function(MessageDisplayStyle2) {
+})({});
+var MessageDisplayStyle = /* @__PURE__ */ (function(MessageDisplayStyle2) {
   MessageDisplayStyle2[MessageDisplayStyle2["MESSAGE_DISPLAY_STYLE_DEFAULT"] = 0] = "MESSAGE_DISPLAY_STYLE_DEFAULT";
   MessageDisplayStyle2[MessageDisplayStyle2["POPUP"] = 1] = "POPUP";
   MessageDisplayStyle2[MessageDisplayStyle2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return MessageDisplayStyle2;
-}({});
-var MessageType = /* @__PURE__ */ function(MessageType2) {
+})({});
+var MessageType = /* @__PURE__ */ (function(MessageType2) {
   MessageType2[MessageType2["SUB_SUCCESS"] = 0] = "SUB_SUCCESS";
   MessageType2[MessageType2["ANCHOR_REMINDER"] = 1] = "ANCHOR_REMINDER";
   MessageType2[MessageType2["ENTER_ROOM_EXPIRE_SOON"] = 2] = "ENTER_ROOM_EXPIRE_SOON";
@@ -139591,14 +139696,14 @@ var MessageType = /* @__PURE__ */ function(MessageType2) {
   MessageType2[MessageType2["SUB_MODERATOR_PIN_PERK"] = 14] = "SUB_MODERATOR_PIN_PERK";
   MessageType2[MessageType2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return MessageType2;
-}({});
-var MicIdxOperation = /* @__PURE__ */ function(MicIdxOperation2) {
+})({});
+var MicIdxOperation = /* @__PURE__ */ (function(MicIdxOperation2) {
   MicIdxOperation2[MicIdxOperation2["MIC_IDX_OP_ON"] = 0] = "MIC_IDX_OP_ON";
   MicIdxOperation2[MicIdxOperation2["MIC_IDX_OP_OFF"] = 1] = "MIC_IDX_OP_OFF";
   MicIdxOperation2[MicIdxOperation2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return MicIdxOperation2;
-}({});
-var OldSubscribeStatus = /* @__PURE__ */ function(OldSubscribeStatus2) {
+})({});
+var OldSubscribeStatus = /* @__PURE__ */ (function(OldSubscribeStatus2) {
   OldSubscribeStatus2[OldSubscribeStatus2["FIRST"] = 0] = "FIRST";
   OldSubscribeStatus2[OldSubscribeStatus2["RESUB"] = 1] = "RESUB";
   OldSubscribeStatus2[OldSubscribeStatus2["SUB_IN_GRACE_PERIOD"] = 2] = "SUB_IN_GRACE_PERIOD";
@@ -139606,8 +139711,8 @@ var OldSubscribeStatus = /* @__PURE__ */ function(OldSubscribeStatus2) {
   OldSubscribeStatus2[OldSubscribeStatus2["OLD_SUBSCRIBE_STATUS_DEFAULT"] = 100] = "OLD_SUBSCRIBE_STATUS_DEFAULT";
   OldSubscribeStatus2[OldSubscribeStatus2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return OldSubscribeStatus2;
-}({});
-var OpType = /* @__PURE__ */ function(OpType2) {
+})({});
+var OpType = /* @__PURE__ */ (function(OpType2) {
   OpType2[OpType2["OP_TYPE_DEFAULT"] = 0] = "OP_TYPE_DEFAULT";
   OpType2[OpType2["ADD"] = 1] = "ADD";
   OpType2[OpType2["REMOVE"] = 2] = "REMOVE";
@@ -139615,36 +139720,36 @@ var OpType = /* @__PURE__ */ function(OpType2) {
   OpType2[OpType2["BASIC_EFFECT"] = 4] = "BASIC_EFFECT";
   OpType2[OpType2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return OpType2;
-}({});
-var PartnershipDropsUpdateMessageChangeMode = /* @__PURE__ */ function(PartnershipDropsUpdateMessageChangeMode2) {
+})({});
+var PartnershipDropsUpdateMessageChangeMode = /* @__PURE__ */ (function(PartnershipDropsUpdateMessageChangeMode2) {
   PartnershipDropsUpdateMessageChangeMode2[PartnershipDropsUpdateMessageChangeMode2["CHANGE_MODE_SHOW"] = 0] = "CHANGE_MODE_SHOW";
   PartnershipDropsUpdateMessageChangeMode2[PartnershipDropsUpdateMessageChangeMode2["CHANGE_MODE_UPDATE"] = 1] = "CHANGE_MODE_UPDATE";
   PartnershipDropsUpdateMessageChangeMode2[PartnershipDropsUpdateMessageChangeMode2["CHANGE_MODE_CLOSE"] = 2] = "CHANGE_MODE_CLOSE";
   PartnershipDropsUpdateMessageChangeMode2[PartnershipDropsUpdateMessageChangeMode2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return PartnershipDropsUpdateMessageChangeMode2;
-}({});
-var PartnershipGameOfflineMessageOfflineGameInfoOfflineType = /* @__PURE__ */ function(PartnershipGameOfflineMessageOfflineGameInfoOfflineType2) {
+})({});
+var PartnershipGameOfflineMessageOfflineGameInfoOfflineType = /* @__PURE__ */ (function(PartnershipGameOfflineMessageOfflineGameInfoOfflineType2) {
   PartnershipGameOfflineMessageOfflineGameInfoOfflineType2[PartnershipGameOfflineMessageOfflineGameInfoOfflineType2["TASK_OFFLINE"] = 0] = "TASK_OFFLINE";
   PartnershipGameOfflineMessageOfflineGameInfoOfflineType2[PartnershipGameOfflineMessageOfflineGameInfoOfflineType2["EVENT_OFFLINE"] = 1] = "EVENT_OFFLINE";
   PartnershipGameOfflineMessageOfflineGameInfoOfflineType2[PartnershipGameOfflineMessageOfflineGameInfoOfflineType2["DROPS_OFFLINE"] = 2] = "DROPS_OFFLINE";
   PartnershipGameOfflineMessageOfflineGameInfoOfflineType2[PartnershipGameOfflineMessageOfflineGameInfoOfflineType2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return PartnershipGameOfflineMessageOfflineGameInfoOfflineType2;
-}({});
-var PinMessageActionType = /* @__PURE__ */ function(PinMessageActionType2) {
+})({});
+var PinMessageActionType = /* @__PURE__ */ (function(PinMessageActionType2) {
   PinMessageActionType2[PinMessageActionType2["UN_KOWN"] = 0] = "UN_KOWN";
   PinMessageActionType2[PinMessageActionType2["PIN"] = 1] = "PIN";
   PinMessageActionType2[PinMessageActionType2["PIN_CANCEL"] = 2] = "PIN_CANCEL";
   PinMessageActionType2[PinMessageActionType2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return PinMessageActionType2;
-}({});
-var PublicAreaMessageCommonCreatorSuccessInfoTopicDisplayLocation = /* @__PURE__ */ function(PublicAreaMessageCommonCreatorSuccessInfoTopicDisplayLocation2) {
+})({});
+var PublicAreaMessageCommonCreatorSuccessInfoTopicDisplayLocation = /* @__PURE__ */ (function(PublicAreaMessageCommonCreatorSuccessInfoTopicDisplayLocation2) {
   PublicAreaMessageCommonCreatorSuccessInfoTopicDisplayLocation2[PublicAreaMessageCommonCreatorSuccessInfoTopicDisplayLocation2["DISPLAY_LOCATION_FULL_SCREEN"] = 0] = "DISPLAY_LOCATION_FULL_SCREEN";
   PublicAreaMessageCommonCreatorSuccessInfoTopicDisplayLocation2[PublicAreaMessageCommonCreatorSuccessInfoTopicDisplayLocation2["DISPLAY_LOCATION_PUBLIC_SCREEN"] = 1] = "DISPLAY_LOCATION_PUBLIC_SCREEN";
   PublicAreaMessageCommonCreatorSuccessInfoTopicDisplayLocation2[PublicAreaMessageCommonCreatorSuccessInfoTopicDisplayLocation2["DISPLAY_LOCATION_BOTH"] = 2] = "DISPLAY_LOCATION_BOTH";
   PublicAreaMessageCommonCreatorSuccessInfoTopicDisplayLocation2[PublicAreaMessageCommonCreatorSuccessInfoTopicDisplayLocation2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return PublicAreaMessageCommonCreatorSuccessInfoTopicDisplayLocation2;
-}({});
-var PublicAreaMessageCommonPortraitInfoUserMetricsUserMetricsType = /* @__PURE__ */ function(PublicAreaMessageCommonPortraitInfoUserMetricsUserMetricsType2) {
+})({});
+var PublicAreaMessageCommonPortraitInfoUserMetricsUserMetricsType = /* @__PURE__ */ (function(PublicAreaMessageCommonPortraitInfoUserMetricsUserMetricsType2) {
   PublicAreaMessageCommonPortraitInfoUserMetricsUserMetricsType2[PublicAreaMessageCommonPortraitInfoUserMetricsUserMetricsType2["USER_METRICS_TYPE_UNKNOWN"] = 0] = "USER_METRICS_TYPE_UNKNOWN";
   PublicAreaMessageCommonPortraitInfoUserMetricsUserMetricsType2[PublicAreaMessageCommonPortraitInfoUserMetricsUserMetricsType2["USER_METRICS_TYPE_GRADE"] = 1] = "USER_METRICS_TYPE_GRADE";
   PublicAreaMessageCommonPortraitInfoUserMetricsUserMetricsType2[PublicAreaMessageCommonPortraitInfoUserMetricsUserMetricsType2["USER_METRICS_TYPE_SUBSCRIBE"] = 2] = "USER_METRICS_TYPE_SUBSCRIBE";
@@ -139654,8 +139759,8 @@ var PublicAreaMessageCommonPortraitInfoUserMetricsUserMetricsType = /* @__PURE__
   PublicAreaMessageCommonPortraitInfoUserMetricsUserMetricsType2[PublicAreaMessageCommonPortraitInfoUserMetricsUserMetricsType2["USER_METRICS_TYPE_GIFT"] = 6] = "USER_METRICS_TYPE_GIFT";
   PublicAreaMessageCommonPortraitInfoUserMetricsUserMetricsType2[PublicAreaMessageCommonPortraitInfoUserMetricsUserMetricsType2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return PublicAreaMessageCommonPortraitInfoUserMetricsUserMetricsType2;
-}({});
-var RankTextMessageRankTestMessageScene = /* @__PURE__ */ function(RankTextMessageRankTestMessageScene2) {
+})({});
+var RankTextMessageRankTestMessageScene = /* @__PURE__ */ (function(RankTextMessageRankTestMessageScene2) {
   RankTextMessageRankTestMessageScene2[RankTextMessageRankTestMessageScene2["RANK_TEXT_MESSAGE_RANK_TEST_MESSAGE_SCENE_UNKNOWN"] = 0] = "RANK_TEXT_MESSAGE_RANK_TEST_MESSAGE_SCENE_UNKNOWN";
   RankTextMessageRankTestMessageScene2[RankTextMessageRankTestMessageScene2["ONLINE_AUDIENCE_TOP_N_UPDATE_PUBLIC_SCREEN"] = 1] = "ONLINE_AUDIENCE_TOP_N_UPDATE_PUBLIC_SCREEN";
   RankTextMessageRankTestMessageScene2[RankTextMessageRankTestMessageScene2["MID_PEAK_MOTIVATION_PUBLIC_SCREEN_TOP"] = 2] = "MID_PEAK_MOTIVATION_PUBLIC_SCREEN_TOP";
@@ -139663,35 +139768,35 @@ var RankTextMessageRankTestMessageScene = /* @__PURE__ */ function(RankTextMessa
   RankTextMessageRankTestMessageScene2[RankTextMessageRankTestMessageScene2["TILE_REWARD_GUIDE"] = 4] = "TILE_REWARD_GUIDE";
   RankTextMessageRankTestMessageScene2[RankTextMessageRankTestMessageScene2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return RankTextMessageRankTestMessageScene2;
-}({});
-var ScoreType = /* @__PURE__ */ function(ScoreType2) {
+})({});
+var ScoreType = /* @__PURE__ */ (function(ScoreType2) {
   ScoreType2[ScoreType2["SCORE_TYPE_UNKNOWN"] = 0] = "SCORE_TYPE_UNKNOWN";
   ScoreType2[ScoreType2["ALL_FAN_TICKET"] = 1] = "ALL_FAN_TICKET";
   ScoreType2[ScoreType2["PLAY_SCORE"] = 2] = "PLAY_SCORE";
   ScoreType2[ScoreType2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return ScoreType2;
-}({});
-var ShowType = /* @__PURE__ */ function(ShowType2) {
+})({});
+var ShowType = /* @__PURE__ */ (function(ShowType2) {
   ShowType2[ShowType2["HOVER"] = 0] = "HOVER";
   ShowType2[ShowType2["PLUG"] = 1] = "PLUG";
   ShowType2[ShowType2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return ShowType2;
-}({});
-var SubPinEventMessageActionType = /* @__PURE__ */ function(SubPinEventMessageActionType2) {
+})({});
+var SubPinEventMessageActionType = /* @__PURE__ */ (function(SubPinEventMessageActionType2) {
   SubPinEventMessageActionType2[SubPinEventMessageActionType2["SUB_PIN_EVENT_MESSAGE_ACTION_TYPE_UNKNOWN"] = 0] = "SUB_PIN_EVENT_MESSAGE_ACTION_TYPE_UNKNOWN";
   SubPinEventMessageActionType2[SubPinEventMessageActionType2["SUB_PIN_EVENT_MESSAGE_ACTION_TYPE_PIN"] = 1] = "SUB_PIN_EVENT_MESSAGE_ACTION_TYPE_PIN";
   SubPinEventMessageActionType2[SubPinEventMessageActionType2["UNPIN"] = 2] = "UNPIN";
   SubPinEventMessageActionType2[SubPinEventMessageActionType2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return SubPinEventMessageActionType2;
-}({});
-var SubscribeType = /* @__PURE__ */ function(SubscribeType2) {
+})({});
+var SubscribeType = /* @__PURE__ */ (function(SubscribeType2) {
   SubscribeType2[SubscribeType2["ONCE"] = 0] = "ONCE";
   SubscribeType2[SubscribeType2["AUTO"] = 1] = "AUTO";
   SubscribeType2[SubscribeType2["SUBSCRIBE_TYPE_DEFAULT"] = 100] = "SUBSCRIBE_TYPE_DEFAULT";
   SubscribeType2[SubscribeType2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return SubscribeType2;
-}({});
-var SubscribingStatus = /* @__PURE__ */ function(SubscribingStatus2) {
+})({});
+var SubscribingStatus = /* @__PURE__ */ (function(SubscribingStatus2) {
   SubscribingStatus2[SubscribingStatus2["SUBSCRIBING_STATUS_UNKNOWN"] = 0] = "SUBSCRIBING_STATUS_UNKNOWN";
   SubscribingStatus2[SubscribingStatus2["SUBSCRIBING_STATUS_ONCE"] = 1] = "SUBSCRIBING_STATUS_ONCE";
   SubscribingStatus2[SubscribingStatus2["CIRCLE"] = 2] = "CIRCLE";
@@ -139701,20 +139806,20 @@ var SubscribingStatus = /* @__PURE__ */ function(SubscribingStatus2) {
   SubscribingStatus2[SubscribingStatus2["NOT_IN_GRACE_PERIOD"] = 6] = "NOT_IN_GRACE_PERIOD";
   SubscribingStatus2[SubscribingStatus2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return SubscribingStatus2;
-}({});
-var TextType = /* @__PURE__ */ function(TextType2) {
+})({});
+var TextType = /* @__PURE__ */ (function(TextType2) {
   TextType2[TextType2["DISPLAY_TEXT"] = 0] = "DISPLAY_TEXT";
   TextType2[TextType2["CONTENT"] = 1] = "CONTENT";
   TextType2[TextType2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return TextType2;
-}({});
-var UnionAnimationInfoType = /* @__PURE__ */ function(UnionAnimationInfoType2) {
+})({});
+var UnionAnimationInfoType = /* @__PURE__ */ (function(UnionAnimationInfoType2) {
   UnionAnimationInfoType2[UnionAnimationInfoType2["NO_UNION_ANIMATION"] = 0] = "NO_UNION_ANIMATION";
   UnionAnimationInfoType2[UnionAnimationInfoType2["LOOP"] = 1] = "LOOP";
   UnionAnimationInfoType2[UnionAnimationInfoType2["LOCK"] = 2] = "LOCK";
   UnionAnimationInfoType2[UnionAnimationInfoType2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return UnionAnimationInfoType2;
-}({});
+})({});
 function createBaseBizLayoutState() {
   return {
     multiGuestBizLayoutExtra: void 0,
@@ -142950,7 +143055,7 @@ var GiftTrayInfo = {
     return message;
   }
 };
-var PlayScene = /* @__PURE__ */ function(PlayScene2) {
+var PlayScene = /* @__PURE__ */ (function(PlayScene2) {
   PlayScene2[PlayScene2["UNKNOWN"] = 0] = "UNKNOWN";
   PlayScene2[PlayScene2["COUNTDOWN_FOR_ALL"] = 1] = "COUNTDOWN_FOR_ALL";
   PlayScene2[PlayScene2["COUNTDOWN_FOR_SINGLE"] = 2] = "COUNTDOWN_FOR_SINGLE";
@@ -142966,15 +143071,15 @@ var PlayScene = /* @__PURE__ */ function(PlayScene2) {
   PlayScene2[PlayScene2["GUEST_SHOWDOWN"] = 12] = "GUEST_SHOWDOWN";
   PlayScene2[PlayScene2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return PlayScene2;
-}({});
-var PlayUserTag = /* @__PURE__ */ function(PlayUserTag2) {
+})({});
+var PlayUserTag = /* @__PURE__ */ (function(PlayUserTag2) {
   PlayUserTag2[PlayUserTag2["PLAY_USER_TAG_UNKNOWN"] = 0] = "PLAY_USER_TAG_UNKNOWN";
   PlayUserTag2[PlayUserTag2["GUEST_SHOWDOWN_NORMAL"] = 1] = "GUEST_SHOWDOWN_NORMAL";
   PlayUserTag2[PlayUserTag2["GUEST_SHOWDOWN_WINNER"] = 2] = "GUEST_SHOWDOWN_WINNER";
   PlayUserTag2[PlayUserTag2["GUEST_SHOWDOWN_LOSER"] = 3] = "GUEST_SHOWDOWN_LOSER";
   PlayUserTag2[PlayUserTag2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return PlayUserTag2;
-}({});
+})({});
 function createBaseAtmosphereInfo() {
   return { tags: [] };
 }
@@ -163849,27 +163954,27 @@ var WebcastEnvelopeMessage = {
     return message;
   }
 };
-var MemberMessageAction = /* @__PURE__ */ function(MemberMessageAction2) {
+var MemberMessageAction = /* @__PURE__ */ (function(MemberMessageAction2) {
   MemberMessageAction2[MemberMessageAction2["MEMBER_MESSAGE_ACTION_UNKNOWN"] = 0] = "MEMBER_MESSAGE_ACTION_UNKNOWN";
   MemberMessageAction2[MemberMessageAction2["MEMBER_MESSAGE_ACTION_JOINED"] = 1] = "MEMBER_MESSAGE_ACTION_JOINED";
   MemberMessageAction2[MemberMessageAction2["MEMBER_MESSAGE_ACTION_SUBSCRIBED"] = 3] = "MEMBER_MESSAGE_ACTION_SUBSCRIBED";
   MemberMessageAction2[MemberMessageAction2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return MemberMessageAction2;
-}({});
-var CommentTag = /* @__PURE__ */ function(CommentTag2) {
+})({});
+var CommentTag = /* @__PURE__ */ (function(CommentTag2) {
   CommentTag2[CommentTag2["COMMENT_TAG_NORMAL"] = 0] = "COMMENT_TAG_NORMAL";
   CommentTag2[CommentTag2["COMMENT_TAG_CANDIDATE"] = 1] = "COMMENT_TAG_CANDIDATE";
   CommentTag2[CommentTag2["COMMENT_TAG_OVERAGE"] = 2] = "COMMENT_TAG_OVERAGE";
   CommentTag2[CommentTag2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return CommentTag2;
-}({});
-var MuteStatus = /* @__PURE__ */ function(MuteStatus2) {
+})({});
+var MuteStatus = /* @__PURE__ */ (function(MuteStatus2) {
   MuteStatus2[MuteStatus2["MUTE_STATUS_MUTE"] = 0] = "MUTE_STATUS_MUTE";
   MuteStatus2[MuteStatus2["MUTE_STATUS_UN_MUTE"] = 1] = "MUTE_STATUS_UN_MUTE";
   MuteStatus2[MuteStatus2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return MuteStatus2;
-}({});
-var ControlAction = /* @__PURE__ */ function(ControlAction2) {
+})({});
+var ControlAction = /* @__PURE__ */ (function(ControlAction2) {
   ControlAction2[ControlAction2["CONTROL_ACTION_FALLBACK_UNKNOWN"] = 0] = "CONTROL_ACTION_FALLBACK_UNKNOWN";
   ControlAction2[ControlAction2["CONTROL_ACTION_STREAM_PAUSED"] = 1] = "CONTROL_ACTION_STREAM_PAUSED";
   ControlAction2[ControlAction2["CONTROL_ACTION_STREAM_UNPAUSED"] = 2] = "CONTROL_ACTION_STREAM_UNPAUSED";
@@ -163877,7 +163982,7 @@ var ControlAction = /* @__PURE__ */ function(ControlAction2) {
   ControlAction2[ControlAction2["CONTROL_ACTION_STREAM_SUSPENDED"] = 4] = "CONTROL_ACTION_STREAM_SUSPENDED";
   ControlAction2[ControlAction2["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
   return ControlAction2;
-}({});
+})({});
 function createBaseHeartBeatMessage() {
   return {
     roomId: "0",
@@ -172216,7 +172321,7 @@ var Request2 = class _Request extends import_node_stream4.Duplex {
     if (cacheableStore.has(cache)) {
       return;
     }
-    const cacheableRequest = new dist_default((requestOptions, handler) => {
+    const cacheableRequest = new dist_default(((requestOptions, handler) => {
       const wrappedHandler = handler ? (response) => {
         const { beforeCacheHooks, gotRequest } = requestOptions;
         if (!beforeCacheHooks || beforeCacheHooks.length === 0) {
@@ -172278,7 +172383,7 @@ var Request2 = class _Request extends import_node_stream4.Duplex {
         };
       }
       return result;
-    }, cache);
+    }), cache);
     cacheableStore.set(cache, cacheableRequest.request());
   }
   async _createCacheableRequest(url2, options) {
@@ -172900,7 +173005,7 @@ var create = (defaults3) => {
     };
     return iterateHandlers(request.options);
   };
-  const got2 = (url2, options, defaultOptions = defaults3.options) => makeRequest(url2, options, defaultOptions, false);
+  const got2 = ((url2, options, defaultOptions = defaults3.options) => makeRequest(url2, options, defaultOptions, false));
   got2.extend = (...instancesOrOptions) => {
     const options = new Options(void 0, void 0, defaults3.options);
     const handlers = [...defaults3.handlers];
@@ -172925,7 +173030,7 @@ var create = (defaults3) => {
       mutableDefaults: Boolean(mutableDefaults)
     });
   };
-  const paginateEach = async function* (url2, options) {
+  const paginateEach = (async function* (url2, options) {
     if (distribution_default.plainObject(url2)) {
       assertNoUrlInOptionsObject(url2);
     }
@@ -173047,14 +173152,14 @@ var create = (defaults3) => {
       }
       numberOfRequests++;
     }
-  };
+  });
   got2.paginate = paginateEach;
-  got2.paginate.all = async (url2, options) => Array.fromAsync(paginateEach(url2, options));
+  got2.paginate.all = (async (url2, options) => Array.fromAsync(paginateEach(url2, options)));
   got2.paginate.each = paginateEach;
-  got2.stream = (url2, options) => makeRequest(url2, options, defaults3.options, true);
+  got2.stream = ((url2, options) => makeRequest(url2, options, defaults3.options, true));
   for (const method of aliases) {
-    got2[method] = (url2, options) => got2(url2, { ...options, method });
-    got2.stream[method] = (url2, options) => makeRequest(url2, { ...options, method }, defaults3.options, true);
+    got2[method] = ((url2, options) => got2(url2, { ...options, method }));
+    got2.stream[method] = ((url2, options) => makeRequest(url2, { ...options, method }, defaults3.options, true));
   }
   if (!defaults3.mutableDefaults) {
     Object.freeze(defaults3.handlers);
@@ -173091,22 +173196,82 @@ var { toString: toString2 } = Object.prototype;
 var { getPrototypeOf } = Object;
 var { iterator, toStringTag } = Symbol;
 var hasOwnProperty = (({ hasOwnProperty: hasOwnProperty2 }) => (obj, prop) => hasOwnProperty2.call(obj, prop))(Object.prototype);
+var isUnsafeObjectKey = (prop) => typeof prop === "string" && (prop === "__proto__" || prop === "constructor" || prop === "prototype");
+var isPrototypeBoundary = (obj, prototype2, source) => obj === Object.prototype || !source && prototype2 === null;
+var isSafeAndFullyMutable = (obj) => {
+  if (!Object.isExtensible(obj)) {
+    return false;
+  }
+  const props = Object.getOwnPropertyNames(obj);
+  if (Object.getOwnPropertySymbols) {
+    props.push(...Object.getOwnPropertySymbols(obj));
+  }
+  return props.every((prop) => {
+    if (isUnsafeObjectKey(prop)) {
+      return false;
+    }
+    const descriptor = Object.getOwnPropertyDescriptor(obj, prop);
+    return !!descriptor && descriptor.configurable && descriptor.writable === true;
+  });
+};
 var hasOwnInPrototypeChain = (thing, prop) => {
   let obj = thing;
   const seen = [];
-  while (obj != null && obj !== Object.prototype) {
+  while (obj != null) {
     if (seen.indexOf(obj) !== -1) {
       return false;
     }
     seen.push(obj);
+    const prototype2 = getPrototypeOf(obj);
+    if (isPrototypeBoundary(obj, prototype2, obj === thing)) {
+      return false;
+    }
     if (hasOwnProperty(obj, prop)) {
       return true;
     }
-    obj = getPrototypeOf(obj);
+    obj = prototype2;
   }
   return false;
 };
 var getSafeProp = (obj, prop) => obj != null && hasOwnInPrototypeChain(obj, prop) ? obj[prop] : void 0;
+var toSafeFlatObject = (thing) => {
+  if (thing == null || typeof thing !== "object" && typeof thing !== "function") {
+    return thing;
+  }
+  const sourcePrototype = getPrototypeOf(thing);
+  if (sourcePrototype === null && isSafeAndFullyMutable(thing)) {
+    return thing;
+  }
+  const result = /* @__PURE__ */ Object.create(null);
+  const merged = /* @__PURE__ */ Object.create(null);
+  const seen = [];
+  let current = thing;
+  while (current != null) {
+    if (seen.indexOf(current) !== -1) {
+      break;
+    }
+    seen.push(current);
+    const prototype2 = current === thing ? sourcePrototype : getPrototypeOf(current);
+    if (isPrototypeBoundary(current, prototype2, current === thing)) {
+      break;
+    }
+    const props = Object.getOwnPropertyNames(current);
+    if (Object.getOwnPropertySymbols) {
+      props.push(...Object.getOwnPropertySymbols(current));
+    }
+    for (const prop of props) {
+      if (isUnsafeObjectKey(prop)) {
+        continue;
+      }
+      if (!hasOwnProperty(merged, prop)) {
+        result[prop] = thing[prop];
+        merged[prop] = true;
+      }
+    }
+    current = prototype2;
+  }
+  return result;
+};
 var kindOf = /* @__PURE__ */ ((cache) => (thing) => {
   const str = toString2.call(thing);
   return cache[str] || (cache[str] = str.slice(8, -1).toLowerCase());
@@ -173141,9 +173306,9 @@ var isPlainObject2 = (val) => {
     return false;
   }
   const prototype2 = getPrototypeOf(val);
-  return (prototype2 === null || prototype2 === Object.prototype || getPrototypeOf(prototype2) === null) && // Treat any genuine (non-Object.prototype-polluted) Symbol.toStringTag or
-  // Symbol.iterator as evidence the value is a tagged/iterable type rather
-  // than a plain object, while ignoring keys injected onto Object.prototype.
+  return (prototype2 === null || prototype2 === Object.prototype || getPrototypeOf(prototype2) === null) && // Treat safe own/inherited Symbol.toStringTag or Symbol.iterator members as
+  // evidence the value is tagged/iterable, while ignoring members reachable
+  // only through shared or terminal prototype boundaries.
   !hasOwnInPrototypeChain(val, toStringTag) && !hasOwnInPrototypeChain(val, iterator);
 };
 var isEmptyObject2 = (val) => {
@@ -173554,6 +173719,7 @@ var utils_default = {
   // an alias to avoid ESLint no-prototype-builtins detection
   hasOwnInPrototypeChain,
   getSafeProp,
+  toSafeFlatObject,
   reduceDescriptors,
   freezeMethods,
   toObjectSet,
@@ -174192,24 +174358,16 @@ function toFormData(obj, formData, options) {
     throw new TypeError("target must be an object");
   }
   formData = formData || new (FormData_default || FormData)();
-  options = utils_default.toFlatObject(
-    options,
-    {
-      metaTokens: true,
-      dots: false,
-      indexes: false
-    },
-    false,
-    function defined(option, source) {
-      return !utils_default.isUndefined(source[option]);
-    }
-  );
-  const metaTokens = options.metaTokens;
-  const visitor = options.visitor || defaultVisitor;
-  const dots = options.dots;
-  const indexes = options.indexes;
-  const _Blob = options.Blob || typeof Blob !== "undefined" && Blob;
-  const maxDepth = options.maxDepth === void 0 ? DEFAULT_FORM_DATA_MAX_DEPTH : options.maxDepth;
+  const option = (name, fallback) => {
+    const value = utils_default.getSafeProp(options, name);
+    return utils_default.isUndefined(value) ? fallback : value;
+  };
+  const metaTokens = option("metaTokens", true);
+  const visitor = option("visitor") || defaultVisitor;
+  const dots = option("dots", false);
+  const indexes = option("indexes", false);
+  const _Blob = option("Blob") || typeof Blob !== "undefined" && Blob;
+  const maxDepth = option("maxDepth", DEFAULT_FORM_DATA_MAX_DEPTH);
   const useBlob = _Blob && utils_default.isSpecCompliantForm(formData);
   const stack = [];
   if (!utils_default.isFunction(visitor)) {
@@ -174233,7 +174391,10 @@ function toFormData(obj, formData, options) {
       if (Buffer_default && Buffer_default.isBufferAvailable()) {
         return Buffer_default.from(value);
       }
-      throw new AxiosError_default("Blob is not supported. Use a Buffer instead.", AxiosError_default.ERR_NOT_SUPPORT);
+      throw new AxiosError_default(
+        "Blob is not supported. Use a Buffer instead.",
+        AxiosError_default.ERR_NOT_SUPPORT
+      );
     }
     return value;
   }
@@ -174379,9 +174540,47 @@ function buildURL(url2, params, options) {
 }
 
 // node_modules/axios/lib/core/InterceptorManager.js
+var $internals2 = Symbol("internals");
+function countHandlers(handlers) {
+  return handlers ? handlers.length : 0;
+}
+function trimHandlers(handlers) {
+  if (!handlers) {
+    return;
+  }
+  while (handlers.length && handlers[handlers.length - 1] === null) {
+    handlers.pop();
+  }
+}
+function syncHandlerEntries(manager, internals) {
+  const handlers = manager.handlers;
+  const length = countHandlers(handlers);
+  if (handlers !== internals.handlersRef) {
+    internals.handlersRef = handlers;
+    internals.handlerEntries.clear();
+  } else if (length !== internals.handlersLength) {
+    if (!length) {
+      internals.handlerEntries.clear();
+    } else {
+      internals.handlerEntries.forEach(function removeStaleEntry(entry, id) {
+        if (handlers[entry.index] !== entry.handler) {
+          internals.handlerEntries.delete(id);
+        }
+      });
+    }
+  }
+  internals.handlersLength = length;
+}
 var InterceptorManager = class {
   constructor() {
     this.handlers = [];
+    this[$internals2] = {
+      handlersRef: this.handlers,
+      handlersLength: this.handlers.length,
+      handlerEntries: /* @__PURE__ */ new Map(),
+      iterationDepth: 0,
+      nextId: 0
+    };
   }
   /**
    * Add a new interceptor to the stack
@@ -174393,13 +174592,25 @@ var InterceptorManager = class {
    * @return {Number} An ID used to remove interceptor later
    */
   use(fulfilled, rejected, options) {
-    this.handlers.push({
+    const handler = {
       fulfilled,
       rejected,
       synchronous: options ? options.synchronous : false,
       runWhen: options ? options.runWhen : null
+    };
+    const internals = this[$internals2];
+    if (this.handlers == null) {
+      this.handlers = [];
+    }
+    syncHandlerEntries(this, internals);
+    const id = internals.nextId++;
+    this.handlers.push(handler);
+    internals.handlerEntries.set(id, {
+      handler,
+      index: this.handlers.length - 1
     });
-    return this.handlers.length - 1;
+    internals.handlersLength = this.handlers.length;
+    return id;
   }
   /**
    * Remove an interceptor from the stack
@@ -174409,8 +174620,19 @@ var InterceptorManager = class {
    * @returns {void}
    */
   eject(id) {
-    if (this.handlers[id]) {
-      this.handlers[id] = null;
+    const internals = this[$internals2];
+    syncHandlerEntries(this, internals);
+    const entry = internals.handlerEntries.get(id);
+    if (entry) {
+      internals.handlerEntries.delete(id);
+      if (this.handlers[entry.index] !== entry.handler) {
+        return;
+      }
+      this.handlers[entry.index] = null;
+      if (!internals.iterationDepth) {
+        trimHandlers(this.handlers);
+        internals.handlersLength = this.handlers.length;
+      }
     }
   }
   /**
@@ -174421,6 +174643,7 @@ var InterceptorManager = class {
   clear() {
     if (this.handlers) {
       this.handlers = [];
+      syncHandlerEntries(this, this[$internals2]);
     }
   }
   /**
@@ -174434,11 +174657,22 @@ var InterceptorManager = class {
    * @returns {void}
    */
   forEach(fn) {
-    utils_default.forEach(this.handlers, function forEachHandler(h2) {
-      if (h2 !== null) {
-        fn(h2);
+    const internals = this[$internals2];
+    syncHandlerEntries(this, internals);
+    internals.iterationDepth++;
+    try {
+      utils_default.forEach(this.handlers, function forEachHandler(h2) {
+        if (h2 !== null) {
+          fn(h2);
+        }
+      });
+    } finally {
+      if (!--internals.iterationDepth) {
+        syncHandlerEntries(this, internals);
+        trimHandlers(this.handlers);
+        internals.handlersLength = countHandlers(this.handlers);
       }
-    });
+    }
   }
 };
 var InterceptorManager_default = InterceptorManager;
@@ -174596,6 +174830,22 @@ function formDataToJSON(formData) {
 }
 var formDataToJSON_default = formDataToJSON;
 
+// node_modules/axios/lib/core/methodList.js
+var methodList = Object.freeze([
+  "get",
+  "delete",
+  "head",
+  "options",
+  "post",
+  "put",
+  "patch",
+  "purge",
+  "link",
+  "unlink",
+  "query"
+]);
+var methodList_default = methodList;
+
 // node_modules/axios/lib/defaults/index.js
 var own = (obj, key) => obj != null && utils_default.hasOwnProp(obj, key) ? obj[key] : void 0;
 function stringifySafely2(rawValue, parser, encoder) {
@@ -174708,7 +174958,7 @@ var defaults2 = {
     }
   }
 };
-utils_default.forEach(["delete", "get", "head", "post", "put", "patch", "query"], (method) => {
+utils_default.forEach(methodList_default, (method) => {
   defaults2.headers[method] = {};
 });
 var defaults_default = defaults2;
@@ -174786,19 +175036,21 @@ function combineURLs(baseURL, relativeURL) {
   return baseURL.slice(0, end) + "/" + relativeURL.replace(/^\/+/, "");
 }
 
+// node_modules/axios/lib/helpers/normalizeURLForProtocolCheck.js
+var urlParserControlCharacters = /[\t\n\r]/g;
+function normalizeURLForProtocolCheck(url2) {
+  if (typeof url2 !== "string") {
+    return url2;
+  }
+  let start = 0;
+  while (start < url2.length && url2.charCodeAt(start) <= 32) {
+    start++;
+  }
+  return url2.slice(start).replace(urlParserControlCharacters, "");
+}
+
 // node_modules/axios/lib/core/buildFullPath.js
 var malformedHttpProtocol = /^https?:(?!\/\/)/i;
-var httpProtocolControlCharacters = /[\t\n\r]/g;
-function stripLeadingC0ControlOrSpace2(url2) {
-  let i2 = 0;
-  while (i2 < url2.length && url2.charCodeAt(i2) <= 32) {
-    i2++;
-  }
-  return url2.slice(i2);
-}
-function normalizeURLForProtocolCheck(url2) {
-  return stripLeadingC0ControlOrSpace2(url2).replace(httpProtocolControlCharacters, "");
-}
 function redactFragment(fragment) {
   if (!fragment) {
     return fragment;
@@ -174920,7 +175172,7 @@ var import_follow_redirects = __toESM(require_follow_redirects(), 1);
 var import_zlib = __toESM(require("zlib"), 1);
 
 // node_modules/axios/lib/env/data.js
-var VERSION2 = "1.19.0";
+var VERSION2 = "1.20.0";
 
 // node_modules/axios/lib/helpers/parseProtocol.js
 function parseProtocol(url2) {
@@ -174929,7 +175181,7 @@ function parseProtocol(url2) {
 }
 
 // node_modules/axios/lib/helpers/fromDataURI.js
-var DATA_URL_PATTERN = /^([^,;]+\/[^,;]+)?((?:;[^,;=]+=[^,;]+)*)(;base64)?,([\s\S]*)$/;
+var DATA_URL_PATTERN = /^([^,;/]+\/[^,;/]+)?((?:;[^,;=]+=[^,;]+)*)(;base64)?,([\s\S]*)$/;
 function fromDataURI(uri, asBlob, options) {
   const _Blob = options && options.Blob || platform_default.classes.Blob;
   const protocol = parseProtocol(uri);
@@ -175200,13 +175452,13 @@ var formDataToStream = (form, headersHandler, options) => {
   }
   headersHandler && headersHandler(computedHeaders);
   return import_stream5.Readable.from(
-    async function* () {
+    (async function* () {
       for (const part of parts) {
         yield boundaryBytes;
         yield* part.encode();
       }
       yield footerBytes;
-    }()
+    })()
   );
 };
 var formDataToStream_default = formDataToStream;
@@ -175242,6 +175494,7 @@ var Http2Sessions = class {
   }
   getSession(authority, options) {
     options = Object.assign(
+      /* @__PURE__ */ Object.create(null),
       {
         sessionTimeout: 1e3
       },
@@ -175307,6 +175560,7 @@ var Http2Sessions = class {
       };
     }
     session.once("close", removeSession);
+    session.once("error", removeSession);
     let entry = [session, options];
     authoritySessions ? authoritySessions.push(entry) : authoritySessions = this.sessions[authority] = [entry];
     return session;
@@ -175331,6 +175585,13 @@ var callbackify_default = callbackify;
 
 // node_modules/axios/lib/helpers/shouldBypassProxy.js
 var LOOPBACK_HOSTNAMES = /* @__PURE__ */ new Set(["localhost", "0.0.0.0"]);
+var trimTrailingDots = (value) => {
+  let end = value.length;
+  while (end && value.charCodeAt(end - 1) === 46) {
+    end--;
+  }
+  return end === value.length ? value : value.slice(0, end);
+};
 var isIPv4Loopback = (host) => {
   const parts = host.split(".");
   if (parts.length !== 4) return false;
@@ -175363,7 +175624,7 @@ var normalizeIPAddress = (host) => {
   if (h2.charAt(0) === "[" && h2.charAt(h2.length - 1) === "]") {
     h2 = h2.slice(1, -1);
   }
-  h2 = h2.replace(/\.+$/, "");
+  h2 = trimTrailingDots(h2);
   if (!/^[0-9.xXa-fA-F]+$/.test(h2)) return host;
   const parts = h2.split(".");
   if (parts.some((p) => p === "")) return host;
@@ -175475,6 +175736,40 @@ var unmapIPv4MappedIPv6 = (host) => {
   }
   return host;
 };
+var IPV4_OCTET_RE = /^(?:0|[1-9]\d{0,2})$/;
+var ipv4ToBytes = (host) => {
+  const parts = host.split(".");
+  return parts.length === 4 && parts.every((part) => IPV4_OCTET_RE.test(part) && Number(part) <= 255) ? parts.map(Number) : null;
+};
+var IPV6_GROUP_RE = /^[0-9a-f]{1,4}$/i;
+var ipv6ToBytes = (host) => {
+  const halves = host.split("::");
+  if (halves.length > 2) {
+    return null;
+  }
+  const groups = halves[0] ? halves[0].split(":") : [];
+  if (halves.length === 2) {
+    const rear = halves[1] ? halves[1].split(":") : [];
+    const missing = 8 - groups.length - rear.length;
+    if (missing < 1) {
+      return null;
+    }
+    groups.push(...new Array(missing).fill("0"), ...rear);
+  }
+  if (groups.length !== 8 || groups.some((group) => !IPV6_GROUP_RE.test(group))) {
+    return null;
+  }
+  return groups.flatMap((group) => {
+    const value = Number.parseInt(group, 16);
+    return [value >> 8 & 255, value & 255];
+  });
+};
+var ipToBytes = (host) => {
+  if (typeof host !== "string" || !host) {
+    return null;
+  }
+  return host.indexOf(":") !== -1 ? ipv6ToBytes(host) : ipv4ToBytes(host);
+};
 var normalizeNoProxyHost = (hostname) => {
   if (!hostname) {
     return hostname;
@@ -175482,12 +175777,89 @@ var normalizeNoProxyHost = (hostname) => {
   if (hostname.charAt(0) === "[" && hostname.charAt(hostname.length - 1) === "]") {
     hostname = hostname.slice(1, -1);
   }
-  const trimmed = hostname.replace(/\.+$/, "");
+  const trimmed = trimTrailingDots(hostname);
   const ipv4 = normalizeIPAddress(trimmed);
   if (ipv4 !== trimmed) {
     return ipv4;
   }
   return unmapIPv4MappedIPv6(trimmed);
+};
+var normalizeCidrBase = (input) => {
+  let base = input;
+  const startsBracket = base.charAt(0) === "[";
+  const endsBracket = base.charAt(base.length - 1) === "]";
+  const hasBracket = base.includes("[") || base.includes("]");
+  if (startsBracket || endsBracket) {
+    if (!startsBracket || !endsBracket) {
+      return null;
+    }
+    base = base.slice(1, -1);
+    if (base.indexOf(":") === -1 || base.includes("[") || base.includes("]")) {
+      return null;
+    }
+  } else if (hasBracket) {
+    return null;
+  }
+  if (!base || base.charAt(base.length - 1) === ".") {
+    return null;
+  }
+  const wasIPv6 = base.indexOf(":") !== -1;
+  if (wasIPv6) {
+    try {
+      base = new URL(`http://[${base}]/`).hostname.slice(1, -1);
+    } catch (_err) {
+      return null;
+    }
+  } else {
+    base = normalizeIPAddress(base);
+    if (!ipv4ToBytes(base)) {
+      return null;
+    }
+  }
+  return { normalized: unmapIPv4MappedIPv6(base), wasIPv6 };
+};
+var CIDR_ENTRY_RE = /^(.+)\/(0|[1-9]\d{0,2})$/;
+var parseCidrEntry = (entry) => {
+  if (entry.indexOf("/") === -1) {
+    return void 0;
+  }
+  const match = CIDR_ENTRY_RE.exec(entry);
+  if (!match) {
+    return null;
+  }
+  let prefix = Number(match[2]);
+  const parsedBase = normalizeCidrBase(match[1]);
+  if (!parsedBase) {
+    return null;
+  }
+  const { normalized, wasIPv6 } = parsedBase;
+  if (wasIPv6 && normalized.indexOf(":") === -1) {
+    if (prefix < 96) {
+      return null;
+    }
+    prefix -= 96;
+  }
+  const bytes = ipToBytes(normalized);
+  if (!bytes || prefix > bytes.length * 8) {
+    return null;
+  }
+  return { bytes, prefix };
+};
+var isInSubnet = (addressBytes, networkBytes, prefix) => {
+  const fullBytes = prefix >> 3;
+  for (let i2 = 0; i2 < fullBytes; i2++) {
+    if (addressBytes[i2] !== networkBytes[i2]) {
+      return false;
+    }
+  }
+  const remainingBits = prefix & 7;
+  if (remainingBits) {
+    const mask = 255 << 8 - remainingBits & 255;
+    if ((addressBytes[fullBytes] & mask) !== (networkBytes[fullBytes] & mask)) {
+      return false;
+    }
+  }
+  return true;
 };
 function shouldBypassProxy(location) {
   let parsed;
@@ -175505,12 +175877,17 @@ function shouldBypassProxy(location) {
   }
   const port = Number.parseInt(parsed.port, 10) || DEFAULT_PORTS2[parsed.protocol.split(":", 1)[0]] || 0;
   const hostname = normalizeNoProxyHost(parsed.hostname.toLowerCase());
+  const hostnameBytes = ipToBytes(hostname);
   return noProxy.split(/[\s,]+/).some((entry) => {
     if (!entry) {
       return false;
     }
     if (entry === "*") {
       return true;
+    }
+    const cidr = parseCidrEntry(entry);
+    if (cidr !== void 0) {
+      return cidr !== null && !!hostnameBytes && hostnameBytes.length === cidr.bytes.length && isInSubnet(hostnameBytes, cidr.bytes, cidr.prefix);
     }
     let [entryHost, entryPort] = parseNoProxyEntry(entry);
     entryHost = normalizeNoProxyHost(entryHost);
@@ -175597,7 +175974,8 @@ function throttle(fn, freq) {
     }
   };
   const flush = () => lastArgs && invoke(lastArgs);
-  return [throttled, flush];
+  const flushWith = (...args) => invoke(args);
+  return [throttled, flush, flushWith];
 }
 var throttle_default = throttle;
 
@@ -175606,7 +175984,7 @@ var progressEventReducer = (listener, isDownloadStream, freq = 3) => {
   let bytesNotified = 0;
   const _speedometer = speedometer_default(50, 250);
   return throttle_default((e) => {
-    if (!e || typeof e.loaded !== "number") {
+    if (!e || !utils_default.isNumber(e.loaded)) {
       return;
     }
     const rawLoaded = e.loaded;
@@ -175767,6 +176145,12 @@ var { http: httpFollow, https: httpsFollow } = import_follow_redirects.default;
 var isHttps = /https:?/;
 var kAxiosSocketListener = Symbol("axios.http.socketListener");
 var kAxiosCurrentReq = Symbol("axios.http.currentReq");
+function handleSocketError(err2) {
+  const current = this[kAxiosCurrentReq];
+  if (current && !current.destroyed) {
+    current.destroy(err2);
+  }
+}
 var kAxiosInstalledTunnel = Symbol("axios.http.installedTunnel");
 var tunnelingAgentCache = /* @__PURE__ */ new Map();
 var tunnelingAgentCacheUser = /* @__PURE__ */ new WeakMap();
@@ -175869,10 +176253,10 @@ function isSameOriginRedirect(redirectOptions, requestDetails) {
     return false;
   }
 }
-function setProxy(options, configProxy, location, isRedirect, configHttpsAgent, configHttpAgent) {
+function setProxy(options, configProxy, location, isRedirect, configHttpsAgent, configHttpAgent, allowEnvProxy = true) {
   let proxy = configProxy;
   const proxyEnvAgent = getProxyEnvAgent(options, configHttpAgent, configHttpsAgent);
-  if (!proxy && proxy !== false && !isNodeEnvProxyEnabled(proxyEnvAgent)) {
+  if (!proxy && proxy !== false && allowEnvProxy && !isNodeEnvProxyEnabled(proxyEnvAgent)) {
     const proxyUrl = getProxyForUrl(location);
     if (proxyUrl) {
       if (!shouldBypassProxy(location)) {
@@ -175969,9 +176353,13 @@ function setProxy(options, configProxy, location, isRedirect, configHttpsAgent, 
       redirectOptions.href,
       true,
       configHttpsAgent,
-      configHttpAgent
+      configHttpAgent,
+      allowEnvProxy
     );
   };
+  return Boolean(
+    proxy || configProxy !== false && allowEnvProxy && isNodeEnvProxyEnabled(proxyEnvAgent)
+  );
 }
 var isHttpAdapterSupported = typeof process !== "undefined" && utils_default.kindOf(process) === "process";
 var wrapAsync = (asyncExecutor) => {
@@ -175996,7 +176384,7 @@ var wrapAsync = (asyncExecutor) => {
 };
 var resolveFamily = ({ address, family }) => {
   if (!utils_default.isString(address)) {
-    throw TypeError("address must be a string");
+    throw new AxiosError_default("address must be a string", AxiosError_default.ERR_BAD_OPTION_VALUE);
   }
   return {
     address,
@@ -176004,6 +176392,30 @@ var resolveFamily = ({ address, family }) => {
   };
 };
 var buildAddressEntry = (address, family) => resolveFamily(utils_default.isObject(address) ? address : { address, family });
+var normalizedLookupCache = /* @__PURE__ */ new WeakMap();
+var normalizeLookup = (lookup) => {
+  let normalized = normalizedLookupCache.get(lookup);
+  if (normalized) {
+    return normalized;
+  }
+  const callbackLookup = callbackify_default(lookup, (value) => utils_default.isArray(value) ? value : [value]);
+  normalized = (hostname, opt, cb) => {
+    callbackLookup(hostname, opt, (err2, arg0, arg1) => {
+      if (err2) {
+        return cb(err2);
+      }
+      let addresses;
+      try {
+        addresses = utils_default.isArray(arg0) ? arg0.map((addr) => buildAddressEntry(addr)) : [buildAddressEntry(arg0, arg1)];
+      } catch (error2) {
+        return cb(error2);
+      }
+      opt.all ? cb(err2, addresses) : cb(err2, addresses[0].address, addresses[0].family);
+    });
+  };
+  normalizedLookupCache.set(lookup, normalized);
+  return normalized;
+};
 var http2Transport = {
   request(options, cb) {
     const authority = options.protocol + "//" + options.hostname + ":" + (options.port || (options.protocol === "https:" ? 443 : 80));
@@ -176040,6 +176452,7 @@ var http_default = isHttpAdapterSupported && function httpAdapter(config) {
     let family = own2("family");
     let httpVersion = own2("httpVersion");
     if (httpVersion === void 0) httpVersion = 1;
+    const rawHttpVersion = httpVersion;
     let http2Options = own2("http2Options");
     const httpAgent = own2("httpAgent");
     const httpsAgent = own2("httpsAgent");
@@ -176056,25 +176469,32 @@ var http_default = isHttpAdapterSupported && function httpAdapter(config) {
     let rejected = false;
     let req;
     let connectPhaseTimer;
-    httpVersion = +httpVersion;
+    try {
+      httpVersion = +httpVersion;
+    } catch (err2) {
+      throw new AxiosError_default(
+        "Invalid protocol version: value is not a number",
+        AxiosError_default.ERR_BAD_OPTION_VALUE,
+        config
+      );
+    }
     if (Number.isNaN(httpVersion)) {
-      throw TypeError(`Invalid protocol version: '${config.httpVersion}' is not a number`);
+      throw new AxiosError_default(
+        `Invalid protocol version: '${rawHttpVersion}' is not a number`,
+        AxiosError_default.ERR_BAD_OPTION_VALUE,
+        config
+      );
     }
     if (httpVersion !== 1 && httpVersion !== 2) {
-      throw TypeError(`Unsupported protocol version '${httpVersion}'`);
+      throw new AxiosError_default(
+        `Unsupported protocol version '${httpVersion}'`,
+        AxiosError_default.ERR_BAD_OPTION_VALUE,
+        config
+      );
     }
     const isHttp2 = httpVersion === 2;
     if (lookup) {
-      const _lookup = callbackify_default(lookup, (value) => utils_default.isArray(value) ? value : [value]);
-      lookup = (hostname, opt, cb) => {
-        _lookup(hostname, opt, (err2, arg0, arg1) => {
-          if (err2) {
-            return cb(err2);
-          }
-          const addresses = utils_default.isArray(arg0) ? arg0.map((addr) => buildAddressEntry(addr)) : [buildAddressEntry(arg0, arg1)];
-          opt.all ? cb(err2, addresses) : cb(err2, addresses[0].address, addresses[0].family);
-        });
-      };
+      lookup = normalizeLookup(lookup);
     }
     const abortEmitter = new import_events2.EventEmitter();
     function abort(reason) {
@@ -176317,6 +176737,9 @@ var http_default = isHttpAdapterSupported && function httpAdapter(config) {
       utils_default.hasOwnProp(transitional2, "advertiseZstdAcceptEncoding") && transitional2.advertiseZstdAcceptEncoding === true ? ACCEPT_ENCODING_WITH_ZSTD : ACCEPT_ENCODING,
       false
     );
+    if (isHttp2 && lookup) {
+      http2Options = Object.assign(/* @__PURE__ */ Object.create(null), http2Options, { lookup });
+    }
     const options = Object.assign(/* @__PURE__ */ Object.create(null), {
       path: path3,
       method,
@@ -176327,9 +176750,11 @@ var http_default = isHttpAdapterSupported && function httpAdapter(config) {
       family,
       beforeRedirect: dispatchBeforeRedirect,
       beforeRedirects: /* @__PURE__ */ Object.create(null),
-      http2Options
+      http2Options,
+      createConnection: void 0
     });
     !utils_default.isUndefined(lookup) && (options.lookup = lookup);
+    let proxyApplied = false;
     if (socketPath) {
       if (typeof socketPath !== "string") {
         return reject(
@@ -176357,13 +176782,17 @@ var http_default = isHttpAdapterSupported && function httpAdapter(config) {
     } else {
       options.hostname = parsed.hostname.startsWith("[") ? parsed.hostname.slice(1, -1) : parsed.hostname;
       options.port = parsed.port;
-      setProxy(
+      proxyApplied = setProxy(
         options,
         configProxy,
         protocol + "//" + parsed.hostname + (parsed.port ? ":" + parsed.port : "") + options.path,
         false,
         httpsAgent,
-        httpAgent
+        httpAgent,
+        // The HTTP/2 transport connects independently of HTTP/1 agents, so it
+        // cannot apply either axios-resolved or agent-local environment proxies.
+        // Explicit proxy config is still processed and rejected below.
+        !isHttp2
       );
     }
     let transport;
@@ -176374,6 +176803,15 @@ var http_default = isHttpAdapterSupported && function httpAdapter(config) {
       options.agent = isHttpsRequest ? httpsAgent : httpAgent;
     }
     if (isHttp2) {
+      if (proxyApplied) {
+        return reject(
+          new AxiosError_default(
+            "HTTP/2 requests with a proxy are not supported",
+            AxiosError_default.ERR_NOT_SUPPORT,
+            config
+          )
+        );
+      }
       transport = http2Transport;
     } else {
       const configTransport = own2("transport");
@@ -176461,7 +176899,11 @@ var http_default = isHttpAdapterSupported && function httpAdapter(config) {
             transformStream,
             progressEventDecorator(
               responseLength,
-              progressEventReducer(asyncDecorator(onDownloadProgress, scheduleProgress), true, 3)
+              progressEventReducer(
+                asyncDecorator(onDownloadProgress, scheduleProgress),
+                true,
+                3
+              )
             )
           )
         );
@@ -176474,6 +176916,7 @@ var http_default = isHttpAdapterSupported && function httpAdapter(config) {
           delete res.headers["content-encoding"];
         }
         switch ((res.headers["content-encoding"] || "").toLowerCase()) {
+          /*eslint default-case:0*/
           case "gzip":
           case "x-gzip":
           case "compress":
@@ -176609,12 +177052,7 @@ var http_default = isHttpAdapterSupported && function httpAdapter(config) {
         socket.setKeepAlive(true, 1e3 * 60);
       }
       if (!socket[kAxiosSocketListener]) {
-        socket.on("error", function handleSocketError(err2) {
-          const current = socket[kAxiosCurrentReq];
-          if (current && !current.destroyed) {
-            current.destroy(err2);
-          }
-        });
+        socket.on("error", handleSocketError);
         socket[kAxiosSocketListener] = true;
       }
       socket[kAxiosCurrentReq] = req;
@@ -176859,7 +177297,7 @@ function mergeConfig(config1, config2) {
     transformResponse: defaultToConfig2,
     paramsSerializer: defaultToConfig2,
     timeout: defaultToConfig2,
-    timeoutMessage: defaultToConfig2,
+    timeoutErrorMessage: defaultToConfig2,
     withCredentials: defaultToConfig2,
     withXSRFToken: defaultToConfig2,
     adapter: defaultToConfig2,
@@ -176936,10 +177374,11 @@ function resolveConfig(config) {
     }
   }
   if (utils_default.isFormData(data)) {
+    const getHeaders = utils_default.getSafeProp(data, "getHeaders");
     if (platform_default.hasStandardBrowserEnv || platform_default.hasStandardBrowserWebWorkerEnv || utils_default.isReactNative(data)) {
       headers.setContentType(void 0);
-    } else if (utils_default.isFunction(data.getHeaders)) {
-      setFormDataHeaders(headers, data.getHeaders(), own2("formDataHeaderPolicy"));
+    } else if (utils_default.isFunction(getHeaders)) {
+      setFormDataHeaders(headers, getHeaders.call(data), own2("formDataHeaderPolicy"));
     }
   }
   if (platform_default.hasStandardBrowserEnv) {
@@ -176968,7 +177407,7 @@ var xhr_default = isXHRAdapterSupported && function(config) {
     let { responseType, onUploadProgress, onDownloadProgress } = _config;
     let onCanceled;
     let uploadThrottled, downloadThrottled;
-    let flushUpload, flushDownload;
+    let flushUpload, flushDownload, flushDownloadWithEvent;
     function done() {
       flushUpload && flushUpload();
       flushDownload && flushDownload();
@@ -176978,7 +177417,27 @@ var xhr_default = isXHRAdapterSupported && function(config) {
     let request = new XMLHttpRequest();
     request.open(_config.method.toUpperCase(), _config.url, true);
     request.timeout = _config.timeout;
-    function onloadend() {
+    function onloadend(event) {
+      if (!request) {
+        return;
+      }
+      if (request.status === 0 && (parseProtocol(normalizeURLForProtocolCheck(_config.url)) || parseProtocol(platform_default.origin)) !== "file" && !(request.responseURL && request.responseURL.startsWith("file:"))) {
+        reject(new AxiosError_default("Request aborted", AxiosError_default.ECONNABORTED, config, request));
+        done();
+        request = null;
+        return;
+      }
+      try {
+        if (event) {
+          flushDownloadWithEvent && flushDownloadWithEvent(event);
+        } else {
+          flushDownload && flushDownload();
+        }
+      } catch (err2) {
+        setTimeout(() => {
+          throw err2;
+        });
+      }
       if (!request) {
         return;
       }
@@ -177066,7 +177525,10 @@ var xhr_default = isXHRAdapterSupported && function(config) {
       request.responseType = _config.responseType;
     }
     if (onDownloadProgress) {
-      [downloadThrottled, flushDownload] = progressEventReducer(onDownloadProgress, true);
+      [downloadThrottled, flushDownload, flushDownloadWithEvent] = progressEventReducer(
+        onDownloadProgress,
+        true
+      );
       request.addEventListener("progress", downloadThrottled);
     }
     if (onUploadProgress && request.upload) {
@@ -177236,6 +177698,17 @@ var trackStream = (stream5, chunkSize, onProgress, onFinish) => {
 
 // node_modules/axios/lib/adapters/fetch.js
 var DEFAULT_CHUNK_SIZE = 64 * 1024;
+var DEFAULT_REQUEST_OPTIONS = {
+  cache: "default",
+  redirect: "follow",
+  referrer: "about:client",
+  referrerPolicy: "",
+  mode: "cors",
+  integrity: "",
+  keepalive: false,
+  priority: "auto",
+  window: null
+};
 var { isFunction: isFunction3 } = utils_default;
 var encodeUTF82 = (str) => encodeURIComponent(str).replace(
   /%([0-9A-F]{2})/gi,
@@ -177366,7 +177839,8 @@ var factory = (env) => {
       withCredentials = "same-origin",
       fetchOptions,
       maxContentLength,
-      maxBodyLength
+      maxBodyLength,
+      maxRedirects
     } = resolveConfig_default(config);
     const hasMaxContentLength = utils_default.isNumber(maxContentLength) && maxContentLength > -1;
     const hasMaxBodyLength = utils_default.isNumber(maxBodyLength) && maxBodyLength > -1;
@@ -177496,17 +177970,44 @@ var factory = (env) => {
         }
       }
       headers.set("User-Agent", "axios/" + VERSION2, false);
-      const resolvedOptions = {
-        ...fetchOptions,
+      const safeFetchOptions = fetchOptions == null ? fetchOptions : Object.assign(/* @__PURE__ */ Object.create(null), fetchOptions);
+      if (safeFetchOptions) {
+        delete safeFetchOptions.body;
+        delete safeFetchOptions.headers;
+        delete safeFetchOptions.method;
+        delete safeFetchOptions.signal;
+        delete safeFetchOptions.duplex;
+        delete safeFetchOptions.credentials;
+      }
+      const resolvedOptions = Object.assign(/* @__PURE__ */ Object.create(null), safeFetchOptions, {
         signal: composedSignal,
         method: method.toUpperCase(),
         headers: toByteStringHeaderObject(headers.normalize()),
         body: data,
         duplex: "half",
         credentials: isCredentialsSupported ? withCredentials : void 0
-      };
+      });
+      if (isRequestSupported) {
+        utils_default.forEach(DEFAULT_REQUEST_OPTIONS, (value, key) => {
+          if (resolvedOptions[key] === void 0) {
+            resolvedOptions[key] = value;
+          }
+        });
+        if (resolvedOptions.signal === void 0) {
+          resolvedOptions.signal = null;
+        }
+        if (resolvedOptions.body === void 0) {
+          resolvedOptions.body = null;
+        }
+      }
+      if (maxRedirects === 0) {
+        resolvedOptions.redirect = "manual";
+        if (safeFetchOptions) {
+          safeFetchOptions.redirect = "manual";
+        }
+      }
       request = isRequestSupported && new Request3(url2, resolvedOptions);
-      let response = await (isRequestSupported ? _fetch(request, fetchOptions) : _fetch(url2, resolvedOptions));
+      let response = await (isRequestSupported ? _fetch(request, safeFetchOptions) : _fetch(url2, resolvedOptions));
       const responseHeaders = AxiosHeaders_default.from(response.headers);
       if (hasMaxContentLength) {
         const declaredLength = utils_default.toFiniteNumber(responseHeaders.getContentLength());
@@ -177725,9 +178226,10 @@ function throwIfCancellationRequested(config) {
     throw new CanceledError_default(null, config);
   }
 }
-function dispatchRequest(config) {
+function dispatchRequest(_config) {
+  const config = utils_default.toSafeFlatObject(_config);
   throwIfCancellationRequested(config);
-  config.headers = AxiosHeaders_default.from(config.headers);
+  config.headers = AxiosHeaders_default.from(utils_default.getSafeProp(config, "headers"));
   config.data = transformData.call(config, config.transformRequest);
   if (["post", "put", "patch"].indexOf(config.method) !== -1) {
     config.headers.setContentType("application/x-www-form-urlencoded", false);
@@ -177857,16 +178359,15 @@ var Axios = class {
       return await this._request(configOrUrl, config);
     } catch (err2) {
       if (err2 instanceof Error) {
-        let dummy = {};
-        Error.captureStackTrace ? Error.captureStackTrace(dummy) : dummy = new Error();
-        const stack = (() => {
-          if (!dummy.stack) {
-            return "";
-          }
-          const firstNewlineIndex = dummy.stack.indexOf("\n");
-          return firstNewlineIndex === -1 ? "" : dummy.stack.slice(firstNewlineIndex + 1);
-        })();
         try {
+          let dummy = {};
+          Error.captureStackTrace ? Error.captureStackTrace(dummy) : dummy = new Error();
+          const dummyStack = dummy.stack;
+          let stack = "";
+          if (typeof dummyStack === "string") {
+            const firstNewlineIndex = dummyStack.indexOf("\n");
+            stack = firstNewlineIndex === -1 ? "" : dummyStack.slice(firstNewlineIndex + 1);
+          }
           if (!err2.stack) {
             err2.stack = stack;
           } else if (stack) {
@@ -177936,9 +178437,9 @@ var Axios = class {
       },
       true
     );
-    config.method = (config.method || this.defaults.method || "get").toLowerCase();
+    config.method = (utils_default.getSafeProp(config, "method") || utils_default.getSafeProp(this.defaults, "method") || "get").toLowerCase();
     let contextHeaders = headers && utils_default.merge(headers.common, headers[config.method]);
-    headers && utils_default.forEach(["delete", "get", "head", "post", "put", "patch", "query", "common"], (method) => {
+    headers && utils_default.forEach(methodList_default.concat("common"), (method) => {
       delete headers[method];
     });
     config.headers = AxiosHeaders_default.concat(contextHeaders, headers);
@@ -178201,14 +178702,22 @@ var HttpStatusCode = {
   Gone: 410,
   LengthRequired: 411,
   PreconditionFailed: 412,
+  /**
+   * @deprecated Use `ContentTooLarge` instead.
+   */
   PayloadTooLarge: 413,
+  ContentTooLarge: 413,
   UriTooLong: 414,
   UnsupportedMediaType: 415,
   RangeNotSatisfiable: 416,
   ExpectationFailed: 417,
   ImATeapot: 418,
   MisdirectedRequest: 421,
+  /**
+   * @deprecated Use `UnprocessableContent` instead.
+   */
   UnprocessableEntity: 422,
+  UnprocessableContent: 422,
   Locked: 423,
   FailedDependency: 424,
   TooEarly: 425,
@@ -178237,7 +178746,9 @@ var HttpStatusCode = {
   InvalidSslCertificate: 526
 };
 Object.entries(HttpStatusCode).forEach(([key, value]) => {
-  HttpStatusCode[value] = key;
+  if (HttpStatusCode[value] === void 0) {
+    HttpStatusCode[value] = key;
+  }
 });
 var HttpStatusCode_default = HttpStatusCode;
 
@@ -187504,8 +188015,9 @@ var embeddedDashboardHtml = `<!DOCTYPE html>
         else if (rank === 3) rankClass = 'rank-3';
 
         const rankBadge = \`<span class="rank-pill \${rankClass}">\${rank}</span>\`;
-        const avatar = item.avatar 
-          ? \`<img class="avatar-circle" src="\${item.avatar}" alt="" />\` 
+        const isSafeAvatar = item.avatar && /^(https?:\\/\\/|data:image\\/)/i.test(item.avatar.trim());
+        const avatar = isSafeAvatar 
+          ? \`<img class="avatar-circle" src="\${escapeHtml(item.avatar.trim())}" alt="" />\` 
           : \`<div class="avatar-circle">\u{1F464}</div>\`;
         const distance = currentView === 'round' 
           ? \`\${item.distance} km\` 
@@ -187673,7 +188185,12 @@ var embeddedDashboardHtml = `<!DOCTYPE html>
 
     function escapeHtml(str) {
       if (!str) return '';
-      return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
     }
 
     // =========================================================================
@@ -189830,14 +190347,39 @@ if (import_fs.default.existsSync(envPath)) {
   });
 }
 var app = (0, import_express.default)();
+var isAllowedOrigin = (origin2) => {
+  if (!origin2) return true;
+  try {
+    const parsed = new URL(origin2);
+    const hostname = parsed.hostname.toLowerCase();
+    if (hostname === "localhost" || hostname === "127.0.0.1") return true;
+    if (/^(192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+|172\.(1[6-9]|2\d|3[0-1])\.\d+\.\d+)$/.test(hostname)) return true;
+    if (hostname === "geoguessr.com" || hostname.endsWith(".geoguessr.com")) return true;
+    return false;
+  } catch (_) {
+    return false;
+  }
+};
 var server = import_http5.default.createServer(app);
 var io2 = new Server(server, {
   cors: {
-    origin: "*",
+    origin: (origin2, callback) => {
+      callback(null, isAllowedOrigin(origin2));
+    },
     methods: ["GET", "POST"]
   }
 });
-app.use((0, import_cors.default)());
+app.use(
+  (0, import_cors.default)({
+    origin: (origin2, callback) => {
+      if (isAllowedOrigin(origin2)) {
+        callback(null, true);
+      } else {
+        callback(new Error("Akses diblokir oleh kebijakan keamanan CORS MabarBang."));
+      }
+    }
+  })
+);
 app.use(import_express.default.json({ limit: "50mb" }));
 app.use(import_express.default.urlencoded({ extended: true, limit: "50mb" }));
 app.use((_req, res, next) => {
@@ -190395,10 +190937,11 @@ app.get("/api/state", (req, res) => {
 });
 app.get("/api/auth/config", (_req, res) => {
   const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || "";
-  const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || process.env.SUPABASE_KEY || "";
+  const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || "";
   res.json({
     supabaseUrl,
-    supabaseAnonKey
+    supabaseAnonKey,
+    configured: !!(supabaseUrl && supabaseAnonKey)
   });
 });
 app.post("/api/auth/sync", async (req, res) => {
@@ -190571,6 +191114,10 @@ app.post("/api/game/toggle-coordinates", (req, res) => {
   res.json({ success: true, allowCoordinates: mgr.allowCoordinates });
 });
 app.post("/api/test/inject-pins", (req, res) => {
+  if (process.env.NODE_ENV === "production") {
+    res.status(403).json({ error: "Endpoint uji coba dinonaktifkan di mode produksi" });
+    return;
+  }
   const { pins, location, round, mapName, streamerId } = req.body;
   if (!Array.isArray(pins) || pins.length === 0) {
     res.status(400).json({ error: "pins array is required" });
@@ -190824,47 +191371,7 @@ Tekan tombol ENTER untuk keluar...`);
       console.log(`\u{1F514} UPDATE TERSEDIA: v${update.latestVersion} (Versi saat ini: v${update.currentVersion})`);
       console.log(`\u{1F4E5} Download Link  : ${update.downloadUrl}`);
       console.log(`\u{1F517} Catatan Rilis  : ${update.releaseUrl}`);
-      if (process.platform === "win32" && update.downloadUrl.endsWith(".exe")) {
-        console.log(`\u{1F680} Men-download update otomatis di background...`);
-        try {
-          const tempDir = import_os2.default.tmpdir();
-          const installerPath = import_path3.default.join(tempDir, `MabarBang-Update-${update.latestVersion}.exe`);
-          try {
-            const files = import_fs.default.readdirSync(tempDir);
-            for (const file of files) {
-              if (file.startsWith("MabarBang-Update-") && file.endsWith(".exe") && file !== import_path3.default.basename(installerPath)) {
-                try {
-                  import_fs.default.unlinkSync(import_path3.default.join(tempDir, file));
-                } catch (_) {
-                }
-              }
-            }
-          } catch (_) {
-          }
-          fetch(update.downloadUrl).then(async (downloadRes) => {
-            if (!downloadRes.ok) throw new Error(`HTTP ${downloadRes.status}`);
-            const buffer = Buffer.from(await downloadRes.arrayBuffer());
-            import_fs.default.writeFileSync(installerPath, buffer);
-            console.log(`
-================================================================================`);
-            console.log(`\u2728 UPDATE v${update.latestVersion} SIAP DI-INSTALL!`);
-            console.log(`\u{1F4A1} Menjalankan installer dan membersihkan file sementara otomatis...`);
-            console.log(`================================================================================
-`);
-            (0, import_child_process.exec)(`start /wait "" "${installerPath}" /VERYSILENT /SUPPRESSMSGBOXES && del /f /q "${installerPath}"`, () => {
-              try {
-                if (import_fs.default.existsSync(installerPath)) {
-                  import_fs.default.unlinkSync(installerPath);
-                }
-              } catch (_) {
-              }
-            });
-          }).catch((err2) => {
-            console.warn(`\u26A0\uFE0F Gagal download update otomatis (${err2.message}). Silakan unduh manual: ${update.downloadUrl}`);
-          });
-        } catch (e) {
-        }
-      }
+      console.log(`\u{1F4A1} Streamer dapat mengunduh installer resmi langsung melalui Dashboard atau tautan di atas.`);
     } else {
       console.log(`\u2705 Aplikasi sudah menggunakan versi terbaru (v${APP_VERSION})`);
     }
@@ -190979,6 +191486,10 @@ content-type/dist/index.js:
    *)
 
 mime-db/index.js:
+mime-db/index.js:
+mime-db/index.js:
+mime-db/index.js:
+mime-db/index.js:
   (*!
    * mime-db
    * Copyright(c) 2014 Jonathan Ong
@@ -190986,6 +191497,10 @@ mime-db/index.js:
    * MIT Licensed
    *)
 
+mime-types/index.js:
+mime-types/index.js:
+mime-types/index.js:
+mime-types/index.js:
 mime-types/index.js:
   (*!
    * mime-types
@@ -191010,6 +191525,9 @@ type-is/index.js:
    *)
 
 body-parser/lib/read.js:
+body-parser/lib/types/raw.js:
+body-parser/lib/types/text.js:
+body-parser/index.js:
   (*!
    * body-parser
    * Copyright(c) 2014-2015 Douglas Christopher Wilson
@@ -191017,38 +191535,10 @@ body-parser/lib/read.js:
    *)
 
 body-parser/lib/types/json.js:
-  (*!
-   * body-parser
-   * Copyright(c) 2014 Jonathan Ong
-   * Copyright(c) 2014-2015 Douglas Christopher Wilson
-   * MIT Licensed
-   *)
-
-body-parser/lib/types/raw.js:
-  (*!
-   * body-parser
-   * Copyright(c) 2014-2015 Douglas Christopher Wilson
-   * MIT Licensed
-   *)
-
-body-parser/lib/types/text.js:
-  (*!
-   * body-parser
-   * Copyright(c) 2014-2015 Douglas Christopher Wilson
-   * MIT Licensed
-   *)
-
 body-parser/lib/types/urlencoded.js:
   (*!
    * body-parser
    * Copyright(c) 2014 Jonathan Ong
-   * Copyright(c) 2014-2015 Douglas Christopher Wilson
-   * MIT Licensed
-   *)
-
-body-parser/index.js:
-  (*!
-   * body-parser
    * Copyright(c) 2014-2015 Douglas Christopher Wilson
    * MIT Licensed
    *)
@@ -191085,6 +191575,10 @@ finalhandler/index.js:
    *)
 
 express/lib/view.js:
+express/lib/application.js:
+express/lib/request.js:
+express/lib/express.js:
+express/index.js:
   (*!
    * express
    * Copyright(c) 2009-2013 TJ Holowaychuk
@@ -191097,22 +191591,6 @@ etag/index.js:
   (*!
    * etag
    * Copyright(c) 2014-2016 Douglas Christopher Wilson
-   * MIT Licensed
-   *)
-
-mime-db/index.js:
-  (*!
-   * mime-db
-   * Copyright(c) 2014 Jonathan Ong
-   * Copyright(c) 2015-2022 Douglas Christopher Wilson
-   * MIT Licensed
-   *)
-
-mime-types/index.js:
-  (*!
-   * mime-types
-   * Copyright(c) 2014 Jonathan Ong
-   * Copyright(c) 2015 Douglas Christopher Wilson
    * MIT Licensed
    *)
 
@@ -191131,6 +191609,7 @@ proxy-addr/index.js:
    *)
 
 express/lib/utils.js:
+express/lib/response.js:
   (*!
    * express
    * Copyright(c) 2009-2013 TJ Holowaychuk
@@ -191139,35 +191618,12 @@ express/lib/utils.js:
    *)
 
 router/lib/layer.js:
-  (*!
-   * router
-   * Copyright(c) 2013 Roman Shtylman
-   * Copyright(c) 2014-2022 Douglas Christopher Wilson
-   * MIT Licensed
-   *)
-
 router/lib/route.js:
-  (*!
-   * router
-   * Copyright(c) 2013 Roman Shtylman
-   * Copyright(c) 2014-2022 Douglas Christopher Wilson
-   * MIT Licensed
-   *)
-
 router/index.js:
   (*!
    * router
    * Copyright(c) 2013 Roman Shtylman
    * Copyright(c) 2014-2022 Douglas Christopher Wilson
-   * MIT Licensed
-   *)
-
-express/lib/application.js:
-  (*!
-   * express
-   * Copyright(c) 2009-2013 TJ Holowaychuk
-   * Copyright(c) 2013 Roman Shtylman
-   * Copyright(c) 2014-2015 Douglas Christopher Wilson
    * MIT Licensed
    *)
 
@@ -191179,6 +191635,8 @@ negotiator/lib/accept.js:
    *)
 
 negotiator/index.js:
+negotiator/index.js:
+negotiator/index.js:
   (*!
    * negotiator
    * Copyright(c) 2012 Federico Romero
@@ -191187,22 +191645,8 @@ negotiator/index.js:
    * MIT Licensed
    *)
 
-mime-db/index.js:
-  (*!
-   * mime-db
-   * Copyright(c) 2014 Jonathan Ong
-   * Copyright(c) 2015-2022 Douglas Christopher Wilson
-   * MIT Licensed
-   *)
-
-mime-types/index.js:
-  (*!
-   * mime-types
-   * Copyright(c) 2014 Jonathan Ong
-   * Copyright(c) 2015 Douglas Christopher Wilson
-   * MIT Licensed
-   *)
-
+accepts/index.js:
+accepts/index.js:
 accepts/index.js:
   (*!
    * accepts
@@ -191227,15 +191671,6 @@ range-parser/index.js:
    * MIT Licensed
    *)
 
-express/lib/request.js:
-  (*!
-   * express
-   * Copyright(c) 2009-2013 TJ Holowaychuk
-   * Copyright(c) 2013 Roman Shtylman
-   * Copyright(c) 2014-2015 Douglas Christopher Wilson
-   * MIT Licensed
-   *)
-
 content-disposition/dist/index.js:
   (*!
    * content-disposition
@@ -191247,22 +191682,6 @@ cookie/index.js:
   (*!
    * cookie
    * Copyright(c) 2012-2014 Roman Shtylman
-   * Copyright(c) 2015 Douglas Christopher Wilson
-   * MIT Licensed
-   *)
-
-mime-db/index.js:
-  (*!
-   * mime-db
-   * Copyright(c) 2014 Jonathan Ong
-   * Copyright(c) 2015-2022 Douglas Christopher Wilson
-   * MIT Licensed
-   *)
-
-mime-types/index.js:
-  (*!
-   * mime-types
-   * Copyright(c) 2014 Jonathan Ong
    * Copyright(c) 2015 Douglas Christopher Wilson
    * MIT Licensed
    *)
@@ -191282,14 +191701,6 @@ vary/index.js:
    * MIT Licensed
    *)
 
-express/lib/response.js:
-  (*!
-   * express
-   * Copyright(c) 2009-2013 TJ Holowaychuk
-   * Copyright(c) 2014-2015 Douglas Christopher Wilson
-   * MIT Licensed
-   *)
-
 serve-static/index.js:
   (*!
    * serve-static
@@ -191299,58 +191710,8 @@ serve-static/index.js:
    * MIT Licensed
    *)
 
-express/lib/express.js:
-  (*!
-   * express
-   * Copyright(c) 2009-2013 TJ Holowaychuk
-   * Copyright(c) 2013 Roman Shtylman
-   * Copyright(c) 2014-2015 Douglas Christopher Wilson
-   * MIT Licensed
-   *)
-
-express/index.js:
-  (*!
-   * express
-   * Copyright(c) 2009-2013 TJ Holowaychuk
-   * Copyright(c) 2013 Roman Shtylman
-   * Copyright(c) 2014-2015 Douglas Christopher Wilson
-   * MIT Licensed
-   *)
-
-negotiator/index.js:
-  (*!
-   * negotiator
-   * Copyright(c) 2012 Federico Romero
-   * Copyright(c) 2012-2014 Isaac Z. Schlueter
-   * Copyright(c) 2015 Douglas Christopher Wilson
-   * MIT Licensed
-   *)
-
-mime-db/index.js:
-  (*!
-   * mime-db
-   * Copyright(c) 2014 Jonathan Ong
-   * Copyright(c) 2015-2022 Douglas Christopher Wilson
-   * MIT Licensed
-   *)
-
-mime-types/index.js:
-  (*!
-   * mime-types
-   * Copyright(c) 2014 Jonathan Ong
-   * Copyright(c) 2015 Douglas Christopher Wilson
-   * MIT Licensed
-   *)
-
-accepts/index.js:
-  (*!
-   * accepts
-   * Copyright(c) 2014 Jonathan Ong
-   * Copyright(c) 2015 Douglas Christopher Wilson
-   * MIT Licensed
-   *)
-
 engine.io/build/contrib/base64id.js:
+socket.io/dist/contrib/base64id.js:
   (*!
    * base64id v0.1.0
    *)
@@ -191358,34 +191719,12 @@ engine.io/build/contrib/base64id.js:
 engine.io/build/parser-v3/utf8.js:
   (*! https://mths.be/utf8js v2.1.2 by @mathias *)
 
-negotiator/index.js:
-  (*!
-   * negotiator
-   * Copyright(c) 2012 Federico Romero
-   * Copyright(c) 2012-2014 Isaac Z. Schlueter
-   * Copyright(c) 2015 Douglas Christopher Wilson
-   * MIT Licensed
-   *)
-
-accepts/index.js:
-  (*!
-   * accepts
-   * Copyright(c) 2014 Jonathan Ong
-   * Copyright(c) 2015 Douglas Christopher Wilson
-   * MIT Licensed
-   *)
-
 object-assign/index.js:
   (*
   object-assign
   (c) Sindre Sorhus
   @license MIT
   *)
-
-socket.io/dist/contrib/base64id.js:
-  (*!
-   * base64id v0.1.0
-   *)
 
 keyv/dist/index.js:
   (* v8 ignore next -- @preserve *)
