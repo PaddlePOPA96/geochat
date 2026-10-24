@@ -27,6 +27,9 @@ jobs:
 
       - name: Bundle Server & Build Standalone
         run: npm run build:exe
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
 
       - name: Build Windows Installer (MabarBang-Setup.exe)
         shell: pwsh

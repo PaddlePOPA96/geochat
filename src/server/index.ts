@@ -1145,7 +1145,7 @@ app.get('/', (_req, res) => {
   res.redirect('/dashboard')
 })
 
-export const APP_VERSION = '3.3.2'
+export const APP_VERSION = '3.3.3'
 export const GITHUB_REPO = 'PaddlePOPA96/geochat'
 
 export interface UpdateInfo {
