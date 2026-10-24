@@ -5,7 +5,7 @@ import cors from 'cors'
 import path from 'path'
 import fs from 'fs'
 import os from 'os'
-import { exec } from 'child_process'
+import { exec, spawn } from 'child_process'
 
 // Auto load .env from multiple candidate paths (CWD, executable directory)
 const candidateEnvPaths = [
@@ -1145,7 +1145,7 @@ app.get('/', (_req, res) => {
   res.redirect('/dashboard')
 })
 
-export const APP_VERSION = '3.3.3'
+export const APP_VERSION = '3.3.4'
 export const GITHUB_REPO = 'PaddlePOPA96/geochat'
 
 export interface UpdateInfo {
@@ -1184,7 +1184,7 @@ function compareSemVer(v1: string, v2: string): number {
 export async function checkForAppUpdates(): Promise<UpdateInfo> {
   try {
     const controller = new AbortController()
-    const timer = setTimeout(() => controller.abort(), 3000)
+    const timer = setTimeout(() => controller.abort(), 4000)
     const res = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/releases/latest`, {
       signal: controller.signal,
       headers: {
@@ -1201,11 +1201,20 @@ export async function checkForAppUpdates(): Promise<UpdateInfo> {
       let downloadUrl = releaseUrl
 
       if (Array.isArray(data.assets) && data.assets.length > 0) {
-        const exeAsset = data.assets.find((a: any) =>
-          typeof a.name === 'string' && (a.name.endsWith('.exe') || a.name.endsWith('.zip'))
-        )
-        if (exeAsset?.browser_download_url) {
-          downloadUrl = exeAsset.browser_download_url
+        // Prioritaskan installer resmi (.Setup.exe), lalu .exe lainnya, lalu .zip
+        const setupAsset =
+          data.assets.find(
+            (a: any) => typeof a.name === 'string' && a.name.toLowerCase().endsWith('.setup.exe')
+          ) ||
+          data.assets.find(
+            (a: any) => typeof a.name === 'string' && a.name.toLowerCase().endsWith('.exe')
+          ) ||
+          data.assets.find(
+            (a: any) => typeof a.name === 'string' && a.name.toLowerCase().endsWith('.zip')
+          )
+
+        if (setupAsset?.browser_download_url) {
+          downloadUrl = setupAsset.browser_download_url
         }
       }
 
@@ -1232,6 +1241,99 @@ export async function checkForAppUpdates(): Promise<UpdateInfo> {
 // REST route for checking update
 app.get('/api/update-info', (_req, res) => {
   res.json(cachedUpdateInfo)
+})
+
+// 1-Click Update & Restart Endpoint
+app.post('/api/app/update-and-restart', async (_req, res) => {
+  try {
+    // Refresh jika info update belum ada atau lebih dari 2 menit yang lalu
+    if (!cachedUpdateInfo.checkedAt || Date.now() - cachedUpdateInfo.checkedAt > 120000) {
+      await checkForAppUpdates()
+    }
+
+    if (!cachedUpdateInfo.hasUpdate) {
+      return res.status(400).json({
+        success: false,
+        error: 'Aplikasi sudah menggunakan versi terbaru.'
+      })
+    }
+
+    const downloadUrl = cachedUpdateInfo.downloadUrl
+    if (!downloadUrl || !downloadUrl.startsWith('http')) {
+      return res.status(400).json({
+        success: false,
+        error: 'Tautan installer belum tersedia di rilis GitHub.'
+      })
+    }
+
+    console.log(`[AutoUpdate] Mengunduh installer pembaruan dari: ${downloadUrl}`)
+    const fetchRes = await fetch(downloadUrl, {
+      headers: {
+        'User-Agent': 'MabarBang-App'
+      }
+    })
+
+    if (!fetchRes.ok) {
+      return res.status(502).json({
+        success: false,
+        error: `Gagal mengunduh installer: HTTP ${fetchRes.status} ${fetchRes.statusText}`
+      })
+    }
+
+    const fileBuffer = Buffer.from(await fetchRes.arrayBuffer())
+    const ext = downloadUrl.toLowerCase().endsWith('.zip') ? '.zip' : '.exe'
+    const tempInstallerPath = path.join(
+      os.tmpdir(),
+      `MabarBang-${cachedUpdateInfo.latestVersion}-Setup${ext}`
+    )
+    await fs.promises.writeFile(tempInstallerPath, fileBuffer)
+    console.log(
+      `[AutoUpdate] Installer berhasil disimpan ke: ${tempInstallerPath} (${fileBuffer.length} bytes)`
+    )
+
+    // Kirim respons sukses ke dashboard sebelum server keluar
+    res.json({
+      success: true,
+      message: 'Installer berhasil diunduh! Menjalankan installer dan menutup server...',
+      installerPath: tempInstallerPath
+    })
+
+    // Beri jeda 1 detik agar client browser tuntas menerima respons HTTP
+    setTimeout(() => {
+      console.log(`[AutoUpdate] Menjalankan installer: ${tempInstallerPath}`)
+      try {
+        if (process.platform === 'win32') {
+          const child = spawn(tempInstallerPath, [], {
+            detached: true,
+            stdio: 'ignore'
+          })
+          child.unref()
+        } else if (process.platform === 'darwin') {
+          spawn('open', [tempInstallerPath], { detached: true, stdio: 'ignore' }).unref()
+        } else {
+          spawn('xdg-open', [tempInstallerPath], { detached: true, stdio: 'ignore' }).unref()
+        }
+      } catch (spawnErr) {
+        console.error('[AutoUpdate] Gagal menjalankan proses installer:', spawnErr)
+      }
+
+      console.log('[AutoUpdate] Menutup server MabarBang agar port 5050 & file biner dilepas...')
+      server.close(() => {
+        process.exit(0)
+      })
+
+      // Fallback exit jika server.close tertahan koneksi
+      setTimeout(() => {
+        process.exit(0)
+      }, 1500)
+    }, 1000)
+  } catch (err: any) {
+    console.error('[AutoUpdate] Error saat proses update:', err)
+    res.status(500).json({
+      success: false,
+      error: err?.message || 'Terjadi kesalahan saat memproses pembaruan.'
+    })
+  }
 })
 
 // Socket.IO Events

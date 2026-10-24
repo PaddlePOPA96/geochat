@@ -782,14 +782,17 @@
         <div>
           <div style="font-weight: 900; font-size: 15px; display: flex; align-items: center; gap: 8px;">
             <span>Update Baru Tersedia:</span>
-            <span id="latestVerText" style="background: #ff5964; color: #fff; padding: 2px 8px; border-radius: 6px; border: 2px solid #000; font-size: 13px;">v3.1.5</span>
+            <span id="latestVerText" style="background: #ff5964; color: #fff; padding: 2px 8px; border-radius: 6px; border: 2px solid #000; font-size: 13px;">v3.3.4</span>
           </div>
           <div style="font-size: 12px; font-weight: 700; color: #475569; margin-top: 2px;" id="updateDescText">Installer versi terbaru sudah siap diunduh dari GitHub!</div>
         </div>
       </div>
-      <div style="display: flex; gap: 8px; align-items: center;">
-        <a id="updateDownloadBtn" href="#" target="_blank" class="btn btn-green btn-sm" style="text-decoration: none; display: inline-flex; align-items: center; gap: 6px;">
-          <span>⚡ Download Installer</span>
+      <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+        <button id="btnAutoInstall" class="btn btn-black btn-sm" onclick="triggerAutoInstall()" style="display: inline-flex; align-items: center; gap: 6px;">
+          <span>⚡ Pasang Update Sekarang</span>
+        </button>
+        <a id="updateDownloadBtn" href="#" target="_blank" class="btn btn-white btn-sm" style="text-decoration: none; display: inline-flex; align-items: center; gap: 6px;">
+          <span>📥 Unduh Manual</span>
         </a>
         <button class="btn btn-white btn-sm" onclick="document.getElementById('updateBanner').style.display='none'">✕</button>
       </div>
@@ -1023,7 +1026,7 @@
       socket.emit('request-state', authUser?.id);
     });
 
-    socket.on('update-info', (info) => {
+    function renderUpdateBanner(info) {
       if (info && info.hasUpdate) {
         const banner = document.getElementById('updateBanner');
         const verText = document.getElementById('latestVerText');
@@ -1038,7 +1041,65 @@
           }
         }
       }
+    }
+
+    socket.on('update-info', (info) => {
+      renderUpdateBanner(info);
     });
+
+    // Check updates via REST as well
+    fetch('/api/update-info')
+      .then((r) => r.json())
+      .then((info) => renderUpdateBanner(info))
+      .catch(() => {});
+
+    async function triggerAutoInstall() {
+      const btn = document.getElementById('btnAutoInstall');
+      const desc = document.getElementById('updateDescText');
+      if (!confirm('Aplikasi akan mengunduh installer resmi dari GitHub dan menutup server sementara untuk memasang versi terbaru. Lanjutkan?')) {
+        return;
+      }
+
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<span>⏳ Mengunduh Installer...</span>';
+        btn.style.opacity = '0.7';
+      }
+      if (desc) {
+        desc.textContent = '⏳ Mengunduh installer MabarBang versi terbaru dari GitHub Releases... Mohon tunggu sebentar.';
+      }
+
+      try {
+        const res = await fetch('/api/app/update-and-restart', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' }
+        });
+        const data = await res.json();
+
+        if (res.ok && data.success) {
+          if (btn) {
+            btn.innerHTML = '<span>✅ Memulai Installer...</span>';
+            btn.className = 'btn btn-green btn-sm';
+          }
+          if (desc) {
+            desc.textContent = '✅ Installer berhasil diunduh! Aplikasi akan ditutup otomatis dan jendela installer akan muncul.';
+          }
+          alert('✅ Installer berhasil diunduh!\n\nAplikasi MabarBang akan ditutup otomatis dan installer resmi akan terbuka di layar Anda.\nSilakan ikuti instruksi installer hingga selesai.');
+        } else {
+          throw new Error(data.error || 'Gagal memulai update otomatis.');
+        }
+      } catch (err) {
+        alert('⚠️ Gagal Update Otomatis: ' + (err.message || err) + '\n\nAnda dapat mengunduh installer secara manual melalui tombol "Unduh Manual".');
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = '<span>⚡ Pasang Update Sekarang</span>';
+          btn.style.opacity = '1';
+        }
+        if (desc) {
+          desc.textContent = 'Installer versi terbaru siap dipasang.';
+        }
+      }
+    }
 
     function updateUI() {
       if (!currentState) return;

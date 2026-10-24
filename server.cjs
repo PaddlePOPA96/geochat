@@ -186500,7 +186500,7 @@ async function processNominatimQueue() {
       const url2 = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(item.query)}&format=json&limit=1`;
       const res = await axios_default.get(url2, {
         headers: {
-          "User-Agent": "MabarBang/3.3.3 (https://geoindo.my.id)",
+          "User-Agent": "MabarBang/3.3.4 (https://geoindo.my.id)",
           "Accept-Language": "id,en;q=0.9"
         },
         timeout: 4e3
@@ -187339,14 +187339,17 @@ var embeddedDashboardHtml = `<!DOCTYPE html>
         <div>
           <div style="font-weight: 900; font-size: 15px; display: flex; align-items: center; gap: 8px;">
             <span>Update Baru Tersedia:</span>
-            <span id="latestVerText" style="background: #ff5964; color: #fff; padding: 2px 8px; border-radius: 6px; border: 2px solid #000; font-size: 13px;">v3.1.5</span>
+            <span id="latestVerText" style="background: #ff5964; color: #fff; padding: 2px 8px; border-radius: 6px; border: 2px solid #000; font-size: 13px;">v3.3.4</span>
           </div>
           <div style="font-size: 12px; font-weight: 700; color: #475569; margin-top: 2px;" id="updateDescText">Installer versi terbaru sudah siap diunduh dari GitHub!</div>
         </div>
       </div>
-      <div style="display: flex; gap: 8px; align-items: center;">
-        <a id="updateDownloadBtn" href="#" target="_blank" class="btn btn-green btn-sm" style="text-decoration: none; display: inline-flex; align-items: center; gap: 6px;">
-          <span>\u26A1 Download Installer</span>
+      <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+        <button id="btnAutoInstall" class="btn btn-black btn-sm" onclick="triggerAutoInstall()" style="display: inline-flex; align-items: center; gap: 6px;">
+          <span>\u26A1 Pasang Update Sekarang</span>
+        </button>
+        <a id="updateDownloadBtn" href="#" target="_blank" class="btn btn-white btn-sm" style="text-decoration: none; display: inline-flex; align-items: center; gap: 6px;">
+          <span>\u{1F4E5} Unduh Manual</span>
         </a>
         <button class="btn btn-white btn-sm" onclick="document.getElementById('updateBanner').style.display='none'">\u2715</button>
       </div>
@@ -187580,7 +187583,7 @@ var embeddedDashboardHtml = `<!DOCTYPE html>
       socket.emit('request-state', authUser?.id);
     });
 
-    socket.on('update-info', (info) => {
+    function renderUpdateBanner(info) {
       if (info && info.hasUpdate) {
         const banner = document.getElementById('updateBanner');
         const verText = document.getElementById('latestVerText');
@@ -187595,7 +187598,65 @@ var embeddedDashboardHtml = `<!DOCTYPE html>
           }
         }
       }
+    }
+
+    socket.on('update-info', (info) => {
+      renderUpdateBanner(info);
     });
+
+    // Check updates via REST as well
+    fetch('/api/update-info')
+      .then((r) => r.json())
+      .then((info) => renderUpdateBanner(info))
+      .catch(() => {});
+
+    async function triggerAutoInstall() {
+      const btn = document.getElementById('btnAutoInstall');
+      const desc = document.getElementById('updateDescText');
+      if (!confirm('Aplikasi akan mengunduh installer resmi dari GitHub dan menutup server sementara untuk memasang versi terbaru. Lanjutkan?')) {
+        return;
+      }
+
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<span>\u23F3 Mengunduh Installer...</span>';
+        btn.style.opacity = '0.7';
+      }
+      if (desc) {
+        desc.textContent = '\u23F3 Mengunduh installer MabarBang versi terbaru dari GitHub Releases... Mohon tunggu sebentar.';
+      }
+
+      try {
+        const res = await fetch('/api/app/update-and-restart', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' }
+        });
+        const data = await res.json();
+
+        if (res.ok && data.success) {
+          if (btn) {
+            btn.innerHTML = '<span>\u2705 Memulai Installer...</span>';
+            btn.className = 'btn btn-green btn-sm';
+          }
+          if (desc) {
+            desc.textContent = '\u2705 Installer berhasil diunduh! Aplikasi akan ditutup otomatis dan jendela installer akan muncul.';
+          }
+          alert('\u2705 Installer berhasil diunduh!\\n\\nAplikasi MabarBang akan ditutup otomatis dan installer resmi akan terbuka di layar Anda.\\nSilakan ikuti instruksi installer hingga selesai.');
+        } else {
+          throw new Error(data.error || 'Gagal memulai update otomatis.');
+        }
+      } catch (err) {
+        alert('\u26A0\uFE0F Gagal Update Otomatis: ' + (err.message || err) + '\\n\\nAnda dapat mengunduh installer secara manual melalui tombol "Unduh Manual".');
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = '<span>\u26A1 Pasang Update Sekarang</span>';
+          btn.style.opacity = '1';
+        }
+        if (desc) {
+          desc.textContent = 'Installer versi terbaru siap dipasang.';
+        }
+      }
+    }
 
     function updateUI() {
       if (!currentState) return;
@@ -188287,7 +188348,7 @@ var embeddedDashboardHtml = `<!DOCTYPE html>
 var embeddedUserscript = `// ==UserScript==
 // @name         MabarBang GeoGuessr Connector
 // @namespace    https://github.com/PaddlePOPA96/geochat
-// @version      3.3.3
+// @version      3.3.4
 // @description  Otomatis mengirim data ronde GeoGuessr ke Server MabarBang, menampilkan Scoreboard Overlay & PIN tebakan penonton di peta GeoGuessr
 // @author       kikobooo x arvana prod
 // @match        *://*.geoguessr.com/*
@@ -191498,7 +191559,7 @@ app.get(["/mabarbang.user.js", "/chatguessr.user.js", "/userscript"], (_req, res
 app.get("/", (_req, res) => {
   res.redirect("/dashboard");
 });
-var APP_VERSION = "3.3.3";
+var APP_VERSION = "3.3.4";
 var GITHUB_REPO = "PaddlePOPA96/geochat";
 var cachedUpdateInfo = {
   hasUpdate: false,
@@ -191524,7 +191585,7 @@ function compareSemVer(v1, v2) {
 async function checkForAppUpdates() {
   try {
     const controller = new AbortController();
-    const timer2 = setTimeout(() => controller.abort(), 3e3);
+    const timer2 = setTimeout(() => controller.abort(), 4e3);
     const res = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/releases/latest`, {
       signal: controller.signal,
       headers: {
@@ -191539,11 +191600,15 @@ async function checkForAppUpdates() {
       const releaseUrl = data.html_url || `https://github.com/${GITHUB_REPO}/releases/latest`;
       let downloadUrl = releaseUrl;
       if (Array.isArray(data.assets) && data.assets.length > 0) {
-        const exeAsset = data.assets.find(
-          (a2) => typeof a2.name === "string" && (a2.name.endsWith(".exe") || a2.name.endsWith(".zip"))
+        const setupAsset = data.assets.find(
+          (a2) => typeof a2.name === "string" && a2.name.toLowerCase().endsWith(".setup.exe")
+        ) || data.assets.find(
+          (a2) => typeof a2.name === "string" && a2.name.toLowerCase().endsWith(".exe")
+        ) || data.assets.find(
+          (a2) => typeof a2.name === "string" && a2.name.toLowerCase().endsWith(".zip")
         );
-        if (exeAsset?.browser_download_url) {
-          downloadUrl = exeAsset.browser_download_url;
+        if (setupAsset?.browser_download_url) {
+          downloadUrl = setupAsset.browser_download_url;
         }
       }
       const isNewer = latestTag && compareSemVer(latestTag, APP_VERSION) > 0;
@@ -191565,6 +191630,84 @@ async function checkForAppUpdates() {
 }
 app.get("/api/update-info", (_req, res) => {
   res.json(cachedUpdateInfo);
+});
+app.post("/api/app/update-and-restart", async (_req, res) => {
+  try {
+    if (!cachedUpdateInfo.checkedAt || Date.now() - cachedUpdateInfo.checkedAt > 12e4) {
+      await checkForAppUpdates();
+    }
+    if (!cachedUpdateInfo.hasUpdate) {
+      return res.status(400).json({
+        success: false,
+        error: "Aplikasi sudah menggunakan versi terbaru."
+      });
+    }
+    const downloadUrl = cachedUpdateInfo.downloadUrl;
+    if (!downloadUrl || !downloadUrl.startsWith("http")) {
+      return res.status(400).json({
+        success: false,
+        error: "Tautan installer belum tersedia di rilis GitHub."
+      });
+    }
+    console.log(`[AutoUpdate] Mengunduh installer pembaruan dari: ${downloadUrl}`);
+    const fetchRes = await fetch(downloadUrl, {
+      headers: {
+        "User-Agent": "MabarBang-App"
+      }
+    });
+    if (!fetchRes.ok) {
+      return res.status(502).json({
+        success: false,
+        error: `Gagal mengunduh installer: HTTP ${fetchRes.status} ${fetchRes.statusText}`
+      });
+    }
+    const fileBuffer = Buffer.from(await fetchRes.arrayBuffer());
+    const ext = downloadUrl.toLowerCase().endsWith(".zip") ? ".zip" : ".exe";
+    const tempInstallerPath = import_path3.default.join(
+      import_os2.default.tmpdir(),
+      `MabarBang-${cachedUpdateInfo.latestVersion}-Setup${ext}`
+    );
+    await import_fs.default.promises.writeFile(tempInstallerPath, fileBuffer);
+    console.log(
+      `[AutoUpdate] Installer berhasil disimpan ke: ${tempInstallerPath} (${fileBuffer.length} bytes)`
+    );
+    res.json({
+      success: true,
+      message: "Installer berhasil diunduh! Menjalankan installer dan menutup server...",
+      installerPath: tempInstallerPath
+    });
+    setTimeout(() => {
+      console.log(`[AutoUpdate] Menjalankan installer: ${tempInstallerPath}`);
+      try {
+        if (process.platform === "win32") {
+          const child = (0, import_child_process.spawn)(tempInstallerPath, [], {
+            detached: true,
+            stdio: "ignore"
+          });
+          child.unref();
+        } else if (process.platform === "darwin") {
+          (0, import_child_process.spawn)("open", [tempInstallerPath], { detached: true, stdio: "ignore" }).unref();
+        } else {
+          (0, import_child_process.spawn)("xdg-open", [tempInstallerPath], { detached: true, stdio: "ignore" }).unref();
+        }
+      } catch (spawnErr) {
+        console.error("[AutoUpdate] Gagal menjalankan proses installer:", spawnErr);
+      }
+      console.log("[AutoUpdate] Menutup server MabarBang agar port 5050 & file biner dilepas...");
+      server.close(() => {
+        process.exit(0);
+      });
+      setTimeout(() => {
+        process.exit(0);
+      }, 1500);
+    }, 1e3);
+  } catch (err2) {
+    console.error("[AutoUpdate] Error saat proses update:", err2);
+    res.status(500).json({
+      success: false,
+      error: err2?.message || "Terjadi kesalahan saat memproses pembaruan."
+    });
+  }
 });
 io2.on("connection", (socket) => {
   let boundStreamerId = "default";
