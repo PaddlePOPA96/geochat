@@ -1,9 +1,9 @@
 // ==UserScript==
-// @name         AHUNG SERVER MabarBang YouTube 
-// @namespace    http://tampermonkey.net/
-// @version      3.3.0
-// @description  Otomatis mengirim data ronde GeoGuessr ke Railway/Local, menampilkan Scoreboard Overlay & PIN tebakan penonton di peta GeoGuessr
-// @author       MabarBang
+// @name         MabarBang GeoGuessr Connector
+// @namespace    https://github.com/PaddlePOPA96/geochat
+// @version      3.3.1
+// @description  Otomatis mengirim data ronde GeoGuessr ke Server MabarBang, menampilkan Scoreboard Overlay & PIN tebakan penonton di peta GeoGuessr
+// @author       kikobooo x arvana prod
 // @match        *://*.geoguessr.com/*
 // @run-at       document-start
 // @grant        GM_setValue
@@ -12,10 +12,10 @@
 // @grant        unsafeWindow
 // @connect      localhost
 // @connect      127.0.0.1
-// @connect      geoindo.up.railway.app
+// @connect      geoindo.my.id
 // @require      https://cdn.socket.io/4.7.5/socket.io.min.js
-// @updateURL    https://geoindo.up.railway.app/chatguessr.user.js
-// @downloadURL  https://geoindo.up.railway.app/chatguessr.user.js
+// @updateURL    https://raw.githubusercontent.com/PaddlePOPA96/geochat/main/userscript/chatguessr-connector.user.js
+// @downloadURL  https://raw.githubusercontent.com/PaddlePOPA96/geochat/main/userscript/chatguessr-connector.user.js
 // ==/UserScript==
 
 (function () {

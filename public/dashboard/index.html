@@ -1611,7 +1611,11 @@
     }
 
     function openUserscriptModal() {
-      alert(`Userscript Setup:\n\n1. Pasang ekstensi Tampermonkey di browser Anda.\n2. Buat script baru dan salin isi file "userscript/chatguessr-connector.user.js" dari project ini.\n3. Masukkan server URL Anda: ${window.location.origin}\n4. Buka GeoGuessr dan mainkan! Game token akan otomatis terkirim.`);
+      const gitRawUrl = 'https://raw.githubusercontent.com/PaddlePOPA96/geochat/main/userscript/chatguessr-connector.user.js';
+      const localUrl = `${window.location.origin}/mabarbang.user.js`;
+      if (confirm(`Pasang / Update Userscript MabarBang:\n\nKlik OK untuk langsung pasang/update via GitHub:\n${gitRawUrl}\n\n(Tampermonkey akan otomatis terbuka untuk konfirmasi install)`)) {
+        window.open(gitRawUrl, '_blank');
+      }
     }
 
     function escapeHtml(str) {

@@ -187657,7 +187657,11 @@ var embeddedDashboardHtml = `<!DOCTYPE html>
     }
 
     function openUserscriptModal() {
-      alert(\`Userscript Setup:\\n\\n1. Pasang ekstensi Tampermonkey di browser Anda.\\n2. Buat script baru dan salin isi file "userscript/chatguessr-connector.user.js" dari project ini.\\n3. Masukkan server URL Anda: \${window.location.origin}\\n4. Buka GeoGuessr dan mainkan! Game token akan otomatis terkirim.\`);
+      const gitRawUrl = 'https://raw.githubusercontent.com/PaddlePOPA96/geochat/main/userscript/chatguessr-connector.user.js';
+      const localUrl = \`\${window.location.origin}/mabarbang.user.js\`;
+      if (confirm(\`Pasang / Update Userscript MabarBang:\\n\\nKlik OK untuk langsung pasang/update via GitHub:\\n\${gitRawUrl}\\n\\n(Tampermonkey akan otomatis terbuka untuk konfirmasi install)\`)) {
+        window.open(gitRawUrl, '_blank');
+      }
     }
 
     function escapeHtml(str) {
@@ -187746,11 +187750,11 @@ var embeddedDashboardHtml = `<!DOCTYPE html>
 </html>
 `;
 var embeddedUserscript = `// ==UserScript==
-// @name         AHUNG SERVER MabarBang YouTube 
-// @namespace    http://tampermonkey.net/
-// @version      3.3.0
-// @description  Otomatis mengirim data ronde GeoGuessr ke Railway/Local, menampilkan Scoreboard Overlay & PIN tebakan penonton di peta GeoGuessr
-// @author       MabarBang
+// @name         MabarBang GeoGuessr Connector
+// @namespace    https://github.com/PaddlePOPA96/geochat
+// @version      3.3.1
+// @description  Otomatis mengirim data ronde GeoGuessr ke Server MabarBang, menampilkan Scoreboard Overlay & PIN tebakan penonton di peta GeoGuessr
+// @author       kikobooo x arvana prod
 // @match        *://*.geoguessr.com/*
 // @run-at       document-start
 // @grant        GM_setValue
@@ -187759,10 +187763,10 @@ var embeddedUserscript = `// ==UserScript==
 // @grant        unsafeWindow
 // @connect      localhost
 // @connect      127.0.0.1
-// @connect      geoindo.up.railway.app
+// @connect      geoindo.my.id
 // @require      https://cdn.socket.io/4.7.5/socket.io.min.js
-// @updateURL    https://geoindo.up.railway.app/chatguessr.user.js
-// @downloadURL  https://geoindo.up.railway.app/chatguessr.user.js
+// @updateURL    https://raw.githubusercontent.com/PaddlePOPA96/geochat/main/userscript/chatguessr-connector.user.js
+// @downloadURL  https://raw.githubusercontent.com/PaddlePOPA96/geochat/main/userscript/chatguessr-connector.user.js
 // ==/UserScript==
 
 (function () {
@@ -190658,7 +190662,7 @@ app.get(["/mabarbang.user.js", "/chatguessr.user.js", "/userscript"], (_req, res
 app.get("/", (_req, res) => {
   res.redirect("/dashboard");
 });
-var APP_VERSION = "3.3.0";
+var APP_VERSION = "3.3.1";
 var GITHUB_REPO = "PaddlePOPA96/geochat";
 var cachedUpdateInfo = {
   hasUpdate: false,
