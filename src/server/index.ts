@@ -1145,7 +1145,7 @@ app.get('/', (_req, res) => {
   res.redirect('/dashboard')
 })
 
-export const APP_VERSION = '3.3.4'
+export const APP_VERSION = '3.3.5'
 export const GITHUB_REPO = 'PaddlePOPA96/geochat'
 
 export interface UpdateInfo {
@@ -1470,9 +1470,53 @@ ${cPurple}geoguessr interactive program${cReset}
     if (update.hasUpdate) {
       console.log(`🔔 UPDATE TERSEDIA: v${update.latestVersion} (Versi saat ini: v${update.currentVersion})`)
       console.log(`📥 Download Link  : ${update.downloadUrl}`)
-      console.log(`🔗 Catatan Rilis  : ${update.releaseUrl}`)
+      console.log(`💡 Memulai pembaruan otomatis atau gunakan tombol di Dashboard...`)
 
-      console.log(`💡 Streamer dapat mengunduh installer resmi langsung melalui Dashboard atau tautan di atas.`)
+      // Otomatis download & update installer di background jika user memakai Windows
+      if (
+        process.platform === 'win32' &&
+        update.downloadUrl &&
+        (update.downloadUrl.endsWith('.exe') || update.downloadUrl.endsWith('.Setup.exe'))
+      ) {
+        console.log(`🚀 Mengunduh pembaruan v${update.latestVersion} otomatis di background...`)
+        try {
+          const tempDir = os.tmpdir()
+          const installerPath = path.join(tempDir, `MabarBang-Update-${update.latestVersion}.exe`)
+
+          fetch(update.downloadUrl, {
+            headers: { 'User-Agent': 'MabarBang-App' }
+          })
+            .then(async (downloadRes) => {
+              if (!downloadRes.ok) throw new Error(`HTTP ${downloadRes.status}`)
+              const buffer = Buffer.from(await downloadRes.arrayBuffer())
+              fs.writeFileSync(installerPath, buffer)
+              console.log(
+                `\n================================================================================`
+              )
+              console.log(`✨ UPDATE v${update.latestVersion} SIAP DIPASANG!`)
+              console.log(`💡 Menjalankan installer otomatis...`)
+              console.log(
+                `================================================================================\n`
+              )
+
+              exec(
+                `start /wait "" "${installerPath}" /VERYSILENT /SUPPRESSMSGBOXES /CLOSEAPPLICATIONS /RESTARTAPPLICATIONS && del /f /q "${installerPath}"`,
+                () => {
+                  try {
+                    if (fs.existsSync(installerPath)) {
+                      fs.unlinkSync(installerPath)
+                    }
+                  } catch (_) {}
+                }
+              )
+            })
+            .catch((err) => {
+              console.warn(
+                `⚠️ Gagal download update otomatis di background (${err.message}). Anda bisa update lewat Dashboard.`
+              )
+            })
+        } catch (_) {}
+      }
     } else {
       console.log(`✅ Aplikasi sudah menggunakan versi terbaru (v${APP_VERSION})`)
     }

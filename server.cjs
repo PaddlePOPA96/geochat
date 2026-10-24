@@ -186500,7 +186500,7 @@ async function processNominatimQueue() {
       const url2 = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(item.query)}&format=json&limit=1`;
       const res = await axios_default.get(url2, {
         headers: {
-          "User-Agent": "MabarBang/3.3.4 (https://geoindo.my.id)",
+          "User-Agent": "MabarBang/3.3.5 (https://geoindo.my.id)",
           "Accept-Language": "id,en;q=0.9"
         },
         timeout: 4e3
@@ -188348,7 +188348,7 @@ var embeddedDashboardHtml = `<!DOCTYPE html>
 var embeddedUserscript = `// ==UserScript==
 // @name         MabarBang GeoGuessr Connector
 // @namespace    https://github.com/PaddlePOPA96/geochat
-// @version      3.3.4
+// @version      3.3.5
 // @description  Otomatis mengirim data ronde GeoGuessr ke Server MabarBang, menampilkan Scoreboard Overlay & PIN tebakan penonton di peta GeoGuessr
 // @author       kikobooo x arvana prod
 // @match        *://*.geoguessr.com/*
@@ -191559,7 +191559,7 @@ app.get(["/mabarbang.user.js", "/chatguessr.user.js", "/userscript"], (_req, res
 app.get("/", (_req, res) => {
   res.redirect("/dashboard");
 });
-var APP_VERSION = "3.3.4";
+var APP_VERSION = "3.3.5";
 var GITHUB_REPO = "PaddlePOPA96/geochat";
 var cachedUpdateInfo = {
   hasUpdate: false,
@@ -191826,8 +191826,47 @@ Tekan tombol ENTER untuk keluar...`);
     if (update.hasUpdate) {
       console.log(`\u{1F514} UPDATE TERSEDIA: v${update.latestVersion} (Versi saat ini: v${update.currentVersion})`);
       console.log(`\u{1F4E5} Download Link  : ${update.downloadUrl}`);
-      console.log(`\u{1F517} Catatan Rilis  : ${update.releaseUrl}`);
-      console.log(`\u{1F4A1} Streamer dapat mengunduh installer resmi langsung melalui Dashboard atau tautan di atas.`);
+      console.log(`\u{1F4A1} Memulai pembaruan otomatis atau gunakan tombol di Dashboard...`);
+      if (process.platform === "win32" && update.downloadUrl && (update.downloadUrl.endsWith(".exe") || update.downloadUrl.endsWith(".Setup.exe"))) {
+        console.log(`\u{1F680} Mengunduh pembaruan v${update.latestVersion} otomatis di background...`);
+        try {
+          const tempDir = import_os2.default.tmpdir();
+          const installerPath = import_path3.default.join(tempDir, `MabarBang-Update-${update.latestVersion}.exe`);
+          fetch(update.downloadUrl, {
+            headers: { "User-Agent": "MabarBang-App" }
+          }).then(async (downloadRes) => {
+            if (!downloadRes.ok) throw new Error(`HTTP ${downloadRes.status}`);
+            const buffer = Buffer.from(await downloadRes.arrayBuffer());
+            import_fs.default.writeFileSync(installerPath, buffer);
+            console.log(
+              `
+================================================================================`
+            );
+            console.log(`\u2728 UPDATE v${update.latestVersion} SIAP DIPASANG!`);
+            console.log(`\u{1F4A1} Menjalankan installer otomatis...`);
+            console.log(
+              `================================================================================
+`
+            );
+            (0, import_child_process.exec)(
+              `start /wait "" "${installerPath}" /VERYSILENT /SUPPRESSMSGBOXES /CLOSEAPPLICATIONS /RESTARTAPPLICATIONS && del /f /q "${installerPath}"`,
+              () => {
+                try {
+                  if (import_fs.default.existsSync(installerPath)) {
+                    import_fs.default.unlinkSync(installerPath);
+                  }
+                } catch (_) {
+                }
+              }
+            );
+          }).catch((err2) => {
+            console.warn(
+              `\u26A0\uFE0F Gagal download update otomatis di background (${err2.message}). Anda bisa update lewat Dashboard.`
+            );
+          });
+        } catch (_) {
+        }
+      }
     } else {
       console.log(`\u2705 Aplikasi sudah menggunakan versi terbaru (v${APP_VERSION})`);
     }
