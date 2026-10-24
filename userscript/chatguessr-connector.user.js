@@ -1,14 +1,18 @@
 // ==UserScript==
 // @name         AHUNG SERVER MabarBang YouTube 
 // @namespace    http://tampermonkey.net/
-// @version      2.8.1
+// @version      3.3.0
 // @description  Otomatis mengirim data ronde GeoGuessr ke Railway/Local, menampilkan Scoreboard Overlay & PIN tebakan penonton di peta GeoGuessr
 // @author       MabarBang
 // @match        *://*.geoguessr.com/*
 // @run-at       document-start
 // @grant        GM_setValue
 // @grant        GM_getValue
+// @grant        GM_xmlhttpRequest
 // @grant        unsafeWindow
+// @connect      localhost
+// @connect      127.0.0.1
+// @connect      geoindo.up.railway.app
 // @require      https://cdn.socket.io/4.7.5/socket.io.min.js
 // @updateURL    https://geoindo.up.railway.app/chatguessr.user.js
 // @downloadURL  https://geoindo.up.railway.app/chatguessr.user.js
@@ -22,6 +26,8 @@
   const LOCAL_SERVER_URL = 'http://localhost:5050';
 
   let serverUrl = LOCAL_SERVER_URL;
+  let streamerId = '';
+
   try {
     const saved =
       typeof GM_getValue !== 'undefined'
@@ -29,6 +35,16 @@
         : localStorage.getItem('cg_server_url');
     if (saved && saved.trim()) {
       serverUrl = saved.trim();
+    }
+  } catch (_) { }
+
+  try {
+    const savedStreamer =
+      typeof GM_getValue !== 'undefined'
+        ? GM_getValue('cg_streamer_id')
+        : localStorage.getItem('cg_streamer_id');
+    if (savedStreamer && savedStreamer.trim()) {
+      streamerId = savedStreamer.trim();
     }
   } catch (_) { }
 
@@ -51,6 +67,16 @@
     updateServerModeUI();
     initSocket();
     showToast(`Server: ${modeName || serverUrl}`);
+  }
+
+  function setStreamerId(newId) {
+    streamerId = (newId || '').trim();
+    if (typeof GM_setValue !== 'undefined') GM_setValue('cg_streamer_id', streamerId);
+    try {
+      localStorage.setItem('cg_streamer_id', streamerId);
+    } catch (_) { }
+    initSocket();
+    showToast(streamerId ? `Streamer ID: ${streamerId}` : 'Streamer ID di-reset');
   }
 
   function showToast(msg) {
@@ -720,10 +746,31 @@
 
   function sendToServer(payload) {
     const targetUrl = serverUrl.replace(/\/$/, '') + '/api/geoguessr/update';
+    const bodyStr = JSON.stringify({
+      ...payload,
+      streamerId: streamerId || undefined
+    });
+
+    if (typeof GM_xmlhttpRequest !== 'undefined') {
+      GM_xmlhttpRequest({
+        method: 'POST',
+        url: targetUrl,
+        headers: { 'Content-Type': 'application/json' },
+        data: bodyStr,
+        onload: (res) => {
+          updateBadgeStatus(res.status >= 200 && res.status < 300);
+        },
+        onerror: () => {
+          updateBadgeStatus(false);
+        }
+      });
+      return;
+    }
+
     (win.fetch || fetch)(targetUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
+      body: bodyStr
     })
       .then((res) => {
         updateBadgeStatus(res.ok);
@@ -753,6 +800,11 @@
 
       socket.on('connect', () => {
         console.log('[ChatGuessr] Connected to Socket.IO server at', serverUrl);
+        if (streamerId) {
+          socket.emit('join-streamer', streamerId, 'In-Game Overlay');
+        } else {
+          socket.emit('request-state');
+        }
         updateBadgeStatus(true);
       });
 
@@ -762,6 +814,10 @@
       });
 
       socket.on('state-update', (state) => {
+        // If userscript is tied to a specific streamer ID, filter out updates from other streamers
+        if (streamerId && state.streamerId && state.streamerId !== 'default' && state.streamerId !== streamerId) {
+          return;
+        }
         currentState = state;
         renderNativeOverlay();
       });
@@ -802,6 +858,166 @@
     const style = document.createElement('style');
     style.id = 'cg-overlay-styles';
     style.textContent = `
+      /* Fullscreen Curtain & Intro Card */
+      #cg-intro-curtain {
+        position: fixed;
+        inset: 0;
+        z-index: 9999999;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden;
+        pointer-events: all;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      }
+      .cg-curtain-slab {
+        position: absolute;
+        left: 0;
+        width: 100%;
+        height: 50.5%;
+        z-index: 1;
+        transition: transform 0.65s cubic-bezier(0.85, 0, 0.15, 1);
+      }
+      .cg-curtain-top {
+        top: 0;
+        background: #ffe082;
+        border-bottom: 5px solid #000000;
+        background-image: radial-gradient(#000000 1.5px, transparent 1.5px);
+        background-size: 24px 24px;
+        transform: translateY(0);
+      }
+      .cg-curtain-bottom {
+        bottom: 0;
+        background: #c8f560;
+        border-top: 5px solid #000000;
+        background-image: radial-gradient(#000000 1.5px, transparent 1.5px);
+        background-size: 24px 24px;
+        transform: translateY(0);
+      }
+      #cg-intro-curtain.dismissed .cg-curtain-top {
+        transform: translateY(-101%);
+      }
+      #cg-intro-curtain.dismissed .cg-curtain-bottom {
+        transform: translateY(101%);
+      }
+      .cg-intro-card-wrap {
+        position: relative;
+        z-index: 10;
+        padding: 20px;
+        transition: transform 0.5s cubic-bezier(0.85, 0, 0.15, 1), opacity 0.4s ease;
+      }
+      #cg-intro-curtain.dismissed .cg-intro-card-wrap {
+        transform: scale(0.3) translate(80vw, -80vh);
+        opacity: 0;
+        pointer-events: none;
+      }
+      .cg-intro-card {
+        background: #ffffff;
+        border: 4px solid #000000;
+        border-radius: 28px;
+        box-shadow: 10px 10px 0px #000000;
+        padding: 34px 28px 26px;
+        max-width: 500px;
+        width: 90vw;
+        text-align: center;
+        position: relative;
+        animation: cgPopIntro 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+      }
+      @keyframes cgPopIntro {
+        0% { transform: scale(0.6) rotate(-6deg); opacity: 0; }
+        70% { transform: scale(1.04) rotate(1deg); }
+        100% { transform: scale(1) rotate(0deg); opacity: 1; }
+      }
+      .cg-intro-sticker {
+        position: absolute;
+        font-size: 11px;
+        font-weight: 900;
+        border: 2px solid #000;
+        border-radius: 999px;
+        padding: 3px 10px;
+        box-shadow: 2.5px 2.5px 0px #000;
+        letter-spacing: 0.5px;
+      }
+      .cg-sticker-tl {
+        top: -12px;
+        left: 16px;
+        background: #70d6ff;
+        color: #000;
+        transform: rotate(-5deg);
+      }
+      .cg-sticker-tr {
+        top: -12px;
+        right: 16px;
+        background: #c8f560;
+        color: #000;
+        transform: rotate(4deg);
+      }
+      .cg-intro-title {
+        font-size: clamp(32px, 6vw, 50px);
+        font-weight: 900;
+        letter-spacing: -1.5px;
+        color: #000000;
+        line-height: 1.05;
+        margin: 6px 0 12px;
+        text-transform: uppercase;
+        transform: rotate(-1.5deg);
+        text-shadow: 3px 3px 0px #ffe082, 5px 5px 0px #000000;
+      }
+      .cg-intro-badge {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        background: #ff5964;
+        color: #ffffff;
+        border: 2.5px solid #000000;
+        border-radius: 999px;
+        padding: 6px 16px;
+        font-weight: 900;
+        font-size: 13px;
+        box-shadow: 3px 3px 0px #000000;
+        margin-bottom: 12px;
+      }
+      .cg-intro-bar-outer {
+        width: 100%;
+        max-width: 240px;
+        height: 12px;
+        background: #f8fafc;
+        border: 2px solid #000000;
+        border-radius: 999px;
+        margin: 0 auto 14px;
+        overflow: hidden;
+        box-shadow: 2px 2px 0px #000000;
+      }
+      .cg-intro-bar-inner {
+        height: 100%;
+        width: 0%;
+        background: repeating-linear-gradient(45deg, #c8f560, #c8f560 10px, #bbf7d0 10px, #bbf7d0 20px);
+        border-right: 2px solid #000000;
+        animation: cgFillProgress 1.5s ease-in-out forwards;
+      }
+      @keyframes cgFillProgress {
+        0% { width: 0%; }
+        60% { width: 75%; }
+        100% { width: 100%; }
+      }
+      .cg-intro-btn {
+        background: #000000;
+        color: #ffffff;
+        border: 2.5px solid #000000;
+        border-radius: 999px;
+        padding: 10px 28px;
+        font-size: 14px;
+        font-weight: 900;
+        cursor: pointer;
+        box-shadow: 4px 4px 0px #ff5964;
+        transition: transform 0.15s ease;
+      }
+      .cg-intro-btn:hover {
+        transform: translate(-2px, -2px);
+      }
+
+      /* Native Scoreboard Widget */
       #cg-native-widget {
         position: fixed;
         top: 20px;
@@ -816,9 +1032,15 @@
         z-index: 999999;
         overflow: hidden;
         user-select: none;
-        animation: cgWidgetPopIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+        opacity: 0;
+        transform: scale(0.65) translateY(-32px) rotate(-4deg);
         transform-origin: top center;
         touch-action: none;
+        transition: opacity 0.4s ease, transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+      }
+      #cg-native-widget.cg-shown {
+        opacity: 1;
+        transform: scale(1) translateY(0) rotate(0deg);
       }
       #cg-native-widget.cg-dragging {
         transition: none !important;
@@ -829,20 +1051,6 @@
       }
       #cg-native-widget.cg-dragging .cg-header {
         cursor: grabbing !important;
-      }
-      @keyframes cgWidgetPopIn {
-        0% {
-          opacity: 0;
-          transform: scale(0.65) translateY(-32px) rotate(-4deg);
-        }
-        70% {
-          opacity: 1;
-          transform: scale(1.04) translateY(2px) rotate(1deg);
-        }
-        100% {
-          opacity: 1;
-          transform: scale(1) translateY(0) rotate(0deg);
-        }
       }
       #cg-native-widget.minimized .cg-content-body {
         display: none !important;
@@ -1047,6 +1255,59 @@
     const toastBox = document.createElement('div');
     toastBox.id = 'cg-toast-box';
     document.body.appendChild(toastBox);
+
+    // Fullscreen Intro Curtain (Preloader that morphs/shrinks into the top-right overlay)
+    const curtain = document.createElement('div');
+    curtain.id = 'cg-intro-curtain';
+    curtain.innerHTML = `
+      <div class="cg-curtain-slab cg-curtain-top"></div>
+      <div class="cg-curtain-slab cg-curtain-bottom"></div>
+      <div class="cg-intro-card-wrap">
+        <div class="cg-intro-card">
+          <div class="cg-intro-sticker cg-sticker-tl">✦ MABARBANG ✦</div>
+          <div class="cg-intro-sticker cg-sticker-tr">★ 2026 EDITION ★</div>
+          <h1 class="cg-intro-title">MABAR BANG</h1>
+          <div class="cg-intro-badge">
+            <span>⚡</span>
+            <span>kikobooo</span>
+            <span style="color:#ffe082;">✕</span>
+            <span>arvana prod</span>
+            <span>⚡</span>
+          </div>
+          <div class="cg-intro-bar-outer">
+            <div class="cg-intro-bar-inner"></div>
+          </div>
+          <button class="cg-intro-btn" id="cg-intro-btn-start">GASKEUN! ➔</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(curtain);
+
+    let introDismissed = false;
+    const dismissIntro = () => {
+      if (introDismissed) return;
+      introDismissed = true;
+      curtain.classList.add('dismissed');
+
+      // Munculkan & kecilkan ke widget overlay di pojok kanan atas
+      setTimeout(() => {
+        widget.classList.add('cg-shown');
+      }, 200);
+
+      setTimeout(() => {
+        curtain.remove();
+      }, 700);
+    };
+
+    // Klik tombol / klik curtain untuk skip intro
+    curtain.onclick = dismissIntro;
+    const startBtn = document.getElementById('cg-intro-btn-start');
+    if (startBtn) startBtn.onclick = (e) => { e.stopPropagation(); dismissIntro(); };
+
+    // Otomatis mengecil ke overlay setelah 1.8 detik
+    setTimeout(() => {
+      dismissIntro();
+    }, 1800);
 
     // Pin Toggle Action
     const pinBtn = document.getElementById('cg-btn-pins');
@@ -1450,6 +1711,36 @@
               </div>
               <span style="font-size: 13px;">${currentMode === 'custom' ? '✓' : '✎'}</span>
             </button>
+
+            <!-- Streamer ID Configuration (Multi-User) -->
+            <div style="margin-top: 8px; padding-top: 10px; border-top: 2px dashed #000;">
+              <div style="font-size: 12px; font-weight: 900; margin-bottom: 4px; display: flex; align-items: center; justify-content: space-between;">
+                <span>👤 Streamer ID (Multi-User)</span>
+                <span style="font-size: 10px; color: #64748b;">${streamerId ? 'Tersimpan' : 'Default / Auto'}</span>
+              </div>
+              <div style="display: flex; gap: 6px;">
+                <input type="text" id="cg-input-streamer-id" placeholder="UID Streamer Supabase" value="${streamerId || ''}" style="
+                  flex: 1;
+                  padding: 8px 10px;
+                  background: #fff;
+                  border: 2px solid #000;
+                  border-radius: 8px;
+                  font-size: 11px;
+                  font-weight: 700;
+                  outline: none;
+                ">
+                <button id="cg-btn-save-streamer" style="
+                  background: #c8f560;
+                  border: 2px solid #000;
+                  border-radius: 8px;
+                  padding: 8px 12px;
+                  font-size: 11px;
+                  font-weight: 900;
+                  cursor: pointer;
+                  box-shadow: 2px 2px 0px #000;
+                ">Simpan</button>
+              </div>
+            </div>
           </div>
         </div>
       `;
@@ -1457,6 +1748,15 @@
       document.getElementById('cg-close-modal').onclick = () => {
         modal.style.display = 'none';
       };
+
+      const btnSaveStreamer = document.getElementById('cg-btn-save-streamer');
+      if (btnSaveStreamer) {
+        btnSaveStreamer.onclick = () => {
+          const val = document.getElementById('cg-input-streamer-id').value.trim();
+          setStreamerId(val);
+          renderModalContent();
+        };
+      }
 
       document.getElementById('cg-btn-local').onclick = () => {
         setServerUrl(LOCAL_SERVER_URL, 'Local (5050)');

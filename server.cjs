@@ -83018,6 +83018,7 @@ __export(server_exports, {
   GITHUB_REPO: () => GITHUB_REPO,
   calculateScore: () => calculateScore,
   checkForAppUpdates: () => checkForAppUpdates,
+  getManagerForStreamer: () => getManagerForStreamer,
   haversineDistance: () => haversineDistance,
   parseCoordinates: () => parseCoordinates,
   resolveLocation: () => resolveLocation
@@ -121972,7 +121973,15 @@ var YouTubeBackend = class extends import_events.EventEmitter {
         }
       });
       this.#liveChat.on("error", (err2) => {
-        console.error(`[YouTube Live Error]:`, err2);
+        const errorMsg = err2?.info || err2?.message || String(err2);
+        const isBadRequest = String(err2).includes("400") || String(err2).includes("INVALID_ARGUMENT") || String(errorMsg).includes("INVALID_ARGUMENT");
+        if (isBadRequest) {
+          console.warn(`[YouTube Live] Stream tidak aktif / live chat berakhir (${this.liveId}). Menghentikan koneksi.`);
+          this.close();
+          this.emit("error", new Error("Live stream tidak aktif atau video ID tidak valid."));
+          return;
+        }
+        console.error(`[YouTube Live Error]:`, err2?.message || err2);
         const errorObj = err2 instanceof Error ? err2 : new Error(String(err2));
         this.emit("error", errorObj);
       });
@@ -121985,20 +121994,27 @@ var YouTubeBackend = class extends import_events.EventEmitter {
     } catch (err2) {
       this.#connected = false;
       const errorMsg = err2?.message || String(err2);
-      console.error(`[YouTube Connect Error]:`, errorMsg);
+      const isBadRequest = String(err2).includes("400") || String(err2).includes("INVALID_ARGUMENT") || String(errorMsg).includes("INVALID_ARGUMENT");
+      console.warn(`[YouTube Connect Warn]:`, errorMsg);
       this.emit("error", new Error(errorMsg));
-      if (!this.#closing) {
+      if (!this.#closing && !isBadRequest && this.#reconnectAttempts < 3) {
         this.#scheduleReconnect(errorMsg);
+      } else if (isBadRequest) {
+        this.close();
       }
       throw new Error(errorMsg);
     }
   }
   #scheduleReconnect(reason) {
     if (this.#closing || this.#reconnectTimer) return;
+    if (this.#reconnectAttempts >= 3) {
+      console.warn(`[YouTube Auto-Reconnect] Telah mencapai batas maksimal (3x). Menghentikan percobaan.`);
+      return;
+    }
     this.#reconnectAttempts++;
     const delay2 = Math.min(5e3 * Math.pow(2, this.#reconnectAttempts - 1), 3e4);
     console.log(
-      `[YouTube Auto-Reconnect] Attempt #${this.#reconnectAttempts} in ${delay2 / 1e3}s. Reason: ${reason || "Disconnected"}`
+      `[YouTube Auto-Reconnect] Attempt #${this.#reconnectAttempts}/3 in ${delay2 / 1e3}s. Reason: ${reason || "Disconnected"}`
     );
     this.#reconnectTimer = setTimeout(async () => {
       this.#reconnectTimer = null;
@@ -122006,7 +122022,7 @@ var YouTubeBackend = class extends import_events.EventEmitter {
       try {
         await this.connect();
       } catch (err2) {
-        console.warn(`[YouTube Auto-Reconnect] Attempt #${this.#reconnectAttempts} failed:`, err2);
+        console.warn(`[YouTube Auto-Reconnect] Percobaan #${this.#reconnectAttempts} gagal: ${err2?.message || err2}`);
       }
     }, delay2);
   }
@@ -186039,6 +186055,7 @@ var embeddedDashboardHtml = `<!DOCTYPE html>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800;900&family=JetBrains+Mono:wght@600;700;800&display=swap" rel="stylesheet">
   <script src="/socket.io/socket.io.js"></script>
   <script>if (typeof io === 'undefined') { document.write('<script src="https://cdn.socket.io/4.8.4/socket.io.min.js"><\\/script>'); }</script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
     :root {
       --bg-page: #9b87f5;
@@ -186761,7 +186778,49 @@ var embeddedDashboardHtml = `<!DOCTYPE html>
     </div>
   </div>
 
-  <div class="container">
+  <!-- Full-Page Auth Gatekeeper (Visible only if not logged in) -->
+  <div id="authGatekeeper" style="display: flex; min-height: 100vh; width: 100%; align-items: center; justify-content: center; padding: 24px;">
+    <div style="background: #ffffff; border: 4px solid #000; border-radius: 26px; box-shadow: 10px 10px 0px #000; width: 100%; max-width: 460px; padding: 34px; position: relative;">
+      <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 10px;">
+        <div style="width: 48px; height: 48px; background: #3ecf8e; border: 3px solid #000; border-radius: 14px; display: flex; align-items: center; justify-content: center; font-size: 24px; box-shadow: 3px 3px 0px #000;">\u26A1</div>
+        <div>
+          <h1 id="gateTitle" style="font-size: 24px; font-weight: 900; letter-spacing: -0.6px; margin: 0;">MabarBang Login</h1>
+          <p style="font-size: 13px; font-weight: 700; color: #4b5563; margin-top: 2px;">Masuk ke Dashboard Streamer Anda</p>
+        </div>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 16px; margin-top: 20px;">
+        <div id="gateNameGroup" style="display: none; flex-direction: column; gap: 6px;">
+          <label style="font-size: 13px; font-weight: 800;">Nama Streamer / Channel</label>
+          <input type="text" id="gateName" placeholder="Contoh: Arvana Gaming">
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 6px;">
+          <label style="font-size: 13px; font-weight: 800;">Email Akun</label>
+          <input type="text" id="gateEmail" placeholder="streamer@gmail.com">
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 6px;">
+          <label style="font-size: 13px; font-weight: 800;">Password</label>
+          <input type="password" id="gatePassword" style="width: 100%; padding: 12px 16px; background: #fff; border: var(--border-thick); border-radius: 14px; color: #000; font-family: inherit; font-size: 14px; font-weight: 700; outline: none; box-shadow: 3px 3px 0px #000;" placeholder="\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022">
+        </div>
+
+        <div id="gateAlert" style="display: none; padding: 12px; background: #fee2e2; border: 2.5px solid #000; border-radius: 12px; color: #991b1b; font-size: 13px; font-weight: 800;"></div>
+
+        <button id="btnSubmitGate" class="btn btn-green" onclick="handleGateSubmit()" style="justify-content: center; padding: 15px; font-size: 16px; margin-top: 6px; box-shadow: 4px 4px 0px #000;">
+          <span id="btnSubmitGateText">Masuk Sekarang \u2794</span>
+        </button>
+
+        <div style="text-align: center; font-size: 13px; font-weight: 800; color: #475569; margin-top: 6px;">
+          <span id="gateTogglePrompt">Belum punya akun?</span>
+          <a href="javascript:void(0)" id="gateToggleLink" onclick="toggleGateMode()" style="color: #4f46e5; text-decoration: underline; margin-left: 4px;">Daftar Akun Baru</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Dashboard Container (Only shown when authenticated) -->
+  <div class="container" id="mainDashboardContainer" style="display: none;">
     <!-- Update Alert Banner -->
     <div id="updateBanner" style="display: none; background: #ffe082; border: var(--border-thick); border-radius: var(--radius-card); box-shadow: var(--shadow-solid); padding: 14px 20px; align-items: center; justify-content: space-between; gap: 14px; animation: popIntro 0.4s ease;">
       <div style="display: flex; align-items: center; gap: 14px; flex-wrap: wrap;">
@@ -186792,148 +186851,153 @@ var embeddedDashboardHtml = `<!DOCTYPE html>
         </div>
       </div>
       <div class="header-actions">
-        <button class="btn btn-pink btn-sm" onclick="replayIntro()" title="Putar ulang transisi Mabar Bang">\u{1F3AC} Intro Mabar</button>
-        <button class="btn btn-yellow btn-sm" onclick="copyOverlayUrl()">\u{1F4CB} Copy OBS Overlay URL</button>
+        <div id="authProfileBox" style="display: flex; align-items: center; gap: 10px; background: #f8fafc; border: var(--border-med); border-radius: var(--radius-pill); padding: 4px 14px; box-shadow: 2px 2px 0px #000;">
+          <span style="font-size: 18px;">\u{1F451}</span>
+          <div style="text-align: left; line-height: 1.1;">
+            <div id="streamerNameText" style="font-size: 13px; font-weight: 900; color: #000;">Streamer</div>
+            <div id="streamerEmailText" style="font-size: 11px; font-weight: 700; color: #64748b;">user@supabase.co</div>
+          </div>
+          <button class="btn btn-yellow btn-sm" onclick="copyStreamerUid()" style="padding: 4px 10px; font-size: 11px; margin-left: 4px;" title="Salin Streamer UID (untuk Userscript GeoGuessr)">\u{1F4CB} Salin UID</button>
+          <button class="btn btn-red btn-sm" onclick="logoutSupabase()" style="padding: 4px 10px; font-size: 11px;" title="Keluar dari akun">Logout</button>
+        </div>
+        <button class="btn btn-yellow btn-sm" onclick="openStreamConnectModal()">\u{1F4E1} Koneksi Live Stream (YT / TikTok / Saweria)</button>
         <button class="btn btn-blue btn-sm" onclick="openUserscriptModal()">\u{1F9E9} Userscript Setup</button>
       </div>
     </header>
 
-    <!-- Controls Grid -->
-    <div class="grid-2">
-      <!-- YouTube Connect Card -->
-      <div class="card card-yellow">
-        <div class="card-header">
-          <div class="card-title">
-            <span>\u{1F4FA}</span> YouTube Live Stream
-          </div>
-          <span id="ytBadge" class="badge-pill badge-disconnected">
-            <span class="badge-dot"></span> <span id="ytBadgeText">Disconnected</span>
-          </span>
-        </div>
+    <!-- Modal Tunggal Koneksi Live Stream (YouTube, TikTok, GeoIndo) -->
+    <div id="streamConnectModal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.65); z-index: 999999; align-items: center; justify-content: center; padding: 20px;">
+      <div style="background: #ffffff; border: 4px solid #000; border-radius: 24px; box-shadow: 10px 10px 0px #000; width: 100%; max-width: 580px; padding: 26px; position: relative; animation: popIn 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);">
+        <button onclick="closeStreamConnectModal()" style="position: absolute; top: 18px; right: 18px; background: #ff5964; color: #fff; border: 2.5px solid #000; border-radius: 50%; width: 32px; height: 32px; font-weight: 900; cursor: pointer; box-shadow: 2px 2px 0px #000;">\u2715</button>
 
-        <p style="font-size: 13px; font-weight: 700; color: #1f2937;">
-          Masukkan link stream / popup chat / handle channel (@Arvanna26):
-        </p>
-
-        <div class="input-group">
-          <input type="text" id="streamInput" placeholder="@Arvanna26 atau https://www.youtube.com/watch?v=...">
-          <button id="btnConnectYt" class="btn btn-black" onclick="connectYouTube()">Connect</button>
-          <button id="btnDisconnectYt" class="btn btn-red" onclick="disconnectYouTube()" style="display: none;">Disconnect</button>
-        </div>
-
-        <div class="info-list">
-          <div class="info-item">
-            <span class="info-label">\u{1F3AF} Active Target:</span>
-            <span class="info-val" id="activeTarget">-</span>
+        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 6px;">
+          <div style="width: 40px; height: 40px; background: #ffe082; border: 2.5px solid #000; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 20px; box-shadow: 2px 2px 0px #000;">\u{1F4E1}</div>
+          <div>
+            <h2 style="font-size: 20px; font-weight: 900; letter-spacing: -0.4px;">Hubungkan Live Stream</h2>
+            <p style="font-size: 12px; font-weight: 700; color: #64748b;">Pilih platform untuk membaca tebakan penonton chat</p>
           </div>
         </div>
 
-        <div id="ytErrorBox" style="display: none; padding: 10px 14px; background: #fee2e2; border: 2.5px solid #000; border-radius: 12px; box-shadow: 2px 2px 0px #000; color: #991b1b; font-size: 12px; font-weight: 800;">
-          <span>\u26A0\uFE0F Gagal Connect:</span> <span id="ytErrorText"></span>
+        <!-- Tab Platform Switcher -->
+        <div style="display: flex; gap: 8px; margin: 18px 0 14px;">
+          <button id="tabBtnYt" class="btn btn-yellow btn-sm" onclick="switchStreamTab('yt')">\u{1F4FA} YouTube</button>
+          <button id="tabBtnTt" class="btn btn-white btn-sm" onclick="switchStreamTab('tt')">\u{1F3B5} TikTok</button>
+          <button id="tabBtnGi" class="btn btn-white btn-sm" onclick="switchStreamTab('gi')">\u{1F4B8} GeoIndo / Saweria</button>
+        </div>
+
+        <!-- Panel YouTube -->
+        <div id="panelYt" style="display: flex; flex-direction: column; gap: 12px; background: #fffbeb; border: 2.5px solid #000; border-radius: 16px; padding: 18px; box-shadow: 3px 3px 0px #000;">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <strong style="font-size: 14px;">YouTube Live Stream</strong>
+            <span id="ytBadge" class="badge-pill badge-disconnected">
+              <span class="badge-dot"></span> <span id="ytBadgeText">Disconnected</span>
+            </span>
+          </div>
+          <p style="font-size: 12px; font-weight: 700; color: #475569;">Masukkan link stream / popup chat / handle (@Arvanna26):</p>
+          <div class="input-group">
+            <input type="text" id="streamInput" placeholder="@Arvanna26 atau https://www.youtube.com/watch?v=...">
+            <button id="btnConnectYt" class="btn btn-black" onclick="connectYouTube()">Connect</button>
+            <button id="btnDisconnectYt" class="btn btn-red" onclick="disconnectYouTube()" style="display: none;">Disconnect</button>
+          </div>
+          <div class="info-list" style="margin-top: 4px;">
+            <div class="info-item">
+              <span class="info-label">\u{1F3AF} Active Target:</span>
+              <span class="info-val" id="activeTarget">-</span>
+            </div>
+          </div>
+          <div id="ytErrorBox" style="display: none; padding: 8px 12px; background: #fee2e2; border: 2px solid #000; border-radius: 10px; color: #991b1b; font-size: 11px; font-weight: 800;">
+            <span>\u26A0\uFE0F Gagal Connect:</span> <span id="ytErrorText"></span>
+          </div>
+        </div>
+
+        <!-- Panel TikTok -->
+        <div id="panelTt" style="display: none; flex-direction: column; gap: 12px; background: #fdf2f8; border: 2.5px solid #000; border-radius: 16px; padding: 18px; box-shadow: 3px 3px 0px #000;">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <strong style="font-size: 14px;">TikTok LIVE Stream</strong>
+            <span id="ttBadge" class="badge-pill badge-disconnected">
+              <span class="badge-dot"></span> <span id="ttBadgeText">Disconnected</span>
+            </span>
+          </div>
+          <p style="font-size: 12px; font-weight: 700; color: #475569;">Masukkan username TikTok streamer (contoh: <code>@username</code>):</p>
+          <div class="input-group">
+            <input type="text" id="tiktokInput" placeholder="@username_tiktok">
+            <button id="btnConnectTt" class="btn btn-black" onclick="connectTikTok()">Connect</button>
+            <button id="btnDisconnectTt" class="btn btn-red" onclick="disconnectTikTok()" style="display: none;">Disconnect</button>
+          </div>
+          <div class="info-list" style="margin-top: 4px;">
+            <div class="info-item">
+              <span class="info-label">\u{1F3AF} Active TikTok:</span>
+              <span class="info-val" id="activeTikTokTarget">-</span>
+            </div>
+          </div>
+          <div id="ttErrorBox" style="display: none; padding: 8px 12px; background: #fee2e2; border: 2px solid #000; border-radius: 10px; color: #991b1b; font-size: 11px; font-weight: 800;">
+            <span>\u26A0\uFE0F Gagal Connect TikTok:</span> <span id="ttErrorText"></span>
+          </div>
+        </div>
+
+        <!-- Panel GeoIndo -->
+        <div id="panelGi" style="display: none; flex-direction: column; gap: 12px; background: #f0fdf4; border: 2.5px solid #000; border-radius: 16px; padding: 18px; box-shadow: 3px 3px 0px #000;">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <strong style="font-size: 14px;">Donation Stream (Tako / Saweria)</strong>
+            <span id="giBadge" class="badge-pill badge-disconnected">
+              <span class="badge-dot"></span> <span id="giBadgeText">Disconnected</span>
+            </span>
+          </div>
+          <p style="font-size: 12px; font-weight: 700; color: #475569;">Masukkan Link Stream Donasi atau Stream UID:</p>
+          <div class="input-group">
+            <input type="text" id="geoindoInput" placeholder="Link stream atau UID GeoIndo">
+            <button id="btnConnectGi" class="btn btn-black" onclick="connectGeoIndo()">Connect</button>
+            <button id="btnDisconnectGi" class="btn btn-red" onclick="disconnectGeoIndo()" style="display: none;">Disconnect</button>
+          </div>
+          <div class="info-list" style="margin-top: 4px;">
+            <div class="info-item">
+              <span class="info-label">\u{1F3AF} Active UID:</span>
+              <span class="info-val" id="activeGeoindoTarget">-</span>
+            </div>
+          </div>
+          <div id="giErrorBox" style="display: none; padding: 8px 12px; background: #fee2e2; border: 2px solid #000; border-radius: 10px; color: #991b1b; font-size: 11px; font-weight: 800;">
+            <span>\u26A0\uFE0F Gagal Connect GeoIndo:</span> <span id="giErrorText"></span>
+          </div>
         </div>
       </div>
+    </div>
 
-      <!-- TikTok Live Connect Card -->
-      <div class="card card-pink">
-        <div class="card-header">
-          <div class="card-title">
-            <span>\u{1F3B5}</span> TikTok LIVE Stream
-          </div>
-          <span id="ttBadge" class="badge-pill badge-disconnected">
-            <span class="badge-dot"></span> <span id="ttBadgeText">Disconnected</span>
-          </span>
+    <!-- Controls & Game Status Card -->
+    <div class="card card-green" style="margin-bottom: 20px;">
+      <div class="card-header">
+        <div class="card-title">
+          <span>\u{1F30D}</span> GeoGuessr Game Status
         </div>
-
-        <p style="font-size: 13px; font-weight: 700; color: #1f2937;">
-          Masukkan username TikTok streamer (contoh: <code>@username</code>):
-        </p>
-
-        <div class="input-group">
-          <input type="text" id="tiktokInput" placeholder="@username_tiktok">
-          <button id="btnConnectTt" class="btn btn-black" onclick="connectTikTok()">Connect</button>
-          <button id="btnDisconnectTt" class="btn btn-red" onclick="disconnectTikTok()" style="display: none;">Disconnect</button>
-        </div>
-
-        <div class="info-list">
-          <div class="info-item">
-            <span class="info-label">\u{1F3AF} Active TikTok:</span>
-            <span class="info-val" id="activeTikTokTarget">-</span>
-          </div>
-        </div>
-
-        <div id="ttErrorBox" style="display: none; padding: 10px 14px; background: #fee2e2; border: 2.5px solid #000; border-radius: 12px; box-shadow: 2px 2px 0px #000; color: #991b1b; font-size: 12px; font-weight: 800;">
-          <span>\u26A0\uFE0F Gagal Connect TikTok:</span> <span id="ttErrorText"></span>
-        </div>
-      </div>
-
-      <!-- GeoIndo Donation Stream Connect Card -->
-      <div class="card card-blue" style="grid-column: 1 / -1;">
-        <div class="card-header">
-          <div class="card-title">
-            <span>\u{1F4B8}</span> GeoIndo Live Donation Stream (Tako / Saweria)
-          </div>
-          <span id="giBadge" class="badge-pill badge-disconnected">
-            <span class="badge-dot"></span> <span id="giBadgeText">Disconnected</span>
-          </span>
-        </div>
-
-        <p style="font-size: 13px; font-weight: 700; color: #1f2937;">
-          Masukkan Link Stream Donasi atau Stream UID (contoh: <code>https://www.geoindo.my.id/api/donations/stream?uid=60jJcJMPiASdRgNtRQU2xxj5iwC2</code>):
-        </p>
-
-        <div class="input-group">
-          <input type="text" id="geoindoInput" placeholder="Link stream atau UID GeoIndo">
-          <button id="btnConnectGi" class="btn btn-black" onclick="connectGeoIndo()">Connect</button>
-          <button id="btnDisconnectGi" class="btn btn-red" onclick="disconnectGeoIndo()" style="display: none;">Disconnect</button>
-        </div>
-
-        <div class="info-list">
-          <div class="info-item">
-            <span class="info-label">\u{1F3AF} Active UID:</span>
-            <span class="info-val" id="activeGeoindoTarget">-</span>
-          </div>
-        </div>
-
-        <div id="giErrorBox" style="display: none; padding: 10px 14px; background: #fee2e2; border: 2.5px solid #000; border-radius: 12px; box-shadow: 2px 2px 0px #000; color: #991b1b; font-size: 12px; font-weight: 800;">
-          <span>\u26A0\uFE0F Gagal Connect GeoIndo:</span> <span id="giErrorText"></span>
-        </div>
-      </div>
-
-      <!-- GeoGuessr Game Status Card -->
-      <div class="card card-green" style="grid-column: 1 / -1;">
-        <div class="card-header">
-          <div class="card-title">
-            <span>\u{1F30D}</span> GeoGuessr Game Status
-          </div>
+        <div style="display: flex; gap: 8px; align-items: center;">
           <span id="guessBadge" class="badge-pill badge-disconnected">
             <span class="badge-dot"></span> <span id="guessBadgeText">Guesses Closed</span>
           </span>
         </div>
+      </div>
 
-        <div class="info-list">
-          <div class="info-item">
-            <span class="info-label">\u{1F5FA}\uFE0F Map:</span>
-            <span class="info-val" id="mapNameDisplay">Menunggu Game...</span>
-          </div>
-          <div class="info-item">
-            <span class="info-label">\u{1F4CD} Ronde:</span>
-            <span class="info-val" id="roundDisplay">R1 / 5</span>
-          </div>
-          <div class="info-item">
-            <span class="info-label">\u{1F465} Tebakan Ronde Ini:</span>
-            <span class="info-val" id="guessCountDisplay">0 Guesses</span>
-          </div>
-          <div class="info-item">
-            <span class="info-label">\u{1F310} Tebak Koordinat:</span>
-            <span class="info-val" id="coordsStatusDisplay" style="color: #dc2626;">\u26D4 Disabled</span>
-          </div>
+      <div class="info-list">
+        <div class="info-item">
+          <span class="info-label">\u{1F5FA}\uFE0F Map:</span>
+          <span class="info-val" id="mapNameDisplay">Menunggu Game...</span>
         </div>
+        <div class="info-item">
+          <span class="info-label">\u{1F4CD} Ronde:</span>
+          <span class="info-val" id="roundDisplay">R1 / 5</span>
+        </div>
+        <div class="info-item">
+          <span class="info-label">\u{1F465} Tebakan Ronde Ini:</span>
+          <span class="info-val" id="guessCountDisplay">0 Guesses</span>
+        </div>
+        <div class="info-item">
+          <span class="info-label">\u{1F310} Tebak Koordinat:</span>
+          <span class="info-val" id="coordsStatusDisplay" style="color: #dc2626;">\u26D4 Disabled</span>
+        </div>
+      </div>
 
-        <div style="display: flex; gap: 10px; margin-top: auto; flex-wrap: wrap;">
-          <button id="btnToggleGuesses" class="btn btn-white btn-sm" onclick="toggleGuesses()">\u{1F513} Open Guesses</button>
-          <button id="btnToggleCoords" class="btn btn-yellow btn-sm" onclick="toggleCoordinates()" title="Aktifkan/nonaktifkan tebakan via koordinat angka">\u{1F310} Koordinat: OFF</button>
-          <button class="btn btn-red btn-sm" onclick="resetGame()">\u{1F504} Reset Game</button>
-        </div>
+      <div style="display: flex; gap: 10px; margin-top: auto; flex-wrap: wrap;">
+        <button id="btnToggleGuesses" class="btn btn-white btn-sm" onclick="toggleGuesses()">\u{1F513} Open Guesses</button>
+        <button id="btnToggleCoords" class="btn btn-yellow btn-sm" onclick="toggleCoordinates()" title="Aktifkan/nonaktifkan tebakan via koordinat angka">\u{1F310} Koordinat: OFF</button>
+        <button class="btn btn-red btn-sm" onclick="resetGame()">\u{1F504} Reset Game</button>
       </div>
     </div>
 
@@ -186946,6 +187010,7 @@ var embeddedDashboardHtml = `<!DOCTYPE html>
         <div class="tab-pills">
           <button id="tabRound" class="btn btn-yellow btn-sm" onclick="switchView('round')">Ronde Ini</button>
           <button id="tabGame" class="btn btn-white btn-sm" onclick="switchView('game')">Total Game</button>
+          <button id="tabHistory" class="btn btn-white btn-sm" onclick="switchView('history')">\u{1F4DC} Riwayat Viewer Saya</button>
         </div>
       </div>
 
@@ -186978,20 +187043,30 @@ var embeddedDashboardHtml = `<!DOCTYPE html>
 
     socket.on('connect', () => {
       console.log('Connected to MabarBang server');
-      socket.emit('request-state');
+      if (authUser && authUser.id) {
+        socket.emit('join-streamer', authUser.id, 'Dashboard');
+      } else {
+        socket.emit('request-state');
+      }
     });
 
     socket.on('state-update', (state) => {
+      // If we are logged in as a specific streamer, ignore updates from other streamers
+      if (authUser && authUser.id && state.streamerId && state.streamerId !== 'default' && state.streamerId !== authUser.id) {
+        return;
+      }
       currentState = state;
       updateUI();
     });
 
-    socket.on('round-started', () => {
-      socket.emit('request-state');
+    socket.on('round-started', (payload) => {
+      if (authUser && authUser.id && payload && payload.streamerId && payload.streamerId !== authUser.id) return;
+      socket.emit('request-state', authUser?.id);
     });
 
-    socket.on('round-finished', () => {
-      socket.emit('request-state');
+    socket.on('round-finished', (payload) => {
+      if (authUser && authUser.id && payload && payload.streamerId && payload.streamerId !== authUser.id) return;
+      socket.emit('request-state', authUser?.id);
     });
 
     socket.on('update-info', (info) => {
@@ -187152,21 +187227,264 @@ var embeddedDashboardHtml = `<!DOCTYPE html>
       renderScoreboard();
     }
 
+    // Supabase Auth Integration (Reads directly from .env via /api/auth/config)
+    let SUPABASE_URL = 'https://REDACTED_PROJECT.supabase.co';
+    let SUPABASE_ANON_KEY = 'REDACTED_ANON_KEY';
+    
+    let supabaseClient = null;
+    let authUser = null;
+    let authMode = 'login'; // 'login' or 'register'
+    let historyLeaderboard = [];
+
+    // Dynamically bootstrap Supabase using values configured in .env
+    fetch('/api/auth/config')
+      .then((r) => r.json())
+      .then((cfg) => {
+        if (cfg && cfg.supabaseUrl && cfg.supabaseAnonKey) {
+          SUPABASE_URL = cfg.supabaseUrl;
+          SUPABASE_ANON_KEY = cfg.supabaseAnonKey;
+        }
+        if (typeof window.supabase !== 'undefined' && window.supabase.createClient) {
+          supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+          initSupabaseSession();
+        }
+      })
+      .catch(() => {
+        if (typeof window.supabase !== 'undefined' && window.supabase.createClient) {
+          supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+          initSupabaseSession();
+        }
+      });
+
+    async function initSupabaseSession() {
+      if (!supabaseClient) return;
+      try {
+        const { data: { session } } = await supabaseClient.auth.getSession();
+        if (session && session.user) {
+          authUser = session.user;
+          updateAuthUI();
+          syncUserWithServer(session.access_token);
+        } else {
+          updateAuthUI();
+        }
+
+        supabaseClient.auth.onAuthStateChange(async (event, session) => {
+          if (session && session.user) {
+            authUser = session.user;
+            updateAuthUI();
+            if (socket && socket.connected) {
+              socket.emit('join-streamer', authUser.id, 'Dashboard');
+            }
+            syncUserWithServer(session.access_token);
+          } else {
+            authUser = null;
+            updateAuthUI();
+          }
+        });
+      } catch (err) {
+        console.error('Supabase session init error:', err);
+      }
+    }
+
+    // Helper fetch with streamer identification header
+    function apiFetch(url, options = {}) {
+      options.headers = options.headers || {};
+      if (authUser && authUser.id) {
+        options.headers['x-streamer-id'] = authUser.id;
+      }
+      return fetch(url, options);
+    }
+
+    async function syncUserWithServer(accessToken) {
+      if (!accessToken) return;
+      try {
+        const res = await apiFetch('/api/auth/sync', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ accessToken })
+        });
+        if (res.ok) {
+          const json = await res.json();
+          if (json.state) {
+            currentState = json.state;
+            updateUI();
+          }
+        }
+      } catch (err) {
+        console.error('Failed to sync auth with server:', err);
+      }
+    }
+
+    function updateAuthUI() {
+      const authProfileBox = document.getElementById('authProfileBox');
+      const streamerNameText = document.getElementById('streamerNameText');
+      const streamerEmailText = document.getElementById('streamerEmailText');
+      const authGatekeeper = document.getElementById('authGatekeeper');
+      const mainDashboardContainer = document.getElementById('mainDashboardContainer');
+
+      if (authUser) {
+        const displayName = authUser.user_metadata?.name || authUser.email?.split('@')[0] || 'Streamer';
+        if (authProfileBox) authProfileBox.style.display = 'flex';
+        if (streamerNameText) streamerNameText.textContent = displayName;
+        if (streamerEmailText) streamerEmailText.textContent = authUser.email;
+
+        // Tampilkan Dashboard, Sembunyikan Halaman Gerbang Login
+        if (authGatekeeper) authGatekeeper.style.display = 'none';
+        if (mainDashboardContainer) mainDashboardContainer.style.display = 'flex';
+      } else {
+        // Belum Login: Sembunyikan Dashboard, Tampilkan Halaman Gerbang Login
+        if (authGatekeeper) authGatekeeper.style.display = 'flex';
+        if (mainDashboardContainer) mainDashboardContainer.style.display = 'none';
+      }
+    }
+
+    function copyStreamerUid() {
+      if (!authUser || !authUser.id) {
+        alert('Streamer UID belum tersedia. Silakan login terlebih dahulu.');
+        return;
+      }
+      navigator.clipboard.writeText(authUser.id).then(() => {
+        alert(\`\u2705 Streamer UID berhasil disalin!\\n\\n\${authUser.id}\\n\\nMasukkan UID ini di pengaturan Userscript GeoGuessr Anda.\`);
+      }).catch(() => {
+        prompt('Salin Streamer UID Anda secara manual:', authUser.id);
+      });
+    }
+
+    function toggleGateMode() {
+      authMode = authMode === 'login' ? 'register' : 'login';
+      const title = document.getElementById('gateTitle');
+      const btnSubmit = document.getElementById('btnSubmitGateText');
+      const prompt = document.getElementById('gateTogglePrompt');
+      const link = document.getElementById('gateToggleLink');
+      const nameGroup = document.getElementById('gateNameGroup');
+
+      if (authMode === 'register') {
+        title.textContent = 'MabarBang Register';
+        btnSubmit.textContent = 'Daftar Akun Baru \u2794';
+        prompt.textContent = 'Sudah punya akun?';
+        link.textContent = 'Masuk di sini';
+        nameGroup.style.display = 'flex';
+      } else {
+        title.textContent = 'MabarBang Login';
+        btnSubmit.textContent = 'Masuk Sekarang \u2794';
+        prompt.textContent = 'Belum punya akun?';
+        link.textContent = 'Daftar Akun Baru';
+        nameGroup.style.display = 'none';
+      }
+      document.getElementById('gateAlert').style.display = 'none';
+    }
+
+    async function handleGateSubmit() {
+      if (!supabaseClient) {
+        alert('Supabase client belum siap. Cek koneksi internet Anda.');
+        return;
+      }
+
+      const email = document.getElementById('gateEmail').value.trim();
+      const password = document.getElementById('gatePassword').value.trim();
+      const name = document.getElementById('gateName').value.trim();
+      const alertBox = document.getElementById('gateAlert');
+
+      if (!email || !password) {
+        alertBox.style.display = 'block';
+        alertBox.textContent = 'Email dan password tidak boleh kosong!';
+        return;
+      }
+
+      alertBox.style.display = 'none';
+      const btn = document.getElementById('btnSubmitGate');
+      const btnText = document.getElementById('btnSubmitGateText');
+      const origText = btnText.textContent;
+      btnText.textContent = 'Memproses...';
+      btn.disabled = true;
+
+      try {
+        if (authMode === 'register') {
+          const { data, error } = await supabaseClient.auth.signUp({
+            email,
+            password,
+            options: {
+              data: { name: name || email.split('@')[0] }
+            }
+          });
+          if (error) throw error;
+          alert('Pendaftaran berhasil! Akun Anda aktif.');
+        } else {
+          const { data, error } = await supabaseClient.auth.signInWithPassword({
+            email,
+            password
+          });
+          if (error) throw error;
+        }
+      } catch (err) {
+        alertBox.style.display = 'block';
+        alertBox.textContent = err.message || 'Terjadi kesalahan autentikasi.';
+      } finally {
+        btnText.textContent = origText;
+        btn.disabled = false;
+      }
+    }
+
+    async function logoutSupabase() {
+      if (!confirm('Yakin ingin logout?')) return;
+      if (supabaseClient) {
+        await supabaseClient.auth.signOut();
+      }
+      authUser = null;
+      updateAuthUI();
+      // Sync default user
+      await fetch('/api/auth/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ accessToken: '' })
+      }).catch(() => {});
+      location.reload();
+    }
+
+    async function fetchStreamerHistory() {
+      try {
+        const streamerId = (currentState && currentState.streamerId) ? currentState.streamerId : (authUser ? authUser.id : '');
+        const res = await fetch(\`/api/leaderboard/history?streamerId=\${encodeURIComponent(streamerId)}\`);
+        if (res.ok) {
+          const data = await res.json();
+          historyLeaderboard = data.history || [];
+        }
+      } catch (e) {
+        console.error('Failed to load history:', e);
+      }
+    }
+
     function switchView(view) {
       currentView = view;
       document.getElementById('tabRound').className = view === 'round' ? 'btn btn-yellow btn-sm' : 'btn btn-white btn-sm';
       document.getElementById('tabGame').className = view === 'game' ? 'btn btn-yellow btn-sm' : 'btn btn-white btn-sm';
-      renderScoreboard();
+      document.getElementById('tabHistory').className = view === 'history' ? 'btn btn-yellow btn-sm' : 'btn btn-white btn-sm';
+      
+      if (view === 'history') {
+        fetchStreamerHistory().then(() => renderScoreboard());
+      } else {
+        renderScoreboard();
+      }
     }
 
     function renderScoreboard() {
       const tbody = document.getElementById('scoreboardBody');
-      if (!currentState) return;
+      if (!currentState && currentView !== 'history') return;
 
-      const list = currentView === 'round' ? (currentState.roundGuesses || []) : (currentState.leaderboard || []);
+      let list = [];
+      if (currentView === 'round') {
+        list = currentState ? (currentState.roundGuesses || []) : [];
+      } else if (currentView === 'game') {
+        list = currentState ? (currentState.leaderboard || []) : [];
+      } else if (currentView === 'history') {
+        list = historyLeaderboard || [];
+      }
 
       if (list.length === 0) {
-        tbody.innerHTML = \`<tr><td colspan="4" class="empty-state">Belum ada tebakan. Viewer bisa ketik <code>!g [nama negara/kota]</code> di YouTube chat!</td></tr>\`;
+        const emptyMsg = currentView === 'history' 
+          ? 'Belum ada riwayat leaderboard yang tersimpan di cloud Supabase untuk akun ini.'
+          : 'Belum ada tebakan. Viewer bisa ketik <code>!g [nama negara/kota]</code> di YouTube chat!';
+        tbody.innerHTML = \`<tr><td colspan="4" class="empty-state">\${emptyMsg}</td></tr>\`;
         return;
       }
 
@@ -187182,8 +187500,12 @@ var embeddedDashboardHtml = `<!DOCTYPE html>
         const avatar = item.avatar 
           ? \`<img class="avatar-circle" src="\${item.avatar}" alt="" />\` 
           : \`<div class="avatar-circle">\u{1F464}</div>\`;
-        const distance = currentView === 'round' ? \`\${item.distance} km\` : \`\${Math.round(item.totalDistance)} km total\`;
-        const score = currentView === 'round' ? \`\${item.score.toLocaleString()} pts\` : \`\${item.totalScore.toLocaleString()} pts\`;
+        const distance = currentView === 'round' 
+          ? \`\${item.distance} km\` 
+          : \`\${Math.round(item.totalDistance || item.total_distance || 0)} km total\`;
+        const score = currentView === 'round' 
+          ? \`\${(item.score || 0).toLocaleString()} pts\` 
+          : \`\${(item.totalScore || item.total_score || 0).toLocaleString()} pts\`;
 
         const isDonation = item.platform === 'geoindo' || item.platform === 'Tako' || (item.userId && item.userId.startsWith('geoindo_'));
         const donTag = isDonation ? '<span style="background: #10b981; color: #fff; font-size: 10px; font-weight: 900; padding: 1px 6px; border-radius: 99px; border: 1.5px solid #000; margin-left: 6px;">\u{1F4B8} DONASI</span>' : '';
@@ -187213,7 +187535,7 @@ var embeddedDashboardHtml = `<!DOCTYPE html>
         return;
       }
       localStorage.setItem('cg_last_yt_target', streamUrl);
-      await fetch('/api/youtube/connect', {
+      await apiFetch('/api/youtube/connect', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ streamUrl })
@@ -187221,12 +187543,12 @@ var embeddedDashboardHtml = `<!DOCTYPE html>
     }
 
     const savedTarget = localStorage.getItem('cg_last_yt_target');
-    if (savedTarget) {
+    if (savedTarget && document.getElementById('streamInput')) {
       document.getElementById('streamInput').value = savedTarget;
     }
 
     async function disconnectYouTube() {
-      await fetch('/api/youtube/disconnect', { method: 'POST' });
+      await apiFetch('/api/youtube/disconnect', { method: 'POST' });
     }
 
     async function connectTikTok() {
@@ -187236,7 +187558,7 @@ var embeddedDashboardHtml = `<!DOCTYPE html>
         return;
       }
       localStorage.setItem('cg_last_tt_target', username);
-      await fetch('/api/tiktok/connect', {
+      await apiFetch('/api/tiktok/connect', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username })
@@ -187249,7 +187571,7 @@ var embeddedDashboardHtml = `<!DOCTYPE html>
     }
 
     async function disconnectTikTok() {
-      await fetch('/api/tiktok/disconnect', { method: 'POST' });
+      await apiFetch('/api/tiktok/disconnect', { method: 'POST' });
     }
 
     async function connectGeoIndo() {
@@ -187259,7 +187581,7 @@ var embeddedDashboardHtml = `<!DOCTYPE html>
         return;
       }
       localStorage.setItem('cg_last_gi_target', input);
-      await fetch('/api/geoindo/connect', {
+      await apiFetch('/api/geoindo/connect', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ uid: input })
@@ -187272,29 +187594,66 @@ var embeddedDashboardHtml = `<!DOCTYPE html>
     }
 
     async function disconnectGeoIndo() {
-      await fetch('/api/geoindo/disconnect', { method: 'POST' });
+      await apiFetch('/api/geoindo/disconnect', { method: 'POST' });
     }
 
     async function toggleGuesses() {
       if (!currentState) return;
       const endpoint = currentState.guessesOpen ? '/api/game/close-guesses' : '/api/game/open-guesses';
-      await fetch(endpoint, { method: 'POST' });
+      await apiFetch(endpoint, { method: 'POST' });
     }
 
     async function toggleCoordinates() {
-      await fetch('/api/game/toggle-coordinates', { method: 'POST' });
+      await apiFetch('/api/game/toggle-coordinates', { method: 'POST' });
     }
 
     async function resetGame() {
-      if (confirm('Yakin ingin mereset papan skor game saat ini?')) {
-        await fetch('/api/game/reset', { method: 'POST' });
+      if (confirm('Yakin ingin mereset game dan papan skor?')) {
+        await apiFetch('/api/game/reset', { method: 'POST' });
       }
     }
 
-    function copyOverlayUrl() {
-      const overlayUrl = window.location.origin + '/overlay';
-      navigator.clipboard.writeText(overlayUrl);
-      alert('URL OBS Overlay berhasil disalin: ' + overlayUrl);
+    // Stream Connect Modal Handlers
+    function openStreamConnectModal() {
+      const modal = document.getElementById('streamConnectModal');
+      if (modal) modal.style.display = 'flex';
+    }
+
+    function closeStreamConnectModal() {
+      const modal = document.getElementById('streamConnectModal');
+      if (modal) modal.style.display = 'none';
+    }
+
+    function switchStreamTab(tab) {
+      const panelYt = document.getElementById('panelYt');
+      const panelTt = document.getElementById('panelTt');
+      const panelGi = document.getElementById('panelGi');
+      const tabBtnYt = document.getElementById('tabBtnYt');
+      const tabBtnTt = document.getElementById('tabBtnTt');
+      const tabBtnGi = document.getElementById('tabBtnGi');
+
+      if (tab === 'yt') {
+        panelYt.style.display = 'flex';
+        panelTt.style.display = 'none';
+        panelGi.style.display = 'none';
+        tabBtnYt.className = 'btn btn-yellow btn-sm';
+        tabBtnTt.className = 'btn btn-white btn-sm';
+        tabBtnGi.className = 'btn btn-white btn-sm';
+      } else if (tab === 'tt') {
+        panelYt.style.display = 'none';
+        panelTt.style.display = 'flex';
+        panelGi.style.display = 'none';
+        tabBtnYt.className = 'btn btn-white btn-sm';
+        tabBtnTt.className = 'btn btn-pink btn-sm';
+        tabBtnGi.className = 'btn btn-white btn-sm';
+      } else if (tab === 'gi') {
+        panelYt.style.display = 'none';
+        panelTt.style.display = 'none';
+        panelGi.style.display = 'flex';
+        tabBtnYt.className = 'btn btn-white btn-sm';
+        tabBtnTt.className = 'btn btn-white btn-sm';
+        tabBtnGi.className = 'btn btn-green btn-sm';
+      }
     }
 
     function openUserscriptModal() {
@@ -187386,725 +187745,21 @@ var embeddedDashboardHtml = `<!DOCTYPE html>
 </body>
 </html>
 `;
-var embeddedOverlayHtml = `<!DOCTYPE html>
-<html lang="id">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>MabarBang OBS Overlay</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@600;700;800;900&family=JetBrains+Mono:wght@700;800&display=swap" rel="stylesheet">
-  <script src="/socket.io/socket.io.js"></script>
-  <script>if (typeof io === 'undefined') { document.write('<script src="https://cdn.socket.io/4.8.4/socket.io.min.js"><\\/script>'); }</script>
-  <style>
-    :root {
-      --card-yellow: #ffe082;
-      --card-green: #c8f560;
-      --card-pink: #ffb3c6;
-      --card-blue: #70d6ff;
-      --card-coral: #ff5964;
-      --card-white: #ffffff;
-      --border-thick: 3.5px solid #000000;
-      --border-med: 2.5px solid #000000;
-      --shadow-solid: 6px 6px 0px #000000;
-      --radius-card: 20px;
-      --radius-pill: 9999px;
-    }
-
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-    }
-
-    body {
-      font-family: 'Plus Jakarta Sans', -apple-system, sans-serif;
-      background: transparent;
-      color: #000;
-      overflow: hidden;
-      width: 100vw;
-      height: 100vh;
-      display: flex;
-      justify-content: flex-end;
-      align-items: flex-start;
-      padding: 24px;
-    }
-
-    /* Scoreboard Widget */
-    .overlay-widget {
-      width: 360px;
-      background: var(--card-white);
-      border: var(--border-thick);
-      border-radius: var(--radius-card);
-      box-shadow: var(--shadow-solid);
-      display: flex;
-      flex-direction: column;
-      overflow: hidden;
-      animation: popIn 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
-    }
-
-    @keyframes popIn {
-      from { transform: scale(0.9) translateY(-10px); opacity: 0; }
-      to { transform: scale(1) translateY(0); opacity: 1; }
-    }
-
-    .widget-header {
-      padding: 12px 18px;
-      background: var(--card-yellow);
-      border-bottom: var(--border-thick);
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-
-    .header-left {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-
-    .header-logo {
-      width: 30px;
-      height: 30px;
-      background: var(--card-coral);
-      border: var(--border-med);
-      border-radius: 8px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-weight: 900;
-      font-size: 14px;
-      color: #fff;
-      box-shadow: 2px 2px 0px #000;
-      transform: rotate(-3deg);
-    }
-
-    .header-title {
-      font-size: 15px;
-      font-weight: 900;
-      letter-spacing: -0.4px;
-      color: #000;
-    }
-
-    .round-tag {
-      font-size: 11px;
-      font-weight: 900;
-      background: #ffffff;
-      border: 2px solid #000;
-      color: #000;
-      padding: 3px 10px;
-      border-radius: var(--radius-pill);
-      box-shadow: 2px 2px 0px #000;
-      font-family: 'JetBrains Mono', monospace;
-    }
-
-    .status-bar {
-      padding: 7px 18px;
-      background: var(--card-green);
-      border-bottom: 2px solid #000;
-      font-size: 11px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      font-weight: 800;
-      transition: background 0.2s ease;
-    }
-
-    .status-bar.closed {
-      background: #f1f5f9;
-      color: #64748b;
-    }
-
-    .status-badge {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-
-    .status-dot {
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      border: 1.5px solid #000;
-      background: #22c55e;
-    }
-
-    .status-bar.closed .status-dot {
-      background: #ef4444;
-    }
-
-    /* List Rows */
-    .players-list {
-      max-height: 480px;
-      overflow-y: auto;
-      display: flex;
-      flex-direction: column;
-      background: #ffffff;
-    }
-
-    .player-row {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 9px 14px;
-      border-bottom: 1.5px solid #e2e8f0;
-      animation: rowSlideIn 0.25s ease-out;
-    }
-
-    @keyframes rowSlideIn {
-      from { opacity: 0; transform: translateX(12px); }
-      to { opacity: 1; transform: translateX(0); }
-    }
-
-    .player-row:nth-child(even) {
-      background: #fafaf9;
-    }
-
-    .player-left {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      overflow: hidden;
-    }
-
-    .rank-pill {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      width: 24px;
-      height: 24px;
-      border-radius: 50%;
-      border: 2px solid #000;
-      box-shadow: 2px 2px 0px #000;
-      font-weight: 900;
-      font-size: 11px;
-      flex-shrink: 0;
-    }
-
-    .rank-1 { background: #ffd166; color: #000; }
-    .rank-2 { background: #70d6ff; color: #000; }
-    .rank-3 { background: #ff9ebb; color: #000; }
-    .rank-other { background: #e2e8f0; color: #000; }
-
-    .player-avatar {
-      width: 24px;
-      height: 24px;
-      border-radius: 50%;
-      object-fit: cover;
-      border: 1.5px solid #000;
-      background: #f1f5f9;
-      flex-shrink: 0;
-    }
-
-    .player-name {
-      font-size: 13px;
-      font-weight: 800;
-      color: #000;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      max-width: 140px;
-    }
-
-    .player-right {
-      display: flex;
-      flex-direction: column;
-      align-items: flex-end;
-      gap: 2px;
-      font-family: 'JetBrains Mono', monospace;
-    }
-
-    .player-score {
-      font-size: 12px;
-      font-weight: 900;
-      color: #000;
-      background: #bbf7d0;
-      border: 1.5px solid #000;
-      border-radius: 6px;
-      padding: 1px 6px;
-      box-shadow: 1.5px 1.5px 0px #000;
-    }
-
-    .player-dist {
-      font-size: 10px;
-      font-weight: 700;
-      color: #0369a1;
-      background: #e0f2fe;
-      border: 1px solid #000;
-      border-radius: 4px;
-      padding: 0 4px;
-    }
-
-    .empty-row {
-      padding: 24px 16px;
-      text-align: center;
-      font-size: 12px;
-      font-weight: 800;
-      color: #64748b;
-    }
-
-    /* Notification Toast */
-    .toast-container {
-      position: fixed;
-      bottom: 24px;
-      right: 24px;
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-      pointer-events: none;
-      z-index: 9999;
-    }
-
-    .toast {
-      background: #ffffff;
-      border: 2.5px solid #000000;
-      border-radius: 14px;
-      box-shadow: 4px 4px 0px #000000;
-      padding: 10px 16px;
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      color: #000;
-      animation: toastIn 0.3s cubic-bezier(0.16, 1, 0.3, 1), toastOut 0.3s cubic-bezier(0.16, 1, 0.3, 1) 3.7s forwards;
-    }
-
-    @keyframes toastIn {
-      from { opacity: 0; transform: translateY(20px) scale(0.95); }
-      to { opacity: 1; transform: translateY(0) scale(1); }
-    }
-
-    @keyframes toastOut {
-      from { opacity: 1; transform: translateY(0) scale(1); }
-      to { opacity: 0; transform: translateY(10px) scale(0.95); }
-    }
-
-    /* ==========================================================================
-       Solid Neobrutalism Intro Transition: MABAR BANG - kikobooo x arvana prod
-       ========================================================================== */
-    .intro-curtain {
-      position: fixed;
-      inset: 0;
-      z-index: 999999;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      overflow: hidden;
-      pointer-events: all;
-    }
-
-    .curtain-slab {
-      position: absolute;
-      left: 0;
-      width: 100%;
-      height: 50.5%;
-      z-index: 1;
-      transition: transform 0.65s cubic-bezier(0.85, 0, 0.15, 1);
-    }
-
-    .curtain-top {
-      top: 0;
-      background: #ffe082;
-      border-bottom: 5px solid #000;
-      background-image: radial-gradient(#000000 1.5px, transparent 1.5px);
-      background-size: 24px 24px;
-      transform: translateY(0);
-    }
-
-    .curtain-bottom {
-      bottom: 0;
-      background: #c8f560;
-      border-top: 5px solid #000;
-      background-image: radial-gradient(#000000 1.5px, transparent 1.5px);
-      background-size: 24px 24px;
-      transform: translateY(0);
-    }
-
-    .intro-curtain.dismissed .curtain-top {
-      transform: translateY(-101%);
-    }
-
-    .intro-curtain.dismissed .curtain-bottom {
-      transform: translateY(101%);
-    }
-
-    .intro-card-wrap {
-      position: relative;
-      z-index: 10;
-      padding: 20px;
-      transition: transform 0.45s cubic-bezier(0.85, 0, 0.15, 1), opacity 0.35s ease;
-    }
-
-    .intro-curtain.dismissed .intro-card-wrap {
-      transform: scale(0.6) rotate(-3deg);
-      opacity: 0;
-      pointer-events: none;
-    }
-
-    .intro-card {
-      background: #ffffff;
-      border: 4px solid #000000;
-      border-radius: 28px;
-      box-shadow: 10px 10px 0px #000000;
-      padding: 36px 28px 28px;
-      max-width: 520px;
-      width: 90vw;
-      text-align: center;
-      position: relative;
-      animation: popIntro 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
-    }
-
-    @keyframes popIntro {
-      0% {
-        transform: scale(0.6) rotate(-6deg);
-        opacity: 0;
-      }
-      70% {
-        transform: scale(1.04) rotate(1deg);
-      }
-      100% {
-        transform: scale(1) rotate(0deg);
-        opacity: 1;
-      }
-    }
-
-    .intro-sticker {
-      position: absolute;
-      font-size: 11px;
-      font-weight: 900;
-      border: 2px solid #000;
-      border-radius: var(--radius-pill);
-      padding: 3px 10px;
-      box-shadow: 2.5px 2.5px 0px #000;
-      letter-spacing: 0.5px;
-      z-index: 5;
-    }
-
-    .sticker-tl {
-      top: -12px;
-      left: 16px;
-      background: #70d6ff;
-      color: #000;
-      transform: rotate(-5deg);
-    }
-
-    .sticker-tr {
-      top: -12px;
-      right: 16px;
-      background: #c8f560;
-      color: #000;
-      transform: rotate(4deg);
-    }
-
-    .intro-starburst {
-      position: absolute;
-      top: -20px;
-      right: -14px;
-      font-size: 38px;
-      color: #ff5964;
-      line-height: 1;
-      text-shadow: 2px 2px 0px #000;
-      animation: spinStar 10s linear infinite;
-    }
-
-    @keyframes spinStar {
-      from { transform: rotate(0deg); }
-      to { transform: rotate(360deg); }
-    }
-
-    .intro-tag-pill {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      background: #f1f5f9;
-      border: 2px solid #000;
-      padding: 4px 12px;
-      border-radius: var(--radius-pill);
-      font-size: 10px;
-      font-weight: 800;
-      letter-spacing: 0.8px;
-      text-transform: uppercase;
-      box-shadow: 2px 2px 0px #000;
-      margin-bottom: 10px;
-    }
-
-    .intro-title {
-      font-size: clamp(34px, 7vw, 56px);
-      font-weight: 900;
-      letter-spacing: -2px;
-      color: #000000;
-      line-height: 1.05;
-      margin: 6px 0 14px;
-      text-transform: uppercase;
-      transform: rotate(-1.5deg);
-      text-shadow: 3px 3px 0px #ffe082, 5px 5px 0px #000000;
-    }
-
-    .intro-collab-badge {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      gap: 8px;
-      background: #ff5964;
-      color: #ffffff;
-      border: 2.5px solid #000000;
-      border-radius: var(--radius-pill);
-      padding: 8px 20px;
-      font-weight: 900;
-      font-size: 15px;
-      letter-spacing: 0.5px;
-      box-shadow: 3.5px 3.5px 0px #000000;
-      margin-bottom: 14px;
-      transform: rotate(1deg);
-    }
-
-    .collab-x {
-      color: #ffe082;
-      font-size: 13px;
-      font-weight: 900;
-    }
-
-    .intro-subtext {
-      font-size: 12px;
-      font-weight: 700;
-      color: #475569;
-      margin-bottom: 18px;
-    }
-
-    .intro-bar-outer {
-      width: 100%;
-      max-width: 240px;
-      height: 12px;
-      background: #f8fafc;
-      border: 2px solid #000000;
-      border-radius: var(--radius-pill);
-      margin: 0 auto 16px;
-      overflow: hidden;
-      box-shadow: 2px 2px 0px #000000;
-    }
-
-    .intro-bar-inner {
-      height: 100%;
-      width: 0%;
-      background: repeating-linear-gradient(45deg, #c8f560, #c8f560 10px, #bbf7d0 10px, #bbf7d0 20px);
-      border-right: 2px solid #000000;
-      animation: fillProgress 1.6s ease-in-out forwards;
-    }
-
-    @keyframes fillProgress {
-      0% { width: 0%; }
-      60% { width: 75%; }
-      100% { width: 100%; }
-    }
-  </style>
-</head>
-<body>
-  <!-- Solid Neobrutalism Intro Curtain & Transition -->
-  <div id="intro-curtain" class="intro-curtain" onclick="dismissIntro()">
-    <div class="curtain-slab curtain-top"></div>
-    <div class="curtain-slab curtain-bottom"></div>
-
-    <div class="intro-card-wrap">
-      <div class="intro-card" onclick="event.stopPropagation()">
-        <div class="intro-sticker sticker-tl">\u2726 MABARBANG \u2726</div>
-        <div class="intro-sticker sticker-tr">\u2605 2026 EDITION \u2605</div>
-        <div class="intro-starburst">\u2739</div>
-
-        <div class="intro-tag-pill">
-          LIVE STREAMING ENGINE
-        </div>
-
-        <h1 class="intro-title">MABAR BANG</h1>
-
-        <div class="intro-collab-badge">
-          <span>\u26A1</span>
-          <span>kikobooo</span>
-          <span class="collab-x">\u2715</span>
-          <span>arvana prod</span>
-          <span>\u26A1</span>
-        </div>
-
-        <p class="intro-subtext">MabarBang \u2022 Interaktif YouTube Live Guessing Game</p>
-
-        <div class="intro-bar-outer">
-          <div class="intro-bar-inner"></div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <div class="overlay-widget">
-    <div class="widget-header">
-      <div class="header-left">
-        <div class="header-logo">\u25B6</div>
-        <div class="header-title" id="mapTitle">MabarBang Live</div>
-      </div>
-      <div class="round-tag" id="roundTag">R1 / 5</div>
-    </div>
-
-    <div class="status-bar" id="statusBar">
-      <div class="status-badge">
-        <span class="status-dot"></span>
-        <span id="statusText">Guesses Closed</span>
-      </div>
-      <div style="font-weight: 800;" id="totalGuessesText">0 Guesses</div>
-    </div>
-
-    <div class="players-list" id="playersList">
-      <div class="empty-row">Ketik <code>!g lat, lng</code> atau <code>!g [negara]</code> di chat!</div>
-    </div>
-  </div>
-
-  <div class="toast-container" id="toastContainer"></div>
-
-  <script>
-    const socket = io();
-    let currentState = null;
-
-    // Intro Transition handling
-    const urlParams = new URLSearchParams(window.location.search);
-    const disableIntro = urlParams.get('intro') === '0';
-
-    let introDismissed = false;
-    function dismissIntro() {
-      if (introDismissed) return;
-      introDismissed = true;
-      const curtain = document.getElementById('intro-curtain');
-      if (!curtain) return;
-      curtain.classList.add('dismissed');
-      setTimeout(() => {
-        curtain.style.display = 'none';
-        curtain.style.pointerEvents = 'none';
-      }, 700);
-    }
-
-    if (disableIntro) {
-      const curtain = document.getElementById('intro-curtain');
-      if (curtain) curtain.style.display = 'none';
-    } else {
-      setTimeout(() => {
-        dismissIntro();
-      }, 1800);
-    }
-
-    socket.on('state-update', (state) => {
-      currentState = state;
-      renderOverlay();
-    });
-
-    socket.on('guess-added', ({ guess, totalGuesses }) => {
-      showToast(guess);
-      document.getElementById('totalGuessesText').textContent = totalGuesses + ' Guesses';
-    });
-
-    socket.on('guesses-batch', ({ guesses, totalGuesses }) => {
-      if (Array.isArray(guesses) && guesses.length > 0) {
-        // Only toast the latest 2 guesses to prevent OBS DOM clutter
-        const recent = guesses.slice(-2);
-        recent.forEach((g) => showToast(g));
-      }
-      document.getElementById('totalGuessesText').textContent = totalGuesses + ' Guesses';
-    });
-
-    function renderOverlay() {
-      if (!currentState) return;
-
-      document.getElementById('mapTitle').textContent = currentState.mapName || 'GeoGuessr';
-      document.getElementById('roundTag').textContent = \`R\${currentState.round} / 5\`;
-
-      const statusBar = document.getElementById('statusBar');
-      const statusText = document.getElementById('statusText');
-
-      if (currentState.guessesOpen) {
-        statusBar.className = 'status-bar';
-        statusText.textContent = 'Guesses Open';
-      } else {
-        statusBar.className = 'status-bar closed';
-        statusText.textContent = 'Guesses Closed';
-      }
-
-      const list = currentState.roundGuesses || [];
-      document.getElementById('totalGuessesText').textContent = list.length + ' Guesses';
-
-      const container = document.getElementById('playersList');
-      if (list.length === 0) {
-        container.innerHTML = '<div class="empty-row">Ketik <code>!g [negara/kota]</code> di YouTube chat!</div>';
-        return;
-      }
-
-      let html = '';
-      list.slice(0, 10).forEach((p, idx) => {
-        const rank = idx + 1;
-        let rankClass = 'rank-other';
-        if (rank === 1) rankClass = 'rank-1';
-        else if (rank === 2) rankClass = 'rank-2';
-        else if (rank === 3) rankClass = 'rank-3';
-
-        const avatar = p.avatar ? \`<img class="player-avatar" src="\${p.avatar}" alt="" />\` : \`<div class="player-avatar" style="display:flex;align-items:center;justify-content:center;font-size:10px;">\u{1F464}</div>\`;
-        const isDonation = p.platform === 'geoindo' || p.platform === 'Tako' || (p.userId && p.userId.startsWith('geoindo_'));
-        const donBadge = isDonation ? '<span style="background: #10b981; color: #fff; font-size: 8px; font-weight: 900; padding: 1px 4px; border-radius: 99px; border: 1px solid #000; margin-left: 4px;">\u{1F4B8}</span>' : '';
-
-        html += \`
-          <div class="player-row" style="\${isDonation ? 'background: #f0fdf4;' : ''}">
-            <div class="player-left">
-              <span class="rank-pill \${rankClass}">\${rank}</span>
-              \${avatar}
-              <span class="player-name">\${escapeHtml(p.username)}</span>
-              \${donBadge}
-            </div>
-            <div class="player-right">
-              <span class="player-score">\${p.score.toLocaleString()}</span>
-              <span class="player-dist">\${p.distance} km</span>
-            </div>
-          </div>
-        \`;
-      });
-
-      container.innerHTML = html;
-    }
-
-    function showToast(guess) {
-      const container = document.getElementById('toastContainer');
-      // Limit max 4 toasts on screen
-      while (container.children.length >= 4) {
-        container.removeChild(container.firstChild);
-      }
-      const toast = document.createElement('div');
-      toast.className = 'toast';
-      toast.innerHTML = \`
-        <span style="font-size: 18px;">\u{1F3AF}</span>
-        <div>
-          <strong style="font-size: 13px; color: #000;">\${escapeHtml(guess.username)}</strong>
-          <div style="font-size: 11px; font-weight: 800; color: #059669; font-family: 'JetBrains Mono', monospace;">
-            \${guess.score} pts \u2022 \${guess.distance} km
-          </div>
-        </div>
-      \`;
-      container.appendChild(toast);
-      setTimeout(() => {
-        toast.remove();
-      }, 4000);
-    }
-
-    function escapeHtml(str) {
-      if (!str) return '';
-      return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-    }
-  </script>
-</body>
-</html>
-`;
 var embeddedUserscript = `// ==UserScript==
 // @name         AHUNG SERVER MabarBang YouTube 
 // @namespace    http://tampermonkey.net/
-// @version      2.8.1
+// @version      3.3.0
 // @description  Otomatis mengirim data ronde GeoGuessr ke Railway/Local, menampilkan Scoreboard Overlay & PIN tebakan penonton di peta GeoGuessr
 // @author       MabarBang
 // @match        *://*.geoguessr.com/*
 // @run-at       document-start
 // @grant        GM_setValue
 // @grant        GM_getValue
+// @grant        GM_xmlhttpRequest
 // @grant        unsafeWindow
+// @connect      localhost
+// @connect      127.0.0.1
+// @connect      geoindo.up.railway.app
 // @require      https://cdn.socket.io/4.7.5/socket.io.min.js
 // @updateURL    https://geoindo.up.railway.app/chatguessr.user.js
 // @downloadURL  https://geoindo.up.railway.app/chatguessr.user.js
@@ -188118,6 +187773,8 @@ var embeddedUserscript = `// ==UserScript==
   const LOCAL_SERVER_URL = 'http://localhost:5050';
 
   let serverUrl = LOCAL_SERVER_URL;
+  let streamerId = '';
+
   try {
     const saved =
       typeof GM_getValue !== 'undefined'
@@ -188125,6 +187782,16 @@ var embeddedUserscript = `// ==UserScript==
         : localStorage.getItem('cg_server_url');
     if (saved && saved.trim()) {
       serverUrl = saved.trim();
+    }
+  } catch (_) { }
+
+  try {
+    const savedStreamer =
+      typeof GM_getValue !== 'undefined'
+        ? GM_getValue('cg_streamer_id')
+        : localStorage.getItem('cg_streamer_id');
+    if (savedStreamer && savedStreamer.trim()) {
+      streamerId = savedStreamer.trim();
     }
   } catch (_) { }
 
@@ -188147,6 +187814,16 @@ var embeddedUserscript = `// ==UserScript==
     updateServerModeUI();
     initSocket();
     showToast(\`Server: \${modeName || serverUrl}\`);
+  }
+
+  function setStreamerId(newId) {
+    streamerId = (newId || '').trim();
+    if (typeof GM_setValue !== 'undefined') GM_setValue('cg_streamer_id', streamerId);
+    try {
+      localStorage.setItem('cg_streamer_id', streamerId);
+    } catch (_) { }
+    initSocket();
+    showToast(streamerId ? \`Streamer ID: \${streamerId}\` : 'Streamer ID di-reset');
   }
 
   function showToast(msg) {
@@ -188816,10 +188493,31 @@ var embeddedUserscript = `// ==UserScript==
 
   function sendToServer(payload) {
     const targetUrl = serverUrl.replace(/\\/$/, '') + '/api/geoguessr/update';
+    const bodyStr = JSON.stringify({
+      ...payload,
+      streamerId: streamerId || undefined
+    });
+
+    if (typeof GM_xmlhttpRequest !== 'undefined') {
+      GM_xmlhttpRequest({
+        method: 'POST',
+        url: targetUrl,
+        headers: { 'Content-Type': 'application/json' },
+        data: bodyStr,
+        onload: (res) => {
+          updateBadgeStatus(res.status >= 200 && res.status < 300);
+        },
+        onerror: () => {
+          updateBadgeStatus(false);
+        }
+      });
+      return;
+    }
+
     (win.fetch || fetch)(targetUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
+      body: bodyStr
     })
       .then((res) => {
         updateBadgeStatus(res.ok);
@@ -188849,6 +188547,11 @@ var embeddedUserscript = `// ==UserScript==
 
       socket.on('connect', () => {
         console.log('[ChatGuessr] Connected to Socket.IO server at', serverUrl);
+        if (streamerId) {
+          socket.emit('join-streamer', streamerId, 'In-Game Overlay');
+        } else {
+          socket.emit('request-state');
+        }
         updateBadgeStatus(true);
       });
 
@@ -188858,6 +188561,10 @@ var embeddedUserscript = `// ==UserScript==
       });
 
       socket.on('state-update', (state) => {
+        // If userscript is tied to a specific streamer ID, filter out updates from other streamers
+        if (streamerId && state.streamerId && state.streamerId !== 'default' && state.streamerId !== streamerId) {
+          return;
+        }
         currentState = state;
         renderNativeOverlay();
       });
@@ -188898,6 +188605,166 @@ var embeddedUserscript = `// ==UserScript==
     const style = document.createElement('style');
     style.id = 'cg-overlay-styles';
     style.textContent = \`
+      /* Fullscreen Curtain & Intro Card */
+      #cg-intro-curtain {
+        position: fixed;
+        inset: 0;
+        z-index: 9999999;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden;
+        pointer-events: all;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      }
+      .cg-curtain-slab {
+        position: absolute;
+        left: 0;
+        width: 100%;
+        height: 50.5%;
+        z-index: 1;
+        transition: transform 0.65s cubic-bezier(0.85, 0, 0.15, 1);
+      }
+      .cg-curtain-top {
+        top: 0;
+        background: #ffe082;
+        border-bottom: 5px solid #000000;
+        background-image: radial-gradient(#000000 1.5px, transparent 1.5px);
+        background-size: 24px 24px;
+        transform: translateY(0);
+      }
+      .cg-curtain-bottom {
+        bottom: 0;
+        background: #c8f560;
+        border-top: 5px solid #000000;
+        background-image: radial-gradient(#000000 1.5px, transparent 1.5px);
+        background-size: 24px 24px;
+        transform: translateY(0);
+      }
+      #cg-intro-curtain.dismissed .cg-curtain-top {
+        transform: translateY(-101%);
+      }
+      #cg-intro-curtain.dismissed .cg-curtain-bottom {
+        transform: translateY(101%);
+      }
+      .cg-intro-card-wrap {
+        position: relative;
+        z-index: 10;
+        padding: 20px;
+        transition: transform 0.5s cubic-bezier(0.85, 0, 0.15, 1), opacity 0.4s ease;
+      }
+      #cg-intro-curtain.dismissed .cg-intro-card-wrap {
+        transform: scale(0.3) translate(80vw, -80vh);
+        opacity: 0;
+        pointer-events: none;
+      }
+      .cg-intro-card {
+        background: #ffffff;
+        border: 4px solid #000000;
+        border-radius: 28px;
+        box-shadow: 10px 10px 0px #000000;
+        padding: 34px 28px 26px;
+        max-width: 500px;
+        width: 90vw;
+        text-align: center;
+        position: relative;
+        animation: cgPopIntro 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+      }
+      @keyframes cgPopIntro {
+        0% { transform: scale(0.6) rotate(-6deg); opacity: 0; }
+        70% { transform: scale(1.04) rotate(1deg); }
+        100% { transform: scale(1) rotate(0deg); opacity: 1; }
+      }
+      .cg-intro-sticker {
+        position: absolute;
+        font-size: 11px;
+        font-weight: 900;
+        border: 2px solid #000;
+        border-radius: 999px;
+        padding: 3px 10px;
+        box-shadow: 2.5px 2.5px 0px #000;
+        letter-spacing: 0.5px;
+      }
+      .cg-sticker-tl {
+        top: -12px;
+        left: 16px;
+        background: #70d6ff;
+        color: #000;
+        transform: rotate(-5deg);
+      }
+      .cg-sticker-tr {
+        top: -12px;
+        right: 16px;
+        background: #c8f560;
+        color: #000;
+        transform: rotate(4deg);
+      }
+      .cg-intro-title {
+        font-size: clamp(32px, 6vw, 50px);
+        font-weight: 900;
+        letter-spacing: -1.5px;
+        color: #000000;
+        line-height: 1.05;
+        margin: 6px 0 12px;
+        text-transform: uppercase;
+        transform: rotate(-1.5deg);
+        text-shadow: 3px 3px 0px #ffe082, 5px 5px 0px #000000;
+      }
+      .cg-intro-badge {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        background: #ff5964;
+        color: #ffffff;
+        border: 2.5px solid #000000;
+        border-radius: 999px;
+        padding: 6px 16px;
+        font-weight: 900;
+        font-size: 13px;
+        box-shadow: 3px 3px 0px #000000;
+        margin-bottom: 12px;
+      }
+      .cg-intro-bar-outer {
+        width: 100%;
+        max-width: 240px;
+        height: 12px;
+        background: #f8fafc;
+        border: 2px solid #000000;
+        border-radius: 999px;
+        margin: 0 auto 14px;
+        overflow: hidden;
+        box-shadow: 2px 2px 0px #000000;
+      }
+      .cg-intro-bar-inner {
+        height: 100%;
+        width: 0%;
+        background: repeating-linear-gradient(45deg, #c8f560, #c8f560 10px, #bbf7d0 10px, #bbf7d0 20px);
+        border-right: 2px solid #000000;
+        animation: cgFillProgress 1.5s ease-in-out forwards;
+      }
+      @keyframes cgFillProgress {
+        0% { width: 0%; }
+        60% { width: 75%; }
+        100% { width: 100%; }
+      }
+      .cg-intro-btn {
+        background: #000000;
+        color: #ffffff;
+        border: 2.5px solid #000000;
+        border-radius: 999px;
+        padding: 10px 28px;
+        font-size: 14px;
+        font-weight: 900;
+        cursor: pointer;
+        box-shadow: 4px 4px 0px #ff5964;
+        transition: transform 0.15s ease;
+      }
+      .cg-intro-btn:hover {
+        transform: translate(-2px, -2px);
+      }
+
+      /* Native Scoreboard Widget */
       #cg-native-widget {
         position: fixed;
         top: 20px;
@@ -188912,9 +188779,15 @@ var embeddedUserscript = `// ==UserScript==
         z-index: 999999;
         overflow: hidden;
         user-select: none;
-        animation: cgWidgetPopIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+        opacity: 0;
+        transform: scale(0.65) translateY(-32px) rotate(-4deg);
         transform-origin: top center;
         touch-action: none;
+        transition: opacity 0.4s ease, transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+      }
+      #cg-native-widget.cg-shown {
+        opacity: 1;
+        transform: scale(1) translateY(0) rotate(0deg);
       }
       #cg-native-widget.cg-dragging {
         transition: none !important;
@@ -188925,20 +188798,6 @@ var embeddedUserscript = `// ==UserScript==
       }
       #cg-native-widget.cg-dragging .cg-header {
         cursor: grabbing !important;
-      }
-      @keyframes cgWidgetPopIn {
-        0% {
-          opacity: 0;
-          transform: scale(0.65) translateY(-32px) rotate(-4deg);
-        }
-        70% {
-          opacity: 1;
-          transform: scale(1.04) translateY(2px) rotate(1deg);
-        }
-        100% {
-          opacity: 1;
-          transform: scale(1) translateY(0) rotate(0deg);
-        }
       }
       #cg-native-widget.minimized .cg-content-body {
         display: none !important;
@@ -189143,6 +189002,59 @@ var embeddedUserscript = `// ==UserScript==
     const toastBox = document.createElement('div');
     toastBox.id = 'cg-toast-box';
     document.body.appendChild(toastBox);
+
+    // Fullscreen Intro Curtain (Preloader that morphs/shrinks into the top-right overlay)
+    const curtain = document.createElement('div');
+    curtain.id = 'cg-intro-curtain';
+    curtain.innerHTML = \`
+      <div class="cg-curtain-slab cg-curtain-top"></div>
+      <div class="cg-curtain-slab cg-curtain-bottom"></div>
+      <div class="cg-intro-card-wrap">
+        <div class="cg-intro-card">
+          <div class="cg-intro-sticker cg-sticker-tl">\u2726 MABARBANG \u2726</div>
+          <div class="cg-intro-sticker cg-sticker-tr">\u2605 2026 EDITION \u2605</div>
+          <h1 class="cg-intro-title">MABAR BANG</h1>
+          <div class="cg-intro-badge">
+            <span>\u26A1</span>
+            <span>kikobooo</span>
+            <span style="color:#ffe082;">\u2715</span>
+            <span>arvana prod</span>
+            <span>\u26A1</span>
+          </div>
+          <div class="cg-intro-bar-outer">
+            <div class="cg-intro-bar-inner"></div>
+          </div>
+          <button class="cg-intro-btn" id="cg-intro-btn-start">GASKEUN! \u2794</button>
+        </div>
+      </div>
+    \`;
+    document.body.appendChild(curtain);
+
+    let introDismissed = false;
+    const dismissIntro = () => {
+      if (introDismissed) return;
+      introDismissed = true;
+      curtain.classList.add('dismissed');
+
+      // Munculkan & kecilkan ke widget overlay di pojok kanan atas
+      setTimeout(() => {
+        widget.classList.add('cg-shown');
+      }, 200);
+
+      setTimeout(() => {
+        curtain.remove();
+      }, 700);
+    };
+
+    // Klik tombol / klik curtain untuk skip intro
+    curtain.onclick = dismissIntro;
+    const startBtn = document.getElementById('cg-intro-btn-start');
+    if (startBtn) startBtn.onclick = (e) => { e.stopPropagation(); dismissIntro(); };
+
+    // Otomatis mengecil ke overlay setelah 1.8 detik
+    setTimeout(() => {
+      dismissIntro();
+    }, 1800);
 
     // Pin Toggle Action
     const pinBtn = document.getElementById('cg-btn-pins');
@@ -189546,6 +189458,36 @@ var embeddedUserscript = `// ==UserScript==
               </div>
               <span style="font-size: 13px;">\${currentMode === 'custom' ? '\u2713' : '\u270E'}</span>
             </button>
+
+            <!-- Streamer ID Configuration (Multi-User) -->
+            <div style="margin-top: 8px; padding-top: 10px; border-top: 2px dashed #000;">
+              <div style="font-size: 12px; font-weight: 900; margin-bottom: 4px; display: flex; align-items: center; justify-content: space-between;">
+                <span>\u{1F464} Streamer ID (Multi-User)</span>
+                <span style="font-size: 10px; color: #64748b;">\${streamerId ? 'Tersimpan' : 'Default / Auto'}</span>
+              </div>
+              <div style="display: flex; gap: 6px;">
+                <input type="text" id="cg-input-streamer-id" placeholder="UID Streamer Supabase" value="\${streamerId || ''}" style="
+                  flex: 1;
+                  padding: 8px 10px;
+                  background: #fff;
+                  border: 2px solid #000;
+                  border-radius: 8px;
+                  font-size: 11px;
+                  font-weight: 700;
+                  outline: none;
+                ">
+                <button id="cg-btn-save-streamer" style="
+                  background: #c8f560;
+                  border: 2px solid #000;
+                  border-radius: 8px;
+                  padding: 8px 12px;
+                  font-size: 11px;
+                  font-weight: 900;
+                  cursor: pointer;
+                  box-shadow: 2px 2px 0px #000;
+                ">Simpan</button>
+              </div>
+            </div>
           </div>
         </div>
       \`;
@@ -189553,6 +189495,15 @@ var embeddedUserscript = `// ==UserScript==
       document.getElementById('cg-close-modal').onclick = () => {
         modal.style.display = 'none';
       };
+
+      const btnSaveStreamer = document.getElementById('cg-btn-save-streamer');
+      if (btnSaveStreamer) {
+        btnSaveStreamer.onclick = () => {
+          const val = document.getElementById('cg-input-streamer-id').value.trim();
+          setStreamerId(val);
+          renderModalContent();
+        };
+      }
 
       document.getElementById('cg-btn-local').onclick = () => {
         setServerUrl(LOCAL_SERVER_URL, 'Local (5050)');
@@ -189723,51 +189674,115 @@ var embeddedUserscript = `// ==UserScript==
 `;
 
 // src/server/supabase.ts
-var SUPABASE_URL = process.env.SUPABASE_URL || "https://REDACTED_PROJECT.supabase.co";
-var SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || "REDACTED_SERVICE_KEY";
-async function saveSessionLeaderboard(sessionCode, mapName, leaderboard, totalRounds = 5) {
-  if (!sessionCode || !leaderboard || leaderboard.length === 0) return;
+var getSupabaseUrl = () => process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "";
+var getSupabaseKey = () => process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || "";
+async function verifySupabaseUser(token) {
+  if (!token) return null;
+  const supabaseUrl = getSupabaseUrl();
+  const supabaseKey = getSupabaseKey();
+  if (!supabaseUrl || !supabaseKey) {
+    console.warn("[Supabase] Missing SUPABASE_URL or SUPABASE_KEY in environment");
+    return null;
+  }
   try {
-    const sessionRes = await fetch(`${SUPABASE_URL}/rest/v1/game_sessions`, {
+    const res = await fetch(`${supabaseUrl}/auth/v1/user`, {
+      headers: {
+        apikey: supabaseKey,
+        Authorization: `Bearer ${token}`
+      }
+    });
+    if (!res.ok) return null;
+    return await res.json();
+  } catch (err2) {
+    console.error("[Supabase] Auth verify error:", err2);
+    return null;
+  }
+}
+async function saveSessionLeaderboard(sessionCode, mapName, leaderboard, totalRounds = 5, streamerId) {
+  if (!sessionCode || !leaderboard || leaderboard.length === 0) return;
+  const supabaseUrl = getSupabaseUrl();
+  const supabaseKey = getSupabaseKey();
+  if (!supabaseUrl || !supabaseKey) return;
+  try {
+    const sessionPayload = {
+      session_code: sessionCode,
+      map_name: mapName,
+      total_rounds: totalRounds
+    };
+    if (streamerId && streamerId !== "default") {
+      sessionPayload.streamer_id = streamerId;
+    }
+    let sessionRes = await fetch(`${supabaseUrl}/rest/v1/game_sessions`, {
       method: "POST",
       headers: {
-        apikey: SUPABASE_KEY,
-        Authorization: `Bearer ${SUPABASE_KEY}`,
+        apikey: supabaseKey,
+        Authorization: `Bearer ${supabaseKey}`,
         "Content-Type": "application/json",
         Prefer: "resolution=merge-duplicates,return=representation"
       },
-      body: JSON.stringify({
-        session_code: sessionCode,
-        map_name: mapName,
-        total_rounds: totalRounds
-      })
+      body: JSON.stringify(sessionPayload)
     });
+    if (!sessionRes.ok && sessionPayload.streamer_id) {
+      delete sessionPayload.streamer_id;
+      sessionRes = await fetch(`${supabaseUrl}/rest/v1/game_sessions`, {
+        method: "POST",
+        headers: {
+          apikey: supabaseKey,
+          Authorization: `Bearer ${supabaseKey}`,
+          "Content-Type": "application/json",
+          Prefer: "resolution=merge-duplicates,return=representation"
+        },
+        body: JSON.stringify(sessionPayload)
+      });
+    }
     let sessionId = null;
     if (sessionRes.ok) {
       const sessionData = await sessionRes.json();
       sessionId = sessionData?.[0]?.id || null;
     }
-    const rows = leaderboard.map((entry, index) => ({
-      session_code: sessionCode,
-      session_id: sessionId,
-      user_id: entry.userId,
-      username: entry.username,
-      avatar: entry.avatar || null,
-      total_score: entry.totalScore,
-      total_distance: entry.totalDistance,
-      rounds_count: entry.roundsCount,
-      rank: index + 1
-    }));
-    const lbRes = await fetch(`${SUPABASE_URL}/rest/v1/leaderboards`, {
+    const rows = leaderboard.map((entry, index) => {
+      const row = {
+        session_code: sessionCode,
+        session_id: sessionId,
+        user_id: entry.userId,
+        username: entry.username,
+        avatar: entry.avatar || null,
+        total_score: entry.totalScore,
+        total_distance: entry.totalDistance,
+        rounds_count: entry.roundsCount,
+        rank: index + 1
+      };
+      if (streamerId && streamerId !== "default") {
+        row.streamer_id = streamerId;
+      }
+      return row;
+    });
+    let lbRes = await fetch(`${supabaseUrl}/rest/v1/leaderboards`, {
       method: "POST",
       headers: {
-        apikey: SUPABASE_KEY,
-        Authorization: `Bearer ${SUPABASE_KEY}`,
+        apikey: supabaseKey,
+        Authorization: `Bearer ${supabaseKey}`,
         "Content-Type": "application/json",
         Prefer: "resolution=merge-duplicates"
       },
       body: JSON.stringify(rows)
     });
+    if (!lbRes.ok && rows[0]?.streamer_id) {
+      const fallbackRows = rows.map((r) => {
+        const { streamer_id, ...rest } = r;
+        return rest;
+      });
+      lbRes = await fetch(`${supabaseUrl}/rest/v1/leaderboards`, {
+        method: "POST",
+        headers: {
+          apikey: supabaseKey,
+          Authorization: `Bearer ${supabaseKey}`,
+          "Content-Type": "application/json",
+          Prefer: "resolution=merge-duplicates"
+        },
+        body: JSON.stringify(fallbackRows)
+      });
+    }
     if (!lbRes.ok) {
       const errText = await lbRes.text();
       console.error(`[Supabase] Failed to save leaderboard:`, errText);
@@ -189780,8 +189795,62 @@ async function saveSessionLeaderboard(sessionCode, mapName, leaderboard, totalRo
     console.error(`[Supabase] Error saving session leaderboard:`, err2);
   }
 }
+async function getStreamerLeaderboardHistory(streamerId) {
+  if (!streamerId) return [];
+  const supabaseUrl = getSupabaseUrl();
+  const supabaseKey = getSupabaseKey();
+  if (!supabaseUrl || !supabaseKey) return [];
+  try {
+    let res = await fetch(
+      `${supabaseUrl}/rest/v1/leaderboards?streamer_id=eq.${encodeURIComponent(streamerId)}&select=session_code,username,user_id,avatar,total_score,total_distance,rounds_count,rank,created_at&order=total_score.desc&limit=100`,
+      {
+        headers: {
+          apikey: supabaseKey,
+          Authorization: `Bearer ${supabaseKey}`
+        }
+      }
+    );
+    if (!res.ok) {
+      res = await fetch(
+        `${supabaseUrl}/rest/v1/leaderboards?session_code=like.session_${encodeURIComponent(streamerId)}_*&select=session_code,username,user_id,avatar,total_score,total_distance,rounds_count,rank,created_at&order=total_score.desc&limit=100`,
+        {
+          headers: {
+            apikey: supabaseKey,
+            Authorization: `Bearer ${supabaseKey}`
+          }
+        }
+      );
+    }
+    if (!res.ok) {
+      const err2 = await res.text();
+      console.error("[Supabase] Failed to fetch streamer leaderboard:", err2);
+      return [];
+    }
+    return await res.json();
+  } catch (err2) {
+    console.error("[Supabase] Error getting streamer leaderboard history:", err2);
+    return [];
+  }
+}
 
 // src/server/index.ts
+var envPath = import_path3.default.resolve(process.cwd(), ".env");
+if (import_fs.default.existsSync(envPath)) {
+  const envContent = import_fs.default.readFileSync(envPath, "utf8");
+  envContent.split("\n").forEach((line) => {
+    const trimmed = line.trim();
+    if (trimmed && !trimmed.startsWith("#")) {
+      const eqIdx = trimmed.indexOf("=");
+      if (eqIdx !== -1) {
+        const k = trimmed.substring(0, eqIdx).trim();
+        const v = trimmed.substring(eqIdx + 1).trim();
+        if (k && !process.env[k]) {
+          process.env[k] = v;
+        }
+      }
+    }
+  });
+}
 var app = (0, import_express.default)();
 var server = import_http5.default.createServer(app);
 var io2 = new Server(server, {
@@ -189791,7 +189860,8 @@ var io2 = new Server(server, {
   }
 });
 app.use((0, import_cors.default)());
-app.use(import_express.default.json());
+app.use(import_express.default.json({ limit: "50mb" }));
+app.use(import_express.default.urlencoded({ extended: true, limit: "50mb" }));
 app.use((_req, res, next) => {
   res.removeHeader("X-Frame-Options");
   res.setHeader("Content-Security-Policy", "frame-ancestors *");
@@ -189833,8 +189903,11 @@ var GameServerManager = class {
   geoindoUid = "";
   geoindoStatus = "disconnected";
   geoindoError = "";
+  streamerId = "default";
+  streamerName = "Streamer";
+  streamerEmail = "";
   token = null;
-  sessionCode = `session_${Date.now()}`;
+  sessionCode = `session_default_${Date.now()}`;
   mapName = "GeoGuessr Map";
   mapScale = 2e3;
   maxErrorDistance;
@@ -189859,7 +189932,9 @@ var GameServerManager = class {
   guessBatchQueue = [];
   batchIntervalTimer = null;
   stateBroadcastTimer = null;
-  constructor() {
+  constructor(streamerId = "default") {
+    this.streamerId = streamerId;
+    this.sessionCode = `session_${this.streamerId}_${Date.now()}`;
     this.batchIntervalTimer = setInterval(() => {
       this.flushGuessBatch();
     }, 250);
@@ -189872,18 +189947,28 @@ var GameServerManager = class {
       }
     }, 3e5);
   }
+  getRoomName() {
+    return `streamer_${this.streamerId}`;
+  }
   flushGuessBatch() {
     if (this.guessBatchQueue.length === 0) return;
     const batch = this.guessBatchQueue.splice(0);
-    io2.emit("guesses-batch", {
+    const payload = {
+      streamerId: this.streamerId,
       guesses: batch,
       totalGuesses: Object.keys(this.roundGuesses).length
-    });
-    const latest = batch[batch.length - 1];
-    io2.emit("guess-added", {
-      guess: latest,
+    };
+    const singlePayload = {
+      streamerId: this.streamerId,
+      guess: batch[batch.length - 1],
       totalGuesses: Object.keys(this.roundGuesses).length
-    });
+    };
+    io2.to(this.getRoomName()).emit("guesses-batch", payload);
+    io2.to(this.getRoomName()).emit("guess-added", singlePayload);
+    if (this.streamerId === "default" || getActiveStreamerCount() === 1) {
+      io2.emit("guesses-batch", payload);
+      io2.emit("guess-added", singlePayload);
+    }
   }
   // History of rounds in current game
   roundsHistory = [];
@@ -189915,8 +190000,9 @@ var GameServerManager = class {
       });
       this.youtubeBackend.on("error", (err2) => {
         this.youtubeStatus = "error";
-        this.youtubeError = err2?.message || String(err2);
-        console.error(`[Server] YouTube Live chat error:`, err2);
+        const errMsg = err2?.message || String(err2);
+        this.youtubeError = errMsg;
+        console.warn(`[Server] YouTube Live chat error: ${errMsg}`);
         this.broadcastState();
       });
       this.youtubeBackend.on("guess", (userstate, message) => {
@@ -190069,25 +190155,21 @@ var GameServerManager = class {
   }
   async handleChatGuess(userstate, message) {
     if (!this.guessesOpen) {
-      console.log(`[Guess Ignored] Guesses are closed: "${message}"`);
       return;
     }
     const userId = userstate["user-id"] || userstate.username || "unknown";
     const now = Date.now();
     const lastGuess = this.userLastGuessTime[userId] || 0;
     if (now - lastGuess < 5e3) {
-      console.log(`[Guess Rate-Limited] ${userId} sent guess within 5 seconds`);
       return;
     }
     this.userLastGuessTime[userId] = now;
     const clean = message.replace(/^!g\s*/i, "").trim();
     if (!this.allowCoordinates && parseCoordinates(clean)) {
-      console.log(`[Guess Ignored] Raw coordinates guessing is disabled: "${clean}" by ${userId}`);
       return;
     }
     const coords = await resolveLocation(clean);
     if (!coords) {
-      console.log(`[Guess Ignored] Could not resolve coordinates for: "${clean}"`);
       return;
     }
     const targetLoc = this.roundLocation || { lat: -6.2088, lng: 106.8456 };
@@ -190139,14 +190221,19 @@ var GameServerManager = class {
     }
     this.streamerStats.roundScore = 0;
     this.streamerStats.roundDistance = 0;
-    io2.emit("round-started", {
+    const roundPayload = {
+      streamerId: this.streamerId,
       round: this.round,
       location: this.roundLocation,
       mapName: this.mapName
-    });
+    };
+    io2.to(this.getRoomName()).emit("round-started", roundPayload);
+    if (this.streamerId === "default" || getActiveStreamerCount() === 1) {
+      io2.emit("round-started", roundPayload);
+    }
     this.broadcastState();
     console.log(
-      `[Server] Round ${this.round} started at lat: ${location.lat}, lng: ${location.lng}`
+      `[Server] [Streamer: ${this.streamerName}] Round ${this.round} started at lat: ${location.lat}, lng: ${location.lng}`
     );
   }
   finishRound() {
@@ -190178,36 +190265,59 @@ var GameServerManager = class {
       if (b.score !== a2.score) return b.score - a2.score;
       return a2.distance - b.distance;
     });
-    io2.emit("round-finished", {
+    const roundFinishedPayload = {
+      streamerId: this.streamerId,
       round: this.round,
       location: this.roundLocation,
       results: sortedRoundResults,
       leaderboard: this.getSortedLeaderboard()
-    });
+    };
+    io2.to(this.getRoomName()).emit("round-finished", roundFinishedPayload);
+    if (this.streamerId === "default" || getActiveStreamerCount() === 1) {
+      io2.emit("round-finished", roundFinishedPayload);
+    }
     const currentLb = this.getSortedLeaderboard();
     if (currentLb.length > 0) {
-      saveSessionLeaderboard(this.sessionCode, this.mapName, currentLb, 5);
+      saveSessionLeaderboard(this.sessionCode, this.mapName, currentLb, 5, this.streamerId);
     }
     this.broadcastState();
     console.log(
-      `[Server] Round ${this.round} finished. Total guesses: ${sortedRoundResults.length}`
+      `[Server] [Streamer: ${this.streamerName}] Round ${this.round} finished. Total guesses: ${sortedRoundResults.length}`
     );
   }
   finishGame() {
     this.finishRound();
     this.isFinished = true;
     const finalLb = this.getSortedLeaderboard();
-    io2.emit("game-finished", {
+    const gameFinishedPayload = {
+      streamerId: this.streamerId,
       rounds: this.roundsHistory,
       leaderboard: finalLb
-    });
+    };
+    io2.to(this.getRoomName()).emit("game-finished", gameFinishedPayload);
+    if (this.streamerId === "default" || getActiveStreamerCount() === 1) {
+      io2.emit("game-finished", gameFinishedPayload);
+    }
     if (finalLb.length > 0) {
-      saveSessionLeaderboard(this.sessionCode, this.mapName, finalLb, 5);
+      saveSessionLeaderboard(this.sessionCode, this.mapName, finalLb, 5, this.streamerId);
     }
     this.broadcastState();
   }
+  setStreamerUser(user) {
+    if (!user || !user.id) return;
+    const isDifferent = this.streamerId !== user.id;
+    this.streamerId = user.id;
+    this.streamerEmail = user.email || "";
+    this.streamerName = user.name || user.email?.split("@")[0] || "Streamer";
+    if (isDifferent) {
+      console.log(`[Server] Switched active streamer to: ${this.streamerName} (${this.streamerId})`);
+      this.resetGame();
+    } else {
+      this.broadcastState();
+    }
+  }
   resetGame() {
-    this.sessionCode = `session_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    this.sessionCode = `session_${this.streamerId}_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
     this.round = 1;
     this.roundGuesses = {};
     this.gameLeaderboard = {};
@@ -190232,6 +190342,9 @@ var GameServerManager = class {
   }
   getState() {
     return {
+      streamerId: this.streamerId,
+      streamerName: this.streamerName,
+      streamerEmail: this.streamerEmail,
       youtubeStreamTarget: this.youtubeStreamTarget,
       youtubeStatus: this.youtubeStatus,
       youtubeError: this.youtubeError,
@@ -190266,12 +190379,81 @@ var GameServerManager = class {
       clearTimeout(this.stateBroadcastTimer);
       this.stateBroadcastTimer = null;
     }
-    io2.emit("state-update", this.getState());
+    const state = this.getState();
+    io2.to(this.getRoomName()).emit("state-update", state);
+    if (this.streamerId === "default" || getActiveStreamerCount() === 1) {
+      io2.emit("state-update", state);
+    }
   }
 };
-var manager = new GameServerManager();
-app.get("/api/state", (_req, res) => {
-  res.json(manager.getState());
+var streamerRooms = /* @__PURE__ */ new Map();
+var defaultManager = new GameServerManager("default");
+streamerRooms.set("default", defaultManager);
+function getActiveStreamerCount() {
+  return streamerRooms.size;
+}
+function getManagerForStreamer(streamerId) {
+  const cleanId = (streamerId || "").trim();
+  if (!cleanId || cleanId === "default") {
+    return defaultManager;
+  }
+  let mgr = streamerRooms.get(cleanId);
+  if (!mgr) {
+    mgr = new GameServerManager(cleanId);
+    streamerRooms.set(cleanId, mgr);
+  }
+  return mgr;
+}
+function resolveManagerFromReq(req) {
+  const queryId = req.query.streamerId || req.query.streamer;
+  const bodyId = req.body?.streamerId || req.body?.streamer;
+  const headerId = req.headers["x-streamer-id"];
+  const targetId = (queryId || bodyId || headerId || "").trim();
+  return getManagerForStreamer(targetId);
+}
+app.get("/api/state", (req, res) => {
+  const mgr = resolveManagerFromReq(req);
+  res.json(mgr.getState());
+});
+app.get("/api/auth/config", (_req, res) => {
+  res.json({
+    supabaseUrl: process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || "https://REDACTED_PROJECT.supabase.co",
+    supabaseAnonKey: process.env.VITE_SUPABASE_ANON_KEY || "REDACTED_ANON_KEY"
+  });
+});
+app.post("/api/auth/sync", async (req, res) => {
+  const token = req.headers.authorization?.replace(/^Bearer\s+/i, "") || req.body?.accessToken;
+  if (!token) {
+    res.status(401).json({ error: "Token missing" });
+    return;
+  }
+  const user = await verifySupabaseUser(token);
+  if (!user || !user.id) {
+    res.status(401).json({ error: "Invalid or expired Supabase token" });
+    return;
+  }
+  const streamerName = user.user_metadata?.full_name || user.user_metadata?.name || user.user_metadata?.user_name || user.email?.split("@")[0] || "Streamer";
+  const mgr = getManagerForStreamer(user.id);
+  mgr.setStreamerUser({
+    id: user.id,
+    email: user.email,
+    name: streamerName
+  });
+  res.json({
+    success: true,
+    streamer: {
+      id: mgr.streamerId,
+      name: mgr.streamerName,
+      email: mgr.streamerEmail
+    },
+    state: mgr.getState()
+  });
+});
+app.get("/api/leaderboard/history", async (req, res) => {
+  const mgr = resolveManagerFromReq(req);
+  const streamerId = req.query.streamerId || mgr.streamerId;
+  const history = await getStreamerLeaderboardHistory(streamerId);
+  res.json({ streamerId, history });
 });
 app.post("/api/youtube/connect", (req, res) => {
   const { streamUrl } = req.body;
@@ -190279,13 +190461,15 @@ app.post("/api/youtube/connect", (req, res) => {
     res.status(400).json({ error: "streamUrl is required" });
     return;
   }
-  manager.connectYouTube(streamUrl);
-  res.json({ success: true, state: manager.getState() });
+  const mgr = resolveManagerFromReq(req);
+  mgr.connectYouTube(streamUrl);
+  res.json({ success: true, state: mgr.getState() });
   return;
 });
-app.post("/api/youtube/disconnect", (_req, res) => {
-  manager.disconnectYouTube();
-  res.json({ success: true, state: manager.getState() });
+app.post("/api/youtube/disconnect", (req, res) => {
+  const mgr = resolveManagerFromReq(req);
+  mgr.disconnectYouTube();
+  res.json({ success: true, state: mgr.getState() });
 });
 app.post("/api/tiktok/connect", (req, res) => {
   const { username } = req.body;
@@ -190293,12 +190477,14 @@ app.post("/api/tiktok/connect", (req, res) => {
     res.status(400).json({ error: "username is required" });
     return;
   }
-  manager.connectTikTok(username);
-  res.json({ success: true, state: manager.getState() });
+  const mgr = resolveManagerFromReq(req);
+  mgr.connectTikTok(username);
+  res.json({ success: true, state: mgr.getState() });
 });
-app.post("/api/tiktok/disconnect", (_req, res) => {
-  manager.disconnectTikTok();
-  res.json({ success: true, state: manager.getState() });
+app.post("/api/tiktok/disconnect", (req, res) => {
+  const mgr = resolveManagerFromReq(req);
+  mgr.disconnectTikTok();
+  res.json({ success: true, state: mgr.getState() });
 });
 app.post("/api/geoindo/connect", (req, res) => {
   const { uid } = req.body;
@@ -190306,12 +190492,14 @@ app.post("/api/geoindo/connect", (req, res) => {
     res.status(400).json({ error: "uid is required" });
     return;
   }
-  manager.connectGeoIndo(uid);
-  res.json({ success: true, state: manager.getState() });
+  const mgr = resolveManagerFromReq(req);
+  mgr.connectGeoIndo(uid);
+  res.json({ success: true, state: mgr.getState() });
 });
-app.post("/api/geoindo/disconnect", (_req, res) => {
-  manager.disconnectGeoIndo();
-  res.json({ success: true, state: manager.getState() });
+app.post("/api/geoindo/disconnect", (req, res) => {
+  const mgr = resolveManagerFromReq(req);
+  mgr.disconnectGeoIndo();
+  res.json({ success: true, state: mgr.getState() });
 });
 app.post("/api/geoguessr/update", (req, res) => {
   const {
@@ -190323,35 +190511,37 @@ app.post("/api/geoguessr/update", (req, res) => {
     maxErrorDistance,
     streamerGuess,
     roundFinished,
-    gameFinished
+    gameFinished,
+    streamerId
   } = req.body;
-  if (mapName) manager.mapName = mapName;
-  if (token && manager.token && token !== manager.token) {
-    console.log(`[Server] New game detected (${manager.token} -> ${token}), resetting game state`);
-    manager.resetGame();
+  const mgr = getManagerForStreamer(streamerId);
+  if (mapName) mgr.mapName = mapName;
+  if (token && mgr.token && token !== mgr.token) {
+    console.log(`[Server] [Streamer: ${mgr.streamerName}] New game detected (${mgr.token} -> ${token}), resetting game state`);
+    mgr.resetGame();
   }
-  if (token) manager.token = token;
+  if (token) mgr.token = token;
   if (bounds) {
     const scale = haversineDistance(bounds.min, bounds.max) / 7.458421;
-    manager.mapScale = scale || 2e3;
+    mgr.mapScale = scale || 2e3;
   }
-  if (maxErrorDistance) manager.maxErrorDistance = maxErrorDistance;
+  if (maxErrorDistance) mgr.maxErrorDistance = maxErrorDistance;
   if (streamerGuess) {
     const rScore = typeof streamerGuess.score === "number" ? streamerGuess.score : 0;
     const rDist = typeof streamerGuess.distance === "number" ? streamerGuess.distance : 0;
-    const currentR = round || manager.round;
-    manager.streamerStats.roundScore = rScore;
-    manager.streamerStats.roundDistance = rDist;
-    manager.streamerStats.totalScore = typeof streamerGuess.totalScore === "number" ? streamerGuess.totalScore : manager.streamerStats.totalScore + rScore;
-    manager.streamerStats.totalDistance = typeof streamerGuess.totalDistance === "number" ? streamerGuess.totalDistance : manager.streamerStats.totalDistance + rDist;
-    manager.streamerStats.roundsCount = currentR;
-    manager.streamerStats.history.push({
+    const currentR = round || mgr.round;
+    mgr.streamerStats.roundScore = rScore;
+    mgr.streamerStats.roundDistance = rDist;
+    mgr.streamerStats.totalScore = typeof streamerGuess.totalScore === "number" ? streamerGuess.totalScore : mgr.streamerStats.totalScore + rScore;
+    mgr.streamerStats.totalDistance = typeof streamerGuess.totalDistance === "number" ? streamerGuess.totalDistance : mgr.streamerStats.totalDistance + rDist;
+    mgr.streamerStats.roundsCount = currentR;
+    mgr.streamerStats.history.push({
       round: currentR,
       score: rScore,
       distance: rDist
     });
-    const streamerPosition = typeof streamerGuess.lat === "number" && typeof streamerGuess.lng === "number" ? { lat: streamerGuess.lat, lng: streamerGuess.lng } : manager.roundLocation || { lat: 0, lng: 0 };
-    manager.roundGuesses["streamer"] = {
+    const streamerPosition = typeof streamerGuess.lat === "number" && typeof streamerGuess.lng === "number" ? { lat: streamerGuess.lat, lng: streamerGuess.lng } : mgr.roundLocation || { lat: 0, lng: 0 };
+    mgr.roundGuesses["streamer"] = {
       userId: "streamer",
       username: "\u{1F451} Streamer",
       avatar: "",
@@ -190361,40 +190551,84 @@ app.post("/api/geoguessr/update", (req, res) => {
       time: Date.now()
     };
     console.log(
-      `[Server] Streamer Guess inserted into answers: ${rScore} pts (${rDist} km).`
+      `[Server] [Streamer: ${mgr.streamerName}] Streamer Guess inserted into answers: ${rScore} pts (${rDist} km).`
     );
   }
   if (gameFinished) {
-    manager.finishGame();
+    mgr.finishGame();
   } else if (roundFinished) {
-    manager.finishRound();
+    mgr.finishRound();
   } else if (location && round) {
-    manager.startNewRound(round, location);
+    mgr.startNewRound(round, location);
   }
-  res.json({ success: true, state: manager.getState() });
+  res.json({ success: true, state: mgr.getState() });
 });
-app.post("/api/game/open-guesses", (_req, res) => {
-  manager.guessesOpen = true;
-  manager.broadcastState();
+app.post("/api/game/open-guesses", (req, res) => {
+  const mgr = resolveManagerFromReq(req);
+  mgr.guessesOpen = true;
+  mgr.broadcastState();
   res.json({ success: true });
 });
-app.post("/api/game/close-guesses", (_req, res) => {
-  manager.guessesOpen = false;
-  manager.broadcastState();
+app.post("/api/game/close-guesses", (req, res) => {
+  const mgr = resolveManagerFromReq(req);
+  mgr.guessesOpen = false;
+  mgr.broadcastState();
   res.json({ success: true });
 });
-app.post("/api/game/reset", (_req, res) => {
-  manager.resetGame();
+app.post("/api/game/reset", (req, res) => {
+  const mgr = resolveManagerFromReq(req);
+  mgr.resetGame();
   res.json({ success: true });
 });
 app.post("/api/game/toggle-coordinates", (req, res) => {
+  const mgr = resolveManagerFromReq(req);
   if (typeof req.body?.allow === "boolean") {
-    manager.allowCoordinates = req.body.allow;
+    mgr.allowCoordinates = req.body.allow;
   } else {
-    manager.allowCoordinates = !manager.allowCoordinates;
+    mgr.allowCoordinates = !mgr.allowCoordinates;
   }
-  manager.broadcastState();
-  res.json({ success: true, allowCoordinates: manager.allowCoordinates });
+  mgr.broadcastState();
+  res.json({ success: true, allowCoordinates: mgr.allowCoordinates });
+});
+app.post("/api/test/inject-pins", (req, res) => {
+  const { pins, location, round, mapName, streamerId } = req.body;
+  if (!Array.isArray(pins) || pins.length === 0) {
+    res.status(400).json({ error: "pins array is required" });
+    return;
+  }
+  const mgr = getManagerForStreamer(streamerId);
+  if (mapName) mgr.mapName = mapName;
+  if (round) mgr.round = round;
+  if (location) mgr.roundLocation = location;
+  mgr.guessesOpen = true;
+  for (const p of pins) {
+    mgr.roundGuesses[p.userId] = {
+      userId: p.userId,
+      username: p.username,
+      avatar: p.avatar || "",
+      position: p.position,
+      distance: p.distance,
+      score: p.score,
+      time: p.time || Date.now()
+    };
+  }
+  mgr.broadcastState();
+  const roundFinishedPayload = {
+    streamerId: mgr.streamerId,
+    round: mgr.round,
+    location: mgr.roundLocation,
+    results: Object.values(mgr.roundGuesses).sort((a2, b) => {
+      if (b.score !== a2.score) return b.score - a2.score;
+      return a2.distance - b.distance;
+    }),
+    leaderboard: mgr.getSortedLeaderboard()
+  };
+  io2.to(mgr.getRoomName()).emit("round-finished", roundFinishedPayload);
+  if (mgr.streamerId === "default" || getActiveStreamerCount() === 1) {
+    io2.emit("round-finished", roundFinishedPayload);
+  }
+  console.log(`[Test] Injected ${pins.length} pins into Round ${mgr.round}!`);
+  res.json({ success: true, total: Object.keys(mgr.roundGuesses).length, state: mgr.getState() });
 });
 app.get(["/dashboard", "/dashboard/"], (_req, res) => {
   const filePath = import_path3.default.join(publicDir, "dashboard/index.html");
@@ -190402,14 +190636,6 @@ app.get(["/dashboard", "/dashboard/"], (_req, res) => {
     res.sendFile(filePath);
   } else {
     res.setHeader("Content-Type", "text/html; charset=utf-8").send(embeddedDashboardHtml);
-  }
-});
-app.get(["/overlay", "/overlay/"], (_req, res) => {
-  const filePath = import_path3.default.join(publicDir, "overlay/index.html");
-  if (import_fs.default.existsSync(filePath)) {
-    res.sendFile(filePath);
-  } else {
-    res.setHeader("Content-Type", "text/html; charset=utf-8").send(embeddedOverlayHtml);
   }
 });
 app.get(["/chatguessr.user.js", "/userscript"], (_req, res) => {
@@ -190432,7 +190658,7 @@ app.get(["/chatguessr.user.js", "/userscript"], (_req, res) => {
 app.get("/", (_req, res) => {
   res.redirect("/dashboard");
 });
-var APP_VERSION = "3.2.0";
+var APP_VERSION = "3.3.0";
 var GITHUB_REPO = "PaddlePOPA96/geochat";
 var cachedUpdateInfo = {
   hasUpdate: false,
@@ -190501,10 +190727,30 @@ app.get("/api/update-info", (_req, res) => {
   res.json(cachedUpdateInfo);
 });
 io2.on("connection", (socket) => {
-  socket.emit("state-update", manager.getState());
+  let boundStreamerId = "default";
+  socket.on("join-streamer", (streamerId, clientType) => {
+    if (streamerId && typeof streamerId === "string") {
+      const cleanId = streamerId.trim();
+      const room = `streamer_${cleanId}`;
+      if (boundStreamerId !== cleanId) {
+        if (boundStreamerId !== "default") {
+          socket.leave(`streamer_${boundStreamerId}`);
+        }
+        boundStreamerId = cleanId;
+        socket.join(room);
+        const clientLabel = clientType ? ` (${clientType})` : "";
+        console.log(`[Streamer] ${cleanId.slice(0, 8)}... terhubung${clientLabel}`);
+      }
+      const mgr = getManagerForStreamer(boundStreamerId);
+      socket.emit("state-update", mgr.getState());
+    }
+  });
+  socket.emit("state-update", defaultManager.getState());
   socket.emit("update-info", cachedUpdateInfo);
-  socket.on("request-state", () => {
-    socket.emit("state-update", manager.getState());
+  socket.on("request-state", (streamerId) => {
+    const targetId = streamerId || boundStreamerId;
+    const mgr = getManagerForStreamer(targetId);
+    socket.emit("state-update", mgr.getState());
     socket.emit("update-info", cachedUpdateInfo);
   });
 });
@@ -190646,7 +190892,6 @@ Tekan tombol ENTER untuk keluar...`);
     server.listen(PORT, () => {
       console.log(`\u{1F680} MabarBang Server: Online (Port ${PORT})`);
       console.log(`\u{1F4F1} Streamer Dashboard : http://localhost:${PORT}/dashboard`);
-      console.log(`\u{1F4FA} OBS Studio Overlay : http://localhost:${PORT}/overlay`);
       console.log(`================================================================================`);
       if (!process.env.CI) {
         const url2 = `http://localhost:${PORT}/dashboard`;
@@ -190671,6 +190916,7 @@ Tekan tombol ENTER untuk keluar...`);
   GITHUB_REPO,
   calculateScore,
   checkForAppUpdates,
+  getManagerForStreamer,
   haversineDistance,
   parseCoordinates,
   resolveLocation

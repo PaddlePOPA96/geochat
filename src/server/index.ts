@@ -6,12 +6,31 @@ import path from 'path'
 import fs from 'fs'
 import os from 'os'
 import { exec } from 'child_process'
+
+// Auto load .env if present
+const envPath = path.resolve(process.cwd(), '.env')
+if (fs.existsSync(envPath)) {
+  const envContent = fs.readFileSync(envPath, 'utf8')
+  envContent.split('\n').forEach((line) => {
+    const trimmed = line.trim()
+    if (trimmed && !trimmed.startsWith('#')) {
+      const eqIdx = trimmed.indexOf('=')
+      if (eqIdx !== -1) {
+        const k = trimmed.substring(0, eqIdx).trim()
+        const v = trimmed.substring(eqIdx + 1).trim()
+        if (k && !process.env[k]) {
+          process.env[k] = v
+        }
+      }
+    }
+  })
+}
 import YouTubeBackend from '../main/utils/useYouTubeChat'
 import TikTokBackend from '../main/utils/useTikTokChat'
 import GeoIndoBackend from '../main/utils/useGeoIndoChat'
 import { resolveLocation, parseCoordinates } from '../shared/geocoding'
 import { embeddedDashboardHtml, embeddedOverlayHtml, embeddedUserscript } from './embeddedTemplates'
-import { saveSessionLeaderboard } from './supabase'
+import { saveSessionLeaderboard, verifySupabaseUser, getStreamerLeaderboardHistory } from './supabase'
 
 export { resolveLocation, parseCoordinates }
 
@@ -25,7 +44,8 @@ const io = new SocketIOServer(server, {
 })
 
 app.use(cors())
-app.use(express.json())
+app.use(express.json({ limit: '50mb' }))
+app.use(express.urlencoded({ extended: true, limit: '50mb' }))
 
 // Allow embedding overlay in GeoGuessr
 app.use((_req, res, next) => {
@@ -113,8 +133,12 @@ class GameServerManager {
   geoindoStatus: 'disconnected' | 'connecting' | 'connected' | 'error' = 'disconnected'
   geoindoError = ''
 
+  streamerId: string = 'default'
+  streamerName: string = 'Streamer'
+  streamerEmail: string = ''
+
   token: string | null = null
-  sessionCode: string = `session_${Date.now()}`
+  sessionCode: string = `session_default_${Date.now()}`
   mapName = 'GeoGuessr Map'
   mapScale = 2000
   maxErrorDistance?: number
@@ -150,7 +174,10 @@ class GameServerManager {
   batchIntervalTimer: NodeJS.Timeout | null = null
   stateBroadcastTimer: NodeJS.Timeout | null = null
 
-  constructor() {
+  constructor(streamerId: string = 'default') {
+    this.streamerId = streamerId
+    this.sessionCode = `session_${this.streamerId}_${Date.now()}`
+
     // Start flush timer: Flush guess batches every 250ms
     this.batchIntervalTimer = setInterval(() => {
       this.flushGuessBatch()
@@ -167,19 +194,33 @@ class GameServerManager {
     }, 300000)
   }
 
+  getRoomName() {
+    return `streamer_${this.streamerId}`
+  }
+
   flushGuessBatch() {
     if (this.guessBatchQueue.length === 0) return
     const batch = this.guessBatchQueue.splice(0)
-    io.emit('guesses-batch', {
+    const payload = {
+      streamerId: this.streamerId,
       guesses: batch,
       totalGuesses: Object.keys(this.roundGuesses).length
-    })
-    // Also emit guess-added with the latest guess for backward compatibility
-    const latest = batch[batch.length - 1]
-    io.emit('guess-added', {
-      guess: latest,
+    }
+    const singlePayload = {
+      streamerId: this.streamerId,
+      guess: batch[batch.length - 1],
       totalGuesses: Object.keys(this.roundGuesses).length
-    })
+    }
+
+    // Emit to targeted room
+    io.to(this.getRoomName()).emit('guesses-batch', payload)
+    io.to(this.getRoomName()).emit('guess-added', singlePayload)
+
+    // Also emit globally for backwards compatibility (local single-user mode)
+    if (this.streamerId === 'default' || getActiveStreamerCount() === 1) {
+      io.emit('guesses-batch', payload)
+      io.emit('guess-added', singlePayload)
+    }
   }
 
   // History of rounds in current game
@@ -223,8 +264,9 @@ class GameServerManager {
 
       this.youtubeBackend.on('error', (err: any) => {
         this.youtubeStatus = 'error'
-        this.youtubeError = err?.message || String(err)
-        console.error(`[Server] YouTube Live chat error:`, err)
+        const errMsg = err?.message || String(err)
+        this.youtubeError = errMsg
+        console.warn(`[Server] YouTube Live chat error: ${errMsg}`)
         this.broadcastState()
       })
 
@@ -404,7 +446,6 @@ class GameServerManager {
 
   async handleChatGuess(userstate: any, message: string) {
     if (!this.guessesOpen) {
-      console.log(`[Guess Ignored] Guesses are closed: "${message}"`)
       return
     }
 
@@ -412,7 +453,6 @@ class GameServerManager {
     const now = Date.now()
     const lastGuess = this.userLastGuessTime[userId] || 0
     if (now - lastGuess < 5000) {
-      console.log(`[Guess Rate-Limited] ${userId} sent guess within 5 seconds`)
       return
     }
     this.userLastGuessTime[userId] = now
@@ -421,13 +461,11 @@ class GameServerManager {
 
     // If coordinates are disabled, reject raw coordinate guesses (e.g. "-6.2088, 106.8456")
     if (!this.allowCoordinates && parseCoordinates(clean)) {
-      console.log(`[Guess Ignored] Raw coordinates guessing is disabled: "${clean}" by ${userId}`)
       return
     }
 
     const coords = await resolveLocation(clean)
     if (!coords) {
-      console.log(`[Guess Ignored] Could not resolve coordinates for: "${clean}"`)
       return
     }
 
@@ -506,15 +544,20 @@ class GameServerManager {
     this.streamerStats.roundScore = 0
     this.streamerStats.roundDistance = 0
 
-    io.emit('round-started', {
+    const roundPayload = {
+      streamerId: this.streamerId,
       round: this.round,
       location: this.roundLocation,
       mapName: this.mapName
-    })
+    }
+    io.to(this.getRoomName()).emit('round-started', roundPayload)
+    if (this.streamerId === 'default' || getActiveStreamerCount() === 1) {
+      io.emit('round-started', roundPayload)
+    }
 
     this.broadcastState()
     console.log(
-      `[Server] Round ${this.round} started at lat: ${location.lat}, lng: ${location.lng}`
+      `[Server] [Streamer: ${this.streamerName}] Round ${this.round} started at lat: ${location.lat}, lng: ${location.lng}`
     )
   }
 
@@ -553,22 +596,28 @@ class GameServerManager {
       return a.distance - b.distance
     })
 
-    io.emit('round-finished', {
+    const roundFinishedPayload = {
+      streamerId: this.streamerId,
       round: this.round,
       location: this.roundLocation,
       results: sortedRoundResults,
       leaderboard: this.getSortedLeaderboard()
-    })
+    }
+
+    io.to(this.getRoomName()).emit('round-finished', roundFinishedPayload)
+    if (this.streamerId === 'default' || getActiveStreamerCount() === 1) {
+      io.emit('round-finished', roundFinishedPayload)
+    }
 
     // Automatically sync leaderboard to Supabase for current unique session
     const currentLb = this.getSortedLeaderboard()
     if (currentLb.length > 0) {
-      saveSessionLeaderboard(this.sessionCode, this.mapName, currentLb, 5)
+      saveSessionLeaderboard(this.sessionCode, this.mapName, currentLb, 5, this.streamerId)
     }
 
     this.broadcastState()
     console.log(
-      `[Server] Round ${this.round} finished. Total guesses: ${sortedRoundResults.length}`
+      `[Server] [Streamer: ${this.streamerName}] Round ${this.round} finished. Total guesses: ${sortedRoundResults.length}`
     )
   }
 
@@ -576,18 +625,39 @@ class GameServerManager {
     this.finishRound()
     this.isFinished = true
     const finalLb = this.getSortedLeaderboard()
-    io.emit('game-finished', {
+    const gameFinishedPayload = {
+      streamerId: this.streamerId,
       rounds: this.roundsHistory,
       leaderboard: finalLb
-    })
+    }
+
+    io.to(this.getRoomName()).emit('game-finished', gameFinishedPayload)
+    if (this.streamerId === 'default' || getActiveStreamerCount() === 1) {
+      io.emit('game-finished', gameFinishedPayload)
+    }
+
     if (finalLb.length > 0) {
-      saveSessionLeaderboard(this.sessionCode, this.mapName, finalLb, 5)
+      saveSessionLeaderboard(this.sessionCode, this.mapName, finalLb, 5, this.streamerId)
     }
     this.broadcastState()
   }
 
+  setStreamerUser(user: { id: string; email?: string; name?: string }) {
+    if (!user || !user.id) return
+    const isDifferent = this.streamerId !== user.id
+    this.streamerId = user.id
+    this.streamerEmail = user.email || ''
+    this.streamerName = user.name || user.email?.split('@')[0] || 'Streamer'
+    if (isDifferent) {
+      console.log(`[Server] Switched active streamer to: ${this.streamerName} (${this.streamerId})`)
+      this.resetGame()
+    } else {
+      this.broadcastState()
+    }
+  }
+
   resetGame() {
-    this.sessionCode = `session_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`
+    this.sessionCode = `session_${this.streamerId}_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`
     this.round = 1
     this.roundGuesses = {}
     this.gameLeaderboard = {}
@@ -614,6 +684,9 @@ class GameServerManager {
 
   getState() {
     return {
+      streamerId: this.streamerId,
+      streamerName: this.streamerName,
+      streamerEmail: this.streamerEmail,
       youtubeStreamTarget: this.youtubeStreamTarget,
       youtubeStatus: this.youtubeStatus,
       youtubeError: this.youtubeError,
@@ -650,15 +723,103 @@ class GameServerManager {
       clearTimeout(this.stateBroadcastTimer)
       this.stateBroadcastTimer = null
     }
-    io.emit('state-update', this.getState())
+    const state = this.getState()
+    io.to(this.getRoomName()).emit('state-update', state)
+    if (this.streamerId === 'default' || getActiveStreamerCount() === 1) {
+      io.emit('state-update', state)
+    }
   }
 }
 
-const manager = new GameServerManager()
+// Multi-Tenant Rooms Map: streamerId -> GameServerManager
+const streamerRooms = new Map<string, GameServerManager>()
+const defaultManager = new GameServerManager('default')
+streamerRooms.set('default', defaultManager)
+
+function getActiveStreamerCount(): number {
+  return streamerRooms.size
+}
+
+export function getManagerForStreamer(streamerId?: string): GameServerManager {
+  const cleanId = (streamerId || '').trim()
+  if (!cleanId || cleanId === 'default') {
+    return defaultManager
+  }
+  let mgr = streamerRooms.get(cleanId)
+  if (!mgr) {
+    mgr = new GameServerManager(cleanId)
+    streamerRooms.set(cleanId, mgr)
+  }
+  return mgr
+}
+
+function resolveManagerFromReq(req: express.Request): GameServerManager {
+  const queryId = (req.query.streamerId || req.query.streamer) as string
+  const bodyId = (req.body?.streamerId || req.body?.streamer) as string
+  const headerId = req.headers['x-streamer-id'] as string
+  const targetId = (queryId || bodyId || headerId || '').trim()
+  return getManagerForStreamer(targetId)
+}
 
 // REST API Endpoints
-app.get('/api/state', (_req, res) => {
-  res.json(manager.getState())
+app.get('/api/state', (req, res) => {
+  const mgr = resolveManagerFromReq(req)
+  res.json(mgr.getState())
+})
+
+// Provide Supabase config from .env to frontend
+app.get('/api/auth/config', (_req, res) => {
+  res.json({
+    supabaseUrl: process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || 'https://REDACTED_PROJECT.supabase.co',
+    supabaseAnonKey: process.env.VITE_SUPABASE_ANON_KEY || 'REDACTED_ANON_KEY'
+  })
+})
+
+// Sync authenticated Supabase user
+app.post('/api/auth/sync', async (req, res) => {
+  const token = req.headers.authorization?.replace(/^Bearer\s+/i, '') || req.body?.accessToken
+  if (!token) {
+    res.status(401).json({ error: 'Token missing' })
+    return
+  }
+
+  const user = await verifySupabaseUser(token)
+  if (!user || !user.id) {
+    res.status(401).json({ error: 'Invalid or expired Supabase token' })
+    return
+  }
+
+  const streamerName =
+    user.user_metadata?.full_name ||
+    user.user_metadata?.name ||
+    user.user_metadata?.user_name ||
+    user.email?.split('@')[0] ||
+    'Streamer'
+
+  const mgr = getManagerForStreamer(user.id)
+  mgr.setStreamerUser({
+    id: user.id,
+    email: user.email,
+    name: streamerName
+  })
+
+  res.json({
+    success: true,
+    streamer: {
+      id: mgr.streamerId,
+      name: mgr.streamerName,
+      email: mgr.streamerEmail
+    },
+    state: mgr.getState()
+  })
+})
+
+// Get persistent leaderboard history for active or specified streamer
+app.get('/api/leaderboard/history', async (req, res) => {
+  const mgr = resolveManagerFromReq(req)
+  const streamerId = (req.query.streamerId as string) || mgr.streamerId
+  const history = await getStreamerLeaderboardHistory(streamerId)
+  res.json({ streamerId, history })
 })
 
 // YouTube Connect
@@ -668,14 +829,16 @@ app.post('/api/youtube/connect', (req, res) => {
     res.status(400).json({ error: 'streamUrl is required' })
     return
   }
-  manager.connectYouTube(streamUrl)
-  res.json({ success: true, state: manager.getState() })
+  const mgr = resolveManagerFromReq(req)
+  mgr.connectYouTube(streamUrl)
+  res.json({ success: true, state: mgr.getState() })
   return
 })
 
-app.post('/api/youtube/disconnect', (_req, res) => {
-  manager.disconnectYouTube()
-  res.json({ success: true, state: manager.getState() })
+app.post('/api/youtube/disconnect', (req, res) => {
+  const mgr = resolveManagerFromReq(req)
+  mgr.disconnectYouTube()
+  res.json({ success: true, state: mgr.getState() })
 })
 
 // TikTok Connect
@@ -685,13 +848,15 @@ app.post('/api/tiktok/connect', (req, res) => {
     res.status(400).json({ error: 'username is required' })
     return
   }
-  manager.connectTikTok(username)
-  res.json({ success: true, state: manager.getState() })
+  const mgr = resolveManagerFromReq(req)
+  mgr.connectTikTok(username)
+  res.json({ success: true, state: mgr.getState() })
 })
 
-app.post('/api/tiktok/disconnect', (_req, res) => {
-  manager.disconnectTikTok()
-  res.json({ success: true, state: manager.getState() })
+app.post('/api/tiktok/disconnect', (req, res) => {
+  const mgr = resolveManagerFromReq(req)
+  mgr.disconnectTikTok()
+  res.json({ success: true, state: mgr.getState() })
 })
 
 // GeoIndo Donation Stream Connect
@@ -701,13 +866,15 @@ app.post('/api/geoindo/connect', (req, res) => {
     res.status(400).json({ error: 'uid is required' })
     return
   }
-  manager.connectGeoIndo(uid)
-  res.json({ success: true, state: manager.getState() })
+  const mgr = resolveManagerFromReq(req)
+  mgr.connectGeoIndo(uid)
+  res.json({ success: true, state: mgr.getState() })
 })
 
-app.post('/api/geoindo/disconnect', (_req, res) => {
-  manager.disconnectGeoIndo()
-  res.json({ success: true, state: manager.getState() })
+app.post('/api/geoindo/disconnect', (req, res) => {
+  const mgr = resolveManagerFromReq(req)
+  mgr.disconnectGeoIndo()
+  res.json({ success: true, state: mgr.getState() })
 })
 
 // GeoGuessr Userscript Bridge Endpoint
@@ -721,36 +888,39 @@ app.post('/api/geoguessr/update', (req, res) => {
     maxErrorDistance,
     streamerGuess,
     roundFinished,
-    gameFinished
+    gameFinished,
+    streamerId
   } = req.body
 
-  if (mapName) manager.mapName = mapName
-  if (token && manager.token && token !== manager.token) {
-    console.log(`[Server] New game detected (${manager.token} -> ${token}), resetting game state`)
-    manager.resetGame()
+  const mgr = getManagerForStreamer(streamerId)
+
+  if (mapName) mgr.mapName = mapName
+  if (token && mgr.token && token !== mgr.token) {
+    console.log(`[Server] [Streamer: ${mgr.streamerName}] New game detected (${mgr.token} -> ${token}), resetting game state`)
+    mgr.resetGame()
   }
-  if (token) manager.token = token
+  if (token) mgr.token = token
   if (bounds) {
     const scale = haversineDistance(bounds.min, bounds.max) / 7.458421
-    manager.mapScale = scale || 2000
+    mgr.mapScale = scale || 2000
   }
-  if (maxErrorDistance) manager.maxErrorDistance = maxErrorDistance
+  if (maxErrorDistance) mgr.maxErrorDistance = maxErrorDistance
 
   if (streamerGuess) {
     const rScore = typeof streamerGuess.score === 'number' ? streamerGuess.score : 0
     const rDist = typeof streamerGuess.distance === 'number' ? streamerGuess.distance : 0
-    const currentR = round || manager.round
+    const currentR = round || mgr.round
 
-    manager.streamerStats.roundScore = rScore
-    manager.streamerStats.roundDistance = rDist
-    manager.streamerStats.totalScore = typeof streamerGuess.totalScore === 'number'
+    mgr.streamerStats.roundScore = rScore
+    mgr.streamerStats.roundDistance = rDist
+    mgr.streamerStats.totalScore = typeof streamerGuess.totalScore === 'number'
       ? streamerGuess.totalScore
-      : manager.streamerStats.totalScore + rScore
-    manager.streamerStats.totalDistance = typeof streamerGuess.totalDistance === 'number'
+      : mgr.streamerStats.totalScore + rScore
+    mgr.streamerStats.totalDistance = typeof streamerGuess.totalDistance === 'number'
       ? streamerGuess.totalDistance
-      : manager.streamerStats.totalDistance + rDist
-    manager.streamerStats.roundsCount = currentR
-    manager.streamerStats.history.push({
+      : mgr.streamerStats.totalDistance + rDist
+    mgr.streamerStats.roundsCount = currentR
+    mgr.streamerStats.history.push({
       round: currentR,
       score: rScore,
       distance: rDist
@@ -759,9 +929,9 @@ app.post('/api/geoguessr/update', (req, res) => {
     // Masukkan jawaban streamer langsung ke daftar tebakan (PlayerGuess)
     const streamerPosition = (typeof streamerGuess.lat === 'number' && typeof streamerGuess.lng === 'number')
       ? { lat: streamerGuess.lat, lng: streamerGuess.lng }
-      : (manager.roundLocation || { lat: 0, lng: 0 })
+      : (mgr.roundLocation || { lat: 0, lng: 0 })
 
-    manager.roundGuesses['streamer'] = {
+    mgr.roundGuesses['streamer'] = {
       userId: 'streamer',
       username: '👑 Streamer',
       avatar: '',
@@ -772,65 +942,111 @@ app.post('/api/geoguessr/update', (req, res) => {
     }
 
     console.log(
-      `[Server] Streamer Guess inserted into answers: ${rScore} pts (${rDist} km).`
+      `[Server] [Streamer: ${mgr.streamerName}] Streamer Guess inserted into answers: ${rScore} pts (${rDist} km).`
     )
   }
 
   if (gameFinished) {
-    manager.finishGame()
+    mgr.finishGame()
   } else if (roundFinished) {
-    manager.finishRound()
+    mgr.finishRound()
   } else if (location && round) {
-    manager.startNewRound(round, location)
+    mgr.startNewRound(round, location)
   }
 
-  res.json({ success: true, state: manager.getState() })
+  res.json({ success: true, state: mgr.getState() })
 })
 
 // Manual Controls
-app.post('/api/game/open-guesses', (_req, res) => {
-  manager.guessesOpen = true
-  manager.broadcastState()
+app.post('/api/game/open-guesses', (req, res) => {
+  const mgr = resolveManagerFromReq(req)
+  mgr.guessesOpen = true
+  mgr.broadcastState()
   res.json({ success: true })
 })
 
-app.post('/api/game/close-guesses', (_req, res) => {
-  manager.guessesOpen = false
-  manager.broadcastState()
+app.post('/api/game/close-guesses', (req, res) => {
+  const mgr = resolveManagerFromReq(req)
+  mgr.guessesOpen = false
+  mgr.broadcastState()
   res.json({ success: true })
 })
 
-app.post('/api/game/reset', (_req, res) => {
-  manager.resetGame()
+app.post('/api/game/reset', (req, res) => {
+  const mgr = resolveManagerFromReq(req)
+  mgr.resetGame()
   res.json({ success: true })
 })
 
 app.post('/api/game/toggle-coordinates', (req, res) => {
+  const mgr = resolveManagerFromReq(req)
   if (typeof req.body?.allow === 'boolean') {
-    manager.allowCoordinates = req.body.allow
+    mgr.allowCoordinates = req.body.allow
   } else {
-    manager.allowCoordinates = !manager.allowCoordinates
+    mgr.allowCoordinates = !mgr.allowCoordinates
   }
-  manager.broadcastState()
-  res.json({ success: true, allowCoordinates: manager.allowCoordinates })
+  mgr.broadcastState()
+  res.json({ success: true, allowCoordinates: mgr.allowCoordinates })
 })
 
-// Serve Dashboard & Overlay HTML routes
+// Test Bulk Pins Injection Endpoint (for stress test 1k / 10k pins)
+app.post('/api/test/inject-pins', (req, res) => {
+  const { pins, location, round, mapName, streamerId } = req.body
+  if (!Array.isArray(pins) || pins.length === 0) {
+    res.status(400).json({ error: 'pins array is required' })
+    return
+  }
+
+  const mgr = getManagerForStreamer(streamerId)
+
+  if (mapName) mgr.mapName = mapName
+  if (round) mgr.round = round
+  if (location) mgr.roundLocation = location
+  mgr.guessesOpen = true
+
+  // Inject pins into roundGuesses
+  for (const p of pins) {
+    mgr.roundGuesses[p.userId] = {
+      userId: p.userId,
+      username: p.username,
+      avatar: p.avatar || '',
+      position: p.position,
+      distance: p.distance,
+      score: p.score,
+      time: p.time || Date.now()
+    }
+  }
+
+  mgr.broadcastState()
+
+  // Emit event socket round-finished to room and userscript
+  const roundFinishedPayload = {
+    streamerId: mgr.streamerId,
+    round: mgr.round,
+    location: mgr.roundLocation,
+    results: Object.values(mgr.roundGuesses).sort((a, b) => {
+      if (b.score !== a.score) return b.score - a.score
+      return a.distance - b.distance
+    }),
+    leaderboard: mgr.getSortedLeaderboard()
+  }
+
+  io.to(mgr.getRoomName()).emit('round-finished', roundFinishedPayload)
+  if (mgr.streamerId === 'default' || getActiveStreamerCount() === 1) {
+    io.emit('round-finished', roundFinishedPayload)
+  }
+
+  console.log(`[Test] Injected ${pins.length} pins into Round ${mgr.round}!`)
+  res.json({ success: true, total: Object.keys(mgr.roundGuesses).length, state: mgr.getState() })
+})
+
+// Serve Dashboard & HTML routes
 app.get(['/dashboard', '/dashboard/'], (_req, res) => {
   const filePath = path.join(publicDir, 'dashboard/index.html')
   if (fs.existsSync(filePath)) {
     res.sendFile(filePath)
   } else {
     res.setHeader('Content-Type', 'text/html; charset=utf-8').send(embeddedDashboardHtml)
-  }
-})
-
-app.get(['/overlay', '/overlay/'], (_req, res) => {
-  const filePath = path.join(publicDir, 'overlay/index.html')
-  if (fs.existsSync(filePath)) {
-    res.sendFile(filePath)
-  } else {
-    res.setHeader('Content-Type', 'text/html; charset=utf-8').send(embeddedOverlayHtml)
   }
 })
 
@@ -857,7 +1073,7 @@ app.get('/', (_req, res) => {
   res.redirect('/dashboard')
 })
 
-export const APP_VERSION = '3.2.0'
+export const APP_VERSION = '3.3.0'
 export const GITHUB_REPO = 'PaddlePOPA96/geochat'
 
 export interface UpdateInfo {
@@ -948,12 +1164,35 @@ app.get('/api/update-info', (_req, res) => {
 
 // Socket.IO Events
 io.on('connection', (socket) => {
-  // Send current state immediately on connection
-  socket.emit('state-update', manager.getState())
+  let boundStreamerId = 'default'
+
+  // Join streamer-specific room
+  socket.on('join-streamer', (streamerId: string, clientType?: string) => {
+    if (streamerId && typeof streamerId === 'string') {
+      const cleanId = streamerId.trim()
+      const room = `streamer_${cleanId}`
+      if (boundStreamerId !== cleanId) {
+        if (boundStreamerId !== 'default') {
+          socket.leave(`streamer_${boundStreamerId}`)
+        }
+        boundStreamerId = cleanId
+        socket.join(room)
+        const clientLabel = clientType ? ` (${clientType})` : ''
+        console.log(`[Streamer] ${cleanId.slice(0, 8)}... terhubung${clientLabel}`)
+      }
+      const mgr = getManagerForStreamer(boundStreamerId)
+      socket.emit('state-update', mgr.getState())
+    }
+  })
+
+  // Send initial state immediately
+  socket.emit('state-update', defaultManager.getState())
   socket.emit('update-info', cachedUpdateInfo)
 
-  socket.on('request-state', () => {
-    socket.emit('state-update', manager.getState())
+  socket.on('request-state', (streamerId?: string) => {
+    const targetId = streamerId || boundStreamerId
+    const mgr = getManagerForStreamer(targetId)
+    socket.emit('state-update', mgr.getState())
     socket.emit('update-info', cachedUpdateInfo)
   })
 })
@@ -1108,7 +1347,6 @@ ${cPurple}geoguessr interactive program${cReset}
     server.listen(PORT, () => {
       console.log(`🚀 MabarBang Server: Online (Port ${PORT})`)
       console.log(`📱 Streamer Dashboard : http://localhost:${PORT}/dashboard`)
-      console.log(`📺 OBS Studio Overlay : http://localhost:${PORT}/overlay`)
       console.log(`================================================================================`)
 
       // Auto-open browser on desktop if not in CI

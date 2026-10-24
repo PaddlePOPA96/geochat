@@ -9,6 +9,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800;900&family=JetBrains+Mono:wght@600;700;800&display=swap" rel="stylesheet">
   <script src="/socket.io/socket.io.js"></script>
   <script>if (typeof io === 'undefined') { document.write('<script src="https://cdn.socket.io/4.8.4/socket.io.min.js"><\/script>'); }</script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
     :root {
       --bg-page: #9b87f5;
@@ -731,7 +732,49 @@
     </div>
   </div>
 
-  <div class="container">
+  <!-- Full-Page Auth Gatekeeper (Visible only if not logged in) -->
+  <div id="authGatekeeper" style="display: flex; min-height: 100vh; width: 100%; align-items: center; justify-content: center; padding: 24px;">
+    <div style="background: #ffffff; border: 4px solid #000; border-radius: 26px; box-shadow: 10px 10px 0px #000; width: 100%; max-width: 460px; padding: 34px; position: relative;">
+      <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 10px;">
+        <div style="width: 48px; height: 48px; background: #3ecf8e; border: 3px solid #000; border-radius: 14px; display: flex; align-items: center; justify-content: center; font-size: 24px; box-shadow: 3px 3px 0px #000;">⚡</div>
+        <div>
+          <h1 id="gateTitle" style="font-size: 24px; font-weight: 900; letter-spacing: -0.6px; margin: 0;">MabarBang Login</h1>
+          <p style="font-size: 13px; font-weight: 700; color: #4b5563; margin-top: 2px;">Masuk ke Dashboard Streamer Anda</p>
+        </div>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 16px; margin-top: 20px;">
+        <div id="gateNameGroup" style="display: none; flex-direction: column; gap: 6px;">
+          <label style="font-size: 13px; font-weight: 800;">Nama Streamer / Channel</label>
+          <input type="text" id="gateName" placeholder="Contoh: Arvana Gaming">
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 6px;">
+          <label style="font-size: 13px; font-weight: 800;">Email Akun</label>
+          <input type="text" id="gateEmail" placeholder="streamer@gmail.com">
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 6px;">
+          <label style="font-size: 13px; font-weight: 800;">Password</label>
+          <input type="password" id="gatePassword" style="width: 100%; padding: 12px 16px; background: #fff; border: var(--border-thick); border-radius: 14px; color: #000; font-family: inherit; font-size: 14px; font-weight: 700; outline: none; box-shadow: 3px 3px 0px #000;" placeholder="••••••••">
+        </div>
+
+        <div id="gateAlert" style="display: none; padding: 12px; background: #fee2e2; border: 2.5px solid #000; border-radius: 12px; color: #991b1b; font-size: 13px; font-weight: 800;"></div>
+
+        <button id="btnSubmitGate" class="btn btn-green" onclick="handleGateSubmit()" style="justify-content: center; padding: 15px; font-size: 16px; margin-top: 6px; box-shadow: 4px 4px 0px #000;">
+          <span id="btnSubmitGateText">Masuk Sekarang ➔</span>
+        </button>
+
+        <div style="text-align: center; font-size: 13px; font-weight: 800; color: #475569; margin-top: 6px;">
+          <span id="gateTogglePrompt">Belum punya akun?</span>
+          <a href="javascript:void(0)" id="gateToggleLink" onclick="toggleGateMode()" style="color: #4f46e5; text-decoration: underline; margin-left: 4px;">Daftar Akun Baru</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Dashboard Container (Only shown when authenticated) -->
+  <div class="container" id="mainDashboardContainer" style="display: none;">
     <!-- Update Alert Banner -->
     <div id="updateBanner" style="display: none; background: #ffe082; border: var(--border-thick); border-radius: var(--radius-card); box-shadow: var(--shadow-solid); padding: 14px 20px; align-items: center; justify-content: space-between; gap: 14px; animation: popIntro 0.4s ease;">
       <div style="display: flex; align-items: center; gap: 14px; flex-wrap: wrap;">
@@ -762,148 +805,153 @@
         </div>
       </div>
       <div class="header-actions">
-        <button class="btn btn-pink btn-sm" onclick="replayIntro()" title="Putar ulang transisi Mabar Bang">🎬 Intro Mabar</button>
-        <button class="btn btn-yellow btn-sm" onclick="copyOverlayUrl()">📋 Copy OBS Overlay URL</button>
+        <div id="authProfileBox" style="display: flex; align-items: center; gap: 10px; background: #f8fafc; border: var(--border-med); border-radius: var(--radius-pill); padding: 4px 14px; box-shadow: 2px 2px 0px #000;">
+          <span style="font-size: 18px;">👑</span>
+          <div style="text-align: left; line-height: 1.1;">
+            <div id="streamerNameText" style="font-size: 13px; font-weight: 900; color: #000;">Streamer</div>
+            <div id="streamerEmailText" style="font-size: 11px; font-weight: 700; color: #64748b;">user@supabase.co</div>
+          </div>
+          <button class="btn btn-yellow btn-sm" onclick="copyStreamerUid()" style="padding: 4px 10px; font-size: 11px; margin-left: 4px;" title="Salin Streamer UID (untuk Userscript GeoGuessr)">📋 Salin UID</button>
+          <button class="btn btn-red btn-sm" onclick="logoutSupabase()" style="padding: 4px 10px; font-size: 11px;" title="Keluar dari akun">Logout</button>
+        </div>
+        <button class="btn btn-yellow btn-sm" onclick="openStreamConnectModal()">📡 Koneksi Live Stream (YT / TikTok / Saweria)</button>
         <button class="btn btn-blue btn-sm" onclick="openUserscriptModal()">🧩 Userscript Setup</button>
       </div>
     </header>
 
-    <!-- Controls Grid -->
-    <div class="grid-2">
-      <!-- YouTube Connect Card -->
-      <div class="card card-yellow">
-        <div class="card-header">
-          <div class="card-title">
-            <span>📺</span> YouTube Live Stream
-          </div>
-          <span id="ytBadge" class="badge-pill badge-disconnected">
-            <span class="badge-dot"></span> <span id="ytBadgeText">Disconnected</span>
-          </span>
-        </div>
+    <!-- Modal Tunggal Koneksi Live Stream (YouTube, TikTok, GeoIndo) -->
+    <div id="streamConnectModal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.65); z-index: 999999; align-items: center; justify-content: center; padding: 20px;">
+      <div style="background: #ffffff; border: 4px solid #000; border-radius: 24px; box-shadow: 10px 10px 0px #000; width: 100%; max-width: 580px; padding: 26px; position: relative; animation: popIn 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);">
+        <button onclick="closeStreamConnectModal()" style="position: absolute; top: 18px; right: 18px; background: #ff5964; color: #fff; border: 2.5px solid #000; border-radius: 50%; width: 32px; height: 32px; font-weight: 900; cursor: pointer; box-shadow: 2px 2px 0px #000;">✕</button>
 
-        <p style="font-size: 13px; font-weight: 700; color: #1f2937;">
-          Masukkan link stream / popup chat / handle channel (@Arvanna26):
-        </p>
-
-        <div class="input-group">
-          <input type="text" id="streamInput" placeholder="@Arvanna26 atau https://www.youtube.com/watch?v=...">
-          <button id="btnConnectYt" class="btn btn-black" onclick="connectYouTube()">Connect</button>
-          <button id="btnDisconnectYt" class="btn btn-red" onclick="disconnectYouTube()" style="display: none;">Disconnect</button>
-        </div>
-
-        <div class="info-list">
-          <div class="info-item">
-            <span class="info-label">🎯 Active Target:</span>
-            <span class="info-val" id="activeTarget">-</span>
+        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 6px;">
+          <div style="width: 40px; height: 40px; background: #ffe082; border: 2.5px solid #000; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 20px; box-shadow: 2px 2px 0px #000;">📡</div>
+          <div>
+            <h2 style="font-size: 20px; font-weight: 900; letter-spacing: -0.4px;">Hubungkan Live Stream</h2>
+            <p style="font-size: 12px; font-weight: 700; color: #64748b;">Pilih platform untuk membaca tebakan penonton chat</p>
           </div>
         </div>
 
-        <div id="ytErrorBox" style="display: none; padding: 10px 14px; background: #fee2e2; border: 2.5px solid #000; border-radius: 12px; box-shadow: 2px 2px 0px #000; color: #991b1b; font-size: 12px; font-weight: 800;">
-          <span>⚠️ Gagal Connect:</span> <span id="ytErrorText"></span>
+        <!-- Tab Platform Switcher -->
+        <div style="display: flex; gap: 8px; margin: 18px 0 14px;">
+          <button id="tabBtnYt" class="btn btn-yellow btn-sm" onclick="switchStreamTab('yt')">📺 YouTube</button>
+          <button id="tabBtnTt" class="btn btn-white btn-sm" onclick="switchStreamTab('tt')">🎵 TikTok</button>
+          <button id="tabBtnGi" class="btn btn-white btn-sm" onclick="switchStreamTab('gi')">💸 GeoIndo / Saweria</button>
+        </div>
+
+        <!-- Panel YouTube -->
+        <div id="panelYt" style="display: flex; flex-direction: column; gap: 12px; background: #fffbeb; border: 2.5px solid #000; border-radius: 16px; padding: 18px; box-shadow: 3px 3px 0px #000;">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <strong style="font-size: 14px;">YouTube Live Stream</strong>
+            <span id="ytBadge" class="badge-pill badge-disconnected">
+              <span class="badge-dot"></span> <span id="ytBadgeText">Disconnected</span>
+            </span>
+          </div>
+          <p style="font-size: 12px; font-weight: 700; color: #475569;">Masukkan link stream / popup chat / handle (@Arvanna26):</p>
+          <div class="input-group">
+            <input type="text" id="streamInput" placeholder="@Arvanna26 atau https://www.youtube.com/watch?v=...">
+            <button id="btnConnectYt" class="btn btn-black" onclick="connectYouTube()">Connect</button>
+            <button id="btnDisconnectYt" class="btn btn-red" onclick="disconnectYouTube()" style="display: none;">Disconnect</button>
+          </div>
+          <div class="info-list" style="margin-top: 4px;">
+            <div class="info-item">
+              <span class="info-label">🎯 Active Target:</span>
+              <span class="info-val" id="activeTarget">-</span>
+            </div>
+          </div>
+          <div id="ytErrorBox" style="display: none; padding: 8px 12px; background: #fee2e2; border: 2px solid #000; border-radius: 10px; color: #991b1b; font-size: 11px; font-weight: 800;">
+            <span>⚠️ Gagal Connect:</span> <span id="ytErrorText"></span>
+          </div>
+        </div>
+
+        <!-- Panel TikTok -->
+        <div id="panelTt" style="display: none; flex-direction: column; gap: 12px; background: #fdf2f8; border: 2.5px solid #000; border-radius: 16px; padding: 18px; box-shadow: 3px 3px 0px #000;">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <strong style="font-size: 14px;">TikTok LIVE Stream</strong>
+            <span id="ttBadge" class="badge-pill badge-disconnected">
+              <span class="badge-dot"></span> <span id="ttBadgeText">Disconnected</span>
+            </span>
+          </div>
+          <p style="font-size: 12px; font-weight: 700; color: #475569;">Masukkan username TikTok streamer (contoh: <code>@username</code>):</p>
+          <div class="input-group">
+            <input type="text" id="tiktokInput" placeholder="@username_tiktok">
+            <button id="btnConnectTt" class="btn btn-black" onclick="connectTikTok()">Connect</button>
+            <button id="btnDisconnectTt" class="btn btn-red" onclick="disconnectTikTok()" style="display: none;">Disconnect</button>
+          </div>
+          <div class="info-list" style="margin-top: 4px;">
+            <div class="info-item">
+              <span class="info-label">🎯 Active TikTok:</span>
+              <span class="info-val" id="activeTikTokTarget">-</span>
+            </div>
+          </div>
+          <div id="ttErrorBox" style="display: none; padding: 8px 12px; background: #fee2e2; border: 2px solid #000; border-radius: 10px; color: #991b1b; font-size: 11px; font-weight: 800;">
+            <span>⚠️ Gagal Connect TikTok:</span> <span id="ttErrorText"></span>
+          </div>
+        </div>
+
+        <!-- Panel GeoIndo -->
+        <div id="panelGi" style="display: none; flex-direction: column; gap: 12px; background: #f0fdf4; border: 2.5px solid #000; border-radius: 16px; padding: 18px; box-shadow: 3px 3px 0px #000;">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <strong style="font-size: 14px;">Donation Stream (Tako / Saweria)</strong>
+            <span id="giBadge" class="badge-pill badge-disconnected">
+              <span class="badge-dot"></span> <span id="giBadgeText">Disconnected</span>
+            </span>
+          </div>
+          <p style="font-size: 12px; font-weight: 700; color: #475569;">Masukkan Link Stream Donasi atau Stream UID:</p>
+          <div class="input-group">
+            <input type="text" id="geoindoInput" placeholder="Link stream atau UID GeoIndo">
+            <button id="btnConnectGi" class="btn btn-black" onclick="connectGeoIndo()">Connect</button>
+            <button id="btnDisconnectGi" class="btn btn-red" onclick="disconnectGeoIndo()" style="display: none;">Disconnect</button>
+          </div>
+          <div class="info-list" style="margin-top: 4px;">
+            <div class="info-item">
+              <span class="info-label">🎯 Active UID:</span>
+              <span class="info-val" id="activeGeoindoTarget">-</span>
+            </div>
+          </div>
+          <div id="giErrorBox" style="display: none; padding: 8px 12px; background: #fee2e2; border: 2px solid #000; border-radius: 10px; color: #991b1b; font-size: 11px; font-weight: 800;">
+            <span>⚠️ Gagal Connect GeoIndo:</span> <span id="giErrorText"></span>
+          </div>
         </div>
       </div>
+    </div>
 
-      <!-- TikTok Live Connect Card -->
-      <div class="card card-pink">
-        <div class="card-header">
-          <div class="card-title">
-            <span>🎵</span> TikTok LIVE Stream
-          </div>
-          <span id="ttBadge" class="badge-pill badge-disconnected">
-            <span class="badge-dot"></span> <span id="ttBadgeText">Disconnected</span>
-          </span>
+    <!-- Controls & Game Status Card -->
+    <div class="card card-green" style="margin-bottom: 20px;">
+      <div class="card-header">
+        <div class="card-title">
+          <span>🌍</span> GeoGuessr Game Status
         </div>
-
-        <p style="font-size: 13px; font-weight: 700; color: #1f2937;">
-          Masukkan username TikTok streamer (contoh: <code>@username</code>):
-        </p>
-
-        <div class="input-group">
-          <input type="text" id="tiktokInput" placeholder="@username_tiktok">
-          <button id="btnConnectTt" class="btn btn-black" onclick="connectTikTok()">Connect</button>
-          <button id="btnDisconnectTt" class="btn btn-red" onclick="disconnectTikTok()" style="display: none;">Disconnect</button>
-        </div>
-
-        <div class="info-list">
-          <div class="info-item">
-            <span class="info-label">🎯 Active TikTok:</span>
-            <span class="info-val" id="activeTikTokTarget">-</span>
-          </div>
-        </div>
-
-        <div id="ttErrorBox" style="display: none; padding: 10px 14px; background: #fee2e2; border: 2.5px solid #000; border-radius: 12px; box-shadow: 2px 2px 0px #000; color: #991b1b; font-size: 12px; font-weight: 800;">
-          <span>⚠️ Gagal Connect TikTok:</span> <span id="ttErrorText"></span>
-        </div>
-      </div>
-
-      <!-- GeoIndo Donation Stream Connect Card -->
-      <div class="card card-blue" style="grid-column: 1 / -1;">
-        <div class="card-header">
-          <div class="card-title">
-            <span>💸</span> GeoIndo Live Donation Stream (Tako / Saweria)
-          </div>
-          <span id="giBadge" class="badge-pill badge-disconnected">
-            <span class="badge-dot"></span> <span id="giBadgeText">Disconnected</span>
-          </span>
-        </div>
-
-        <p style="font-size: 13px; font-weight: 700; color: #1f2937;">
-          Masukkan Link Stream Donasi atau Stream UID (contoh: <code>https://www.geoindo.my.id/api/donations/stream?uid=60jJcJMPiASdRgNtRQU2xxj5iwC2</code>):
-        </p>
-
-        <div class="input-group">
-          <input type="text" id="geoindoInput" placeholder="Link stream atau UID GeoIndo">
-          <button id="btnConnectGi" class="btn btn-black" onclick="connectGeoIndo()">Connect</button>
-          <button id="btnDisconnectGi" class="btn btn-red" onclick="disconnectGeoIndo()" style="display: none;">Disconnect</button>
-        </div>
-
-        <div class="info-list">
-          <div class="info-item">
-            <span class="info-label">🎯 Active UID:</span>
-            <span class="info-val" id="activeGeoindoTarget">-</span>
-          </div>
-        </div>
-
-        <div id="giErrorBox" style="display: none; padding: 10px 14px; background: #fee2e2; border: 2.5px solid #000; border-radius: 12px; box-shadow: 2px 2px 0px #000; color: #991b1b; font-size: 12px; font-weight: 800;">
-          <span>⚠️ Gagal Connect GeoIndo:</span> <span id="giErrorText"></span>
-        </div>
-      </div>
-
-      <!-- GeoGuessr Game Status Card -->
-      <div class="card card-green" style="grid-column: 1 / -1;">
-        <div class="card-header">
-          <div class="card-title">
-            <span>🌍</span> GeoGuessr Game Status
-          </div>
+        <div style="display: flex; gap: 8px; align-items: center;">
           <span id="guessBadge" class="badge-pill badge-disconnected">
             <span class="badge-dot"></span> <span id="guessBadgeText">Guesses Closed</span>
           </span>
         </div>
+      </div>
 
-        <div class="info-list">
-          <div class="info-item">
-            <span class="info-label">🗺️ Map:</span>
-            <span class="info-val" id="mapNameDisplay">Menunggu Game...</span>
-          </div>
-          <div class="info-item">
-            <span class="info-label">📍 Ronde:</span>
-            <span class="info-val" id="roundDisplay">R1 / 5</span>
-          </div>
-          <div class="info-item">
-            <span class="info-label">👥 Tebakan Ronde Ini:</span>
-            <span class="info-val" id="guessCountDisplay">0 Guesses</span>
-          </div>
-          <div class="info-item">
-            <span class="info-label">🌐 Tebak Koordinat:</span>
-            <span class="info-val" id="coordsStatusDisplay" style="color: #dc2626;">⛔ Disabled</span>
-          </div>
+      <div class="info-list">
+        <div class="info-item">
+          <span class="info-label">🗺️ Map:</span>
+          <span class="info-val" id="mapNameDisplay">Menunggu Game...</span>
         </div>
+        <div class="info-item">
+          <span class="info-label">📍 Ronde:</span>
+          <span class="info-val" id="roundDisplay">R1 / 5</span>
+        </div>
+        <div class="info-item">
+          <span class="info-label">👥 Tebakan Ronde Ini:</span>
+          <span class="info-val" id="guessCountDisplay">0 Guesses</span>
+        </div>
+        <div class="info-item">
+          <span class="info-label">🌐 Tebak Koordinat:</span>
+          <span class="info-val" id="coordsStatusDisplay" style="color: #dc2626;">⛔ Disabled</span>
+        </div>
+      </div>
 
-        <div style="display: flex; gap: 10px; margin-top: auto; flex-wrap: wrap;">
-          <button id="btnToggleGuesses" class="btn btn-white btn-sm" onclick="toggleGuesses()">🔓 Open Guesses</button>
-          <button id="btnToggleCoords" class="btn btn-yellow btn-sm" onclick="toggleCoordinates()" title="Aktifkan/nonaktifkan tebakan via koordinat angka">🌐 Koordinat: OFF</button>
-          <button class="btn btn-red btn-sm" onclick="resetGame()">🔄 Reset Game</button>
-        </div>
+      <div style="display: flex; gap: 10px; margin-top: auto; flex-wrap: wrap;">
+        <button id="btnToggleGuesses" class="btn btn-white btn-sm" onclick="toggleGuesses()">🔓 Open Guesses</button>
+        <button id="btnToggleCoords" class="btn btn-yellow btn-sm" onclick="toggleCoordinates()" title="Aktifkan/nonaktifkan tebakan via koordinat angka">🌐 Koordinat: OFF</button>
+        <button class="btn btn-red btn-sm" onclick="resetGame()">🔄 Reset Game</button>
       </div>
     </div>
 
@@ -916,6 +964,7 @@
         <div class="tab-pills">
           <button id="tabRound" class="btn btn-yellow btn-sm" onclick="switchView('round')">Ronde Ini</button>
           <button id="tabGame" class="btn btn-white btn-sm" onclick="switchView('game')">Total Game</button>
+          <button id="tabHistory" class="btn btn-white btn-sm" onclick="switchView('history')">📜 Riwayat Viewer Saya</button>
         </div>
       </div>
 
@@ -948,20 +997,30 @@
 
     socket.on('connect', () => {
       console.log('Connected to MabarBang server');
-      socket.emit('request-state');
+      if (authUser && authUser.id) {
+        socket.emit('join-streamer', authUser.id, 'Dashboard');
+      } else {
+        socket.emit('request-state');
+      }
     });
 
     socket.on('state-update', (state) => {
+      // If we are logged in as a specific streamer, ignore updates from other streamers
+      if (authUser && authUser.id && state.streamerId && state.streamerId !== 'default' && state.streamerId !== authUser.id) {
+        return;
+      }
       currentState = state;
       updateUI();
     });
 
-    socket.on('round-started', () => {
-      socket.emit('request-state');
+    socket.on('round-started', (payload) => {
+      if (authUser && authUser.id && payload && payload.streamerId && payload.streamerId !== authUser.id) return;
+      socket.emit('request-state', authUser?.id);
     });
 
-    socket.on('round-finished', () => {
-      socket.emit('request-state');
+    socket.on('round-finished', (payload) => {
+      if (authUser && authUser.id && payload && payload.streamerId && payload.streamerId !== authUser.id) return;
+      socket.emit('request-state', authUser?.id);
     });
 
     socket.on('update-info', (info) => {
@@ -1122,21 +1181,264 @@
       renderScoreboard();
     }
 
+    // Supabase Auth Integration (Reads directly from .env via /api/auth/config)
+    let SUPABASE_URL = 'https://REDACTED_PROJECT.supabase.co';
+    let SUPABASE_ANON_KEY = 'REDACTED_ANON_KEY';
+    
+    let supabaseClient = null;
+    let authUser = null;
+    let authMode = 'login'; // 'login' or 'register'
+    let historyLeaderboard = [];
+
+    // Dynamically bootstrap Supabase using values configured in .env
+    fetch('/api/auth/config')
+      .then((r) => r.json())
+      .then((cfg) => {
+        if (cfg && cfg.supabaseUrl && cfg.supabaseAnonKey) {
+          SUPABASE_URL = cfg.supabaseUrl;
+          SUPABASE_ANON_KEY = cfg.supabaseAnonKey;
+        }
+        if (typeof window.supabase !== 'undefined' && window.supabase.createClient) {
+          supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+          initSupabaseSession();
+        }
+      })
+      .catch(() => {
+        if (typeof window.supabase !== 'undefined' && window.supabase.createClient) {
+          supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+          initSupabaseSession();
+        }
+      });
+
+    async function initSupabaseSession() {
+      if (!supabaseClient) return;
+      try {
+        const { data: { session } } = await supabaseClient.auth.getSession();
+        if (session && session.user) {
+          authUser = session.user;
+          updateAuthUI();
+          syncUserWithServer(session.access_token);
+        } else {
+          updateAuthUI();
+        }
+
+        supabaseClient.auth.onAuthStateChange(async (event, session) => {
+          if (session && session.user) {
+            authUser = session.user;
+            updateAuthUI();
+            if (socket && socket.connected) {
+              socket.emit('join-streamer', authUser.id, 'Dashboard');
+            }
+            syncUserWithServer(session.access_token);
+          } else {
+            authUser = null;
+            updateAuthUI();
+          }
+        });
+      } catch (err) {
+        console.error('Supabase session init error:', err);
+      }
+    }
+
+    // Helper fetch with streamer identification header
+    function apiFetch(url, options = {}) {
+      options.headers = options.headers || {};
+      if (authUser && authUser.id) {
+        options.headers['x-streamer-id'] = authUser.id;
+      }
+      return fetch(url, options);
+    }
+
+    async function syncUserWithServer(accessToken) {
+      if (!accessToken) return;
+      try {
+        const res = await apiFetch('/api/auth/sync', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ accessToken })
+        });
+        if (res.ok) {
+          const json = await res.json();
+          if (json.state) {
+            currentState = json.state;
+            updateUI();
+          }
+        }
+      } catch (err) {
+        console.error('Failed to sync auth with server:', err);
+      }
+    }
+
+    function updateAuthUI() {
+      const authProfileBox = document.getElementById('authProfileBox');
+      const streamerNameText = document.getElementById('streamerNameText');
+      const streamerEmailText = document.getElementById('streamerEmailText');
+      const authGatekeeper = document.getElementById('authGatekeeper');
+      const mainDashboardContainer = document.getElementById('mainDashboardContainer');
+
+      if (authUser) {
+        const displayName = authUser.user_metadata?.name || authUser.email?.split('@')[0] || 'Streamer';
+        if (authProfileBox) authProfileBox.style.display = 'flex';
+        if (streamerNameText) streamerNameText.textContent = displayName;
+        if (streamerEmailText) streamerEmailText.textContent = authUser.email;
+
+        // Tampilkan Dashboard, Sembunyikan Halaman Gerbang Login
+        if (authGatekeeper) authGatekeeper.style.display = 'none';
+        if (mainDashboardContainer) mainDashboardContainer.style.display = 'flex';
+      } else {
+        // Belum Login: Sembunyikan Dashboard, Tampilkan Halaman Gerbang Login
+        if (authGatekeeper) authGatekeeper.style.display = 'flex';
+        if (mainDashboardContainer) mainDashboardContainer.style.display = 'none';
+      }
+    }
+
+    function copyStreamerUid() {
+      if (!authUser || !authUser.id) {
+        alert('Streamer UID belum tersedia. Silakan login terlebih dahulu.');
+        return;
+      }
+      navigator.clipboard.writeText(authUser.id).then(() => {
+        alert(`✅ Streamer UID berhasil disalin!\n\n${authUser.id}\n\nMasukkan UID ini di pengaturan Userscript GeoGuessr Anda.`);
+      }).catch(() => {
+        prompt('Salin Streamer UID Anda secara manual:', authUser.id);
+      });
+    }
+
+    function toggleGateMode() {
+      authMode = authMode === 'login' ? 'register' : 'login';
+      const title = document.getElementById('gateTitle');
+      const btnSubmit = document.getElementById('btnSubmitGateText');
+      const prompt = document.getElementById('gateTogglePrompt');
+      const link = document.getElementById('gateToggleLink');
+      const nameGroup = document.getElementById('gateNameGroup');
+
+      if (authMode === 'register') {
+        title.textContent = 'MabarBang Register';
+        btnSubmit.textContent = 'Daftar Akun Baru ➔';
+        prompt.textContent = 'Sudah punya akun?';
+        link.textContent = 'Masuk di sini';
+        nameGroup.style.display = 'flex';
+      } else {
+        title.textContent = 'MabarBang Login';
+        btnSubmit.textContent = 'Masuk Sekarang ➔';
+        prompt.textContent = 'Belum punya akun?';
+        link.textContent = 'Daftar Akun Baru';
+        nameGroup.style.display = 'none';
+      }
+      document.getElementById('gateAlert').style.display = 'none';
+    }
+
+    async function handleGateSubmit() {
+      if (!supabaseClient) {
+        alert('Supabase client belum siap. Cek koneksi internet Anda.');
+        return;
+      }
+
+      const email = document.getElementById('gateEmail').value.trim();
+      const password = document.getElementById('gatePassword').value.trim();
+      const name = document.getElementById('gateName').value.trim();
+      const alertBox = document.getElementById('gateAlert');
+
+      if (!email || !password) {
+        alertBox.style.display = 'block';
+        alertBox.textContent = 'Email dan password tidak boleh kosong!';
+        return;
+      }
+
+      alertBox.style.display = 'none';
+      const btn = document.getElementById('btnSubmitGate');
+      const btnText = document.getElementById('btnSubmitGateText');
+      const origText = btnText.textContent;
+      btnText.textContent = 'Memproses...';
+      btn.disabled = true;
+
+      try {
+        if (authMode === 'register') {
+          const { data, error } = await supabaseClient.auth.signUp({
+            email,
+            password,
+            options: {
+              data: { name: name || email.split('@')[0] }
+            }
+          });
+          if (error) throw error;
+          alert('Pendaftaran berhasil! Akun Anda aktif.');
+        } else {
+          const { data, error } = await supabaseClient.auth.signInWithPassword({
+            email,
+            password
+          });
+          if (error) throw error;
+        }
+      } catch (err) {
+        alertBox.style.display = 'block';
+        alertBox.textContent = err.message || 'Terjadi kesalahan autentikasi.';
+      } finally {
+        btnText.textContent = origText;
+        btn.disabled = false;
+      }
+    }
+
+    async function logoutSupabase() {
+      if (!confirm('Yakin ingin logout?')) return;
+      if (supabaseClient) {
+        await supabaseClient.auth.signOut();
+      }
+      authUser = null;
+      updateAuthUI();
+      // Sync default user
+      await fetch('/api/auth/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ accessToken: '' })
+      }).catch(() => {});
+      location.reload();
+    }
+
+    async function fetchStreamerHistory() {
+      try {
+        const streamerId = (currentState && currentState.streamerId) ? currentState.streamerId : (authUser ? authUser.id : '');
+        const res = await fetch(`/api/leaderboard/history?streamerId=${encodeURIComponent(streamerId)}`);
+        if (res.ok) {
+          const data = await res.json();
+          historyLeaderboard = data.history || [];
+        }
+      } catch (e) {
+        console.error('Failed to load history:', e);
+      }
+    }
+
     function switchView(view) {
       currentView = view;
       document.getElementById('tabRound').className = view === 'round' ? 'btn btn-yellow btn-sm' : 'btn btn-white btn-sm';
       document.getElementById('tabGame').className = view === 'game' ? 'btn btn-yellow btn-sm' : 'btn btn-white btn-sm';
-      renderScoreboard();
+      document.getElementById('tabHistory').className = view === 'history' ? 'btn btn-yellow btn-sm' : 'btn btn-white btn-sm';
+      
+      if (view === 'history') {
+        fetchStreamerHistory().then(() => renderScoreboard());
+      } else {
+        renderScoreboard();
+      }
     }
 
     function renderScoreboard() {
       const tbody = document.getElementById('scoreboardBody');
-      if (!currentState) return;
+      if (!currentState && currentView !== 'history') return;
 
-      const list = currentView === 'round' ? (currentState.roundGuesses || []) : (currentState.leaderboard || []);
+      let list = [];
+      if (currentView === 'round') {
+        list = currentState ? (currentState.roundGuesses || []) : [];
+      } else if (currentView === 'game') {
+        list = currentState ? (currentState.leaderboard || []) : [];
+      } else if (currentView === 'history') {
+        list = historyLeaderboard || [];
+      }
 
       if (list.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="4" class="empty-state">Belum ada tebakan. Viewer bisa ketik <code>!g [nama negara/kota]</code> di YouTube chat!</td></tr>`;
+        const emptyMsg = currentView === 'history' 
+          ? 'Belum ada riwayat leaderboard yang tersimpan di cloud Supabase untuk akun ini.'
+          : 'Belum ada tebakan. Viewer bisa ketik <code>!g [nama negara/kota]</code> di YouTube chat!';
+        tbody.innerHTML = `<tr><td colspan="4" class="empty-state">${emptyMsg}</td></tr>`;
         return;
       }
 
@@ -1152,8 +1454,12 @@
         const avatar = item.avatar 
           ? `<img class="avatar-circle" src="${item.avatar}" alt="" />` 
           : `<div class="avatar-circle">👤</div>`;
-        const distance = currentView === 'round' ? `${item.distance} km` : `${Math.round(item.totalDistance)} km total`;
-        const score = currentView === 'round' ? `${item.score.toLocaleString()} pts` : `${item.totalScore.toLocaleString()} pts`;
+        const distance = currentView === 'round' 
+          ? `${item.distance} km` 
+          : `${Math.round(item.totalDistance || item.total_distance || 0)} km total`;
+        const score = currentView === 'round' 
+          ? `${(item.score || 0).toLocaleString()} pts` 
+          : `${(item.totalScore || item.total_score || 0).toLocaleString()} pts`;
 
         const isDonation = item.platform === 'geoindo' || item.platform === 'Tako' || (item.userId && item.userId.startsWith('geoindo_'));
         const donTag = isDonation ? '<span style="background: #10b981; color: #fff; font-size: 10px; font-weight: 900; padding: 1px 6px; border-radius: 99px; border: 1.5px solid #000; margin-left: 6px;">💸 DONASI</span>' : '';
@@ -1183,7 +1489,7 @@
         return;
       }
       localStorage.setItem('cg_last_yt_target', streamUrl);
-      await fetch('/api/youtube/connect', {
+      await apiFetch('/api/youtube/connect', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ streamUrl })
@@ -1191,12 +1497,12 @@
     }
 
     const savedTarget = localStorage.getItem('cg_last_yt_target');
-    if (savedTarget) {
+    if (savedTarget && document.getElementById('streamInput')) {
       document.getElementById('streamInput').value = savedTarget;
     }
 
     async function disconnectYouTube() {
-      await fetch('/api/youtube/disconnect', { method: 'POST' });
+      await apiFetch('/api/youtube/disconnect', { method: 'POST' });
     }
 
     async function connectTikTok() {
@@ -1206,7 +1512,7 @@
         return;
       }
       localStorage.setItem('cg_last_tt_target', username);
-      await fetch('/api/tiktok/connect', {
+      await apiFetch('/api/tiktok/connect', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username })
@@ -1219,7 +1525,7 @@
     }
 
     async function disconnectTikTok() {
-      await fetch('/api/tiktok/disconnect', { method: 'POST' });
+      await apiFetch('/api/tiktok/disconnect', { method: 'POST' });
     }
 
     async function connectGeoIndo() {
@@ -1229,7 +1535,7 @@
         return;
       }
       localStorage.setItem('cg_last_gi_target', input);
-      await fetch('/api/geoindo/connect', {
+      await apiFetch('/api/geoindo/connect', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ uid: input })
@@ -1242,29 +1548,66 @@
     }
 
     async function disconnectGeoIndo() {
-      await fetch('/api/geoindo/disconnect', { method: 'POST' });
+      await apiFetch('/api/geoindo/disconnect', { method: 'POST' });
     }
 
     async function toggleGuesses() {
       if (!currentState) return;
       const endpoint = currentState.guessesOpen ? '/api/game/close-guesses' : '/api/game/open-guesses';
-      await fetch(endpoint, { method: 'POST' });
+      await apiFetch(endpoint, { method: 'POST' });
     }
 
     async function toggleCoordinates() {
-      await fetch('/api/game/toggle-coordinates', { method: 'POST' });
+      await apiFetch('/api/game/toggle-coordinates', { method: 'POST' });
     }
 
     async function resetGame() {
-      if (confirm('Yakin ingin mereset papan skor game saat ini?')) {
-        await fetch('/api/game/reset', { method: 'POST' });
+      if (confirm('Yakin ingin mereset game dan papan skor?')) {
+        await apiFetch('/api/game/reset', { method: 'POST' });
       }
     }
 
-    function copyOverlayUrl() {
-      const overlayUrl = window.location.origin + '/overlay';
-      navigator.clipboard.writeText(overlayUrl);
-      alert('URL OBS Overlay berhasil disalin: ' + overlayUrl);
+    // Stream Connect Modal Handlers
+    function openStreamConnectModal() {
+      const modal = document.getElementById('streamConnectModal');
+      if (modal) modal.style.display = 'flex';
+    }
+
+    function closeStreamConnectModal() {
+      const modal = document.getElementById('streamConnectModal');
+      if (modal) modal.style.display = 'none';
+    }
+
+    function switchStreamTab(tab) {
+      const panelYt = document.getElementById('panelYt');
+      const panelTt = document.getElementById('panelTt');
+      const panelGi = document.getElementById('panelGi');
+      const tabBtnYt = document.getElementById('tabBtnYt');
+      const tabBtnTt = document.getElementById('tabBtnTt');
+      const tabBtnGi = document.getElementById('tabBtnGi');
+
+      if (tab === 'yt') {
+        panelYt.style.display = 'flex';
+        panelTt.style.display = 'none';
+        panelGi.style.display = 'none';
+        tabBtnYt.className = 'btn btn-yellow btn-sm';
+        tabBtnTt.className = 'btn btn-white btn-sm';
+        tabBtnGi.className = 'btn btn-white btn-sm';
+      } else if (tab === 'tt') {
+        panelYt.style.display = 'none';
+        panelTt.style.display = 'flex';
+        panelGi.style.display = 'none';
+        tabBtnYt.className = 'btn btn-white btn-sm';
+        tabBtnTt.className = 'btn btn-pink btn-sm';
+        tabBtnGi.className = 'btn btn-white btn-sm';
+      } else if (tab === 'gi') {
+        panelYt.style.display = 'none';
+        panelTt.style.display = 'none';
+        panelGi.style.display = 'flex';
+        tabBtnYt.className = 'btn btn-white btn-sm';
+        tabBtnTt.className = 'btn btn-white btn-sm';
+        tabBtnGi.className = 'btn btn-green btn-sm';
+      }
     }
 
     function openUserscriptModal() {
