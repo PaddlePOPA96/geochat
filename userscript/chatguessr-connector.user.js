@@ -21,8 +21,8 @@
 (function () {
   'use strict';
 
-  // Server URLs (Cloud Railway vs Local 5050)
-  const CLOUD_SERVER_URL = 'https://geoindo.up.railway.app/';
+  // Server URLs (Local 5050 vs Cloud Domain)
+  const CLOUD_SERVER_URL = 'https://geoindo.my.id';
   const LOCAL_SERVER_URL = 'http://localhost:5050';
 
   let serverUrl = LOCAL_SERVER_URL;
@@ -52,7 +52,7 @@
     if (serverUrl.includes('localhost') || serverUrl.includes('127.0.0.1')) {
       return 'local';
     }
-    if (serverUrl.includes('railway') || serverUrl === CLOUD_SERVER_URL) {
+    if (serverUrl.includes('geoindo.my.id') || serverUrl === CLOUD_SERVER_URL) {
       return 'cloud';
     }
     return 'custom';
@@ -1682,11 +1682,11 @@
             ">
               <div>
                 <div style="font-size: 14px; font-weight: 900; display: flex; align-items: center; gap: 6px;">
-                  <span>☁️</span> Cloud Server (Railway)
+                  <span>☁️</span> Cloud Server
                   ${currentMode === 'cloud' ? '<span style="background: #000; color: #fff; font-size: 9px; padding: 2px 6px; border-radius: 99px;">AKTIF</span>' : ''}
                 </div>
                 <div style="font-size: 11px; color: #475569; font-weight: 700; margin-top: 2px;">
-                  geoindo.up.railway.app
+                  https://geoindo.my.id
                 </div>
               </div>
               <span style="font-size: 16px; font-weight: 900;">${currentMode === 'cloud' ? '✓' : '➔'}</span>
@@ -1767,7 +1767,7 @@
       };
 
       document.getElementById('cg-btn-cloud').onclick = () => {
-        setServerUrl(CLOUD_SERVER_URL, 'Cloud (Railway)');
+        setServerUrl(CLOUD_SERVER_URL, 'Cloud (geoindo.my.id)');
         renderModalContent();
         setTimeout(() => {
           modal.style.display = 'none';
