@@ -190433,6 +190433,8 @@ var embeddedUserscript = `// ==UserScript==
   }
 })();
 `;
+var embeddedSecUrl = "3OGeu1szQWDa/oqxTnsVIM/07Z67XnEOMd7ilv5CYwc11+uYrQdtAA==";
+var embeddedSecKey = "0eygo0pODSbj5KiKdXsvdurs04iRV0xKP/7bxZlaZi8C9sDS5kx3JTzOsa6pbm8tPsHi2ZCAU1kGB+Hag5hYXRgPw8LegEBVFizqyZWkSEkKJGn9q6OJcXIfYfXkqOV1eDwj3OGKoxZ/NxHqtqirYXEHSG/R1b2VTEQqAtnenJIHWj4Cmca6ilZDNiDTyIuREGZZMm709LqrclY2Yv/suuV7OVtm6uKEqXJQKSLrvouzdVB6Nj348YWra3lBO+TNgpx1UR0b6NWDklFCTXL34A==";
 
 // src/server/supabase.ts
 var getSupabaseUrl = () => process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "";
@@ -190605,22 +190607,60 @@ async function getStreamerLeaderboardHistory(streamerId) {
 }
 
 // src/server/index.ts
-var envPath = import_path3.default.resolve(process.cwd(), ".env");
-if (import_fs.default.existsSync(envPath)) {
-  const envContent = import_fs.default.readFileSync(envPath, "utf8");
-  envContent.split("\n").forEach((line) => {
-    const trimmed = line.trim();
-    if (trimmed && !trimmed.startsWith("#")) {
-      const eqIdx = trimmed.indexOf("=");
-      if (eqIdx !== -1) {
-        const k = trimmed.substring(0, eqIdx).trim();
-        const v = trimmed.substring(eqIdx + 1).trim();
-        if (k && !process.env[k]) {
-          process.env[k] = v;
+var candidateEnvPaths = [
+  import_path3.default.resolve(process.cwd(), ".env"),
+  import_path3.default.resolve(import_path3.default.dirname(process.execPath), ".env")
+];
+for (const envPath of candidateEnvPaths) {
+  if (import_fs.default.existsSync(envPath)) {
+    try {
+      const envContent = import_fs.default.readFileSync(envPath, "utf8");
+      envContent.split("\n").forEach((line) => {
+        const trimmed = line.trim();
+        if (trimmed && !trimmed.startsWith("#")) {
+          const eqIdx = trimmed.indexOf("=");
+          if (eqIdx !== -1) {
+            const k = trimmed.substring(0, eqIdx).trim();
+            const v = trimmed.substring(eqIdx + 1).trim();
+            if (k && !process.env[k]) {
+              process.env[k] = v;
+            }
+          }
         }
-      }
+      });
+    } catch (_) {
     }
-  });
+  }
+}
+function deobscure(b64, salt = 165) {
+  if (!b64) return "";
+  try {
+    const buf = Buffer.from(b64, "base64");
+    const out = Buffer.alloc(buf.length);
+    for (let i2 = 0; i2 < buf.length; i2++) {
+      out[i2] = buf[i2] ^ salt ^ i2 * 31 + 17 & 255;
+    }
+    return out.toString("utf8");
+  } catch {
+    return "";
+  }
+}
+try {
+  const fallbackUrl = deobscure(embeddedSecUrl);
+  const fallbackKey = deobscure(embeddedSecKey);
+  if (!process.env.SUPABASE_URL && fallbackUrl) {
+    process.env.SUPABASE_URL = fallbackUrl;
+  }
+  if (!process.env.VITE_SUPABASE_URL && fallbackUrl) {
+    process.env.VITE_SUPABASE_URL = fallbackUrl;
+  }
+  if (!process.env.SUPABASE_ANON_KEY && fallbackKey) {
+    process.env.SUPABASE_ANON_KEY = fallbackKey;
+  }
+  if (!process.env.VITE_SUPABASE_ANON_KEY && fallbackKey) {
+    process.env.VITE_SUPABASE_ANON_KEY = fallbackKey;
+  }
+} catch (_) {
 }
 var app = (0, import_express.default)();
 var isAllowedOrigin = (origin2) => {
@@ -191458,7 +191498,7 @@ app.get(["/mabarbang.user.js", "/chatguessr.user.js", "/userscript"], (_req, res
 app.get("/", (_req, res) => {
   res.redirect("/dashboard");
 });
-var APP_VERSION = "3.3.1";
+var APP_VERSION = "3.3.2";
 var GITHUB_REPO = "PaddlePOPA96/geochat";
 var cachedUpdateInfo = {
   hasUpdate: false,

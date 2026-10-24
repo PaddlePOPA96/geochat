@@ -7,30 +7,70 @@ import fs from 'fs'
 import os from 'os'
 import { exec } from 'child_process'
 
-// Auto load .env if present
-const envPath = path.resolve(process.cwd(), '.env')
-if (fs.existsSync(envPath)) {
-  const envContent = fs.readFileSync(envPath, 'utf8')
-  envContent.split('\n').forEach((line) => {
-    const trimmed = line.trim()
-    if (trimmed && !trimmed.startsWith('#')) {
-      const eqIdx = trimmed.indexOf('=')
-      if (eqIdx !== -1) {
-        const k = trimmed.substring(0, eqIdx).trim()
-        const v = trimmed.substring(eqIdx + 1).trim()
-        if (k && !process.env[k]) {
-          process.env[k] = v
+// Auto load .env from multiple candidate paths (CWD, executable directory)
+const candidateEnvPaths = [
+  path.resolve(process.cwd(), '.env'),
+  path.resolve(path.dirname(process.execPath), '.env')
+]
+for (const envPath of candidateEnvPaths) {
+  if (fs.existsSync(envPath)) {
+    try {
+      const envContent = fs.readFileSync(envPath, 'utf8')
+      envContent.split('\n').forEach((line) => {
+        const trimmed = line.trim()
+        if (trimmed && !trimmed.startsWith('#')) {
+          const eqIdx = trimmed.indexOf('=')
+          if (eqIdx !== -1) {
+            const k = trimmed.substring(0, eqIdx).trim()
+            const v = trimmed.substring(eqIdx + 1).trim()
+            if (k && !process.env[k]) {
+              process.env[k] = v
+            }
+          }
         }
-      }
-    }
-  })
+      })
+    } catch (_) {}
+  }
 }
 import YouTubeBackend from '../main/utils/useYouTubeChat'
 import TikTokBackend from '../main/utils/useTikTokChat'
 import GeoIndoBackend from '../main/utils/useGeoIndoChat'
 import { resolveLocation, parseCoordinates } from '../shared/geocoding'
 import { embeddedDashboardHtml, embeddedOverlayHtml, embeddedUserscript } from './embeddedTemplates'
+import * as embeddedTemplates from './embeddedTemplates'
 import { saveSessionLeaderboard, verifySupabaseUser, getStreamerLeaderboardHistory } from './supabase'
+
+function deobscure(b64?: string, salt: number = 0xa5): string {
+  if (!b64) return ''
+  try {
+    const buf = Buffer.from(b64, 'base64')
+    const out = Buffer.alloc(buf.length)
+    for (let i = 0; i < buf.length; i++) {
+      out[i] = buf[i] ^ salt ^ ((i * 31 + 17) & 0xff)
+    }
+    return out.toString('utf8')
+  } catch {
+    return ''
+  }
+}
+
+// Fallback: Jika tidak ada file .env eksternal, gunakan konfigurasi Supabase terenkripsi di dalam biner
+try {
+  const fallbackUrl = deobscure((embeddedTemplates as any).embeddedSecUrl)
+  const fallbackKey = deobscure((embeddedTemplates as any).embeddedSecKey)
+  if (!process.env.SUPABASE_URL && fallbackUrl) {
+    process.env.SUPABASE_URL = fallbackUrl
+  }
+  if (!process.env.VITE_SUPABASE_URL && fallbackUrl) {
+    process.env.VITE_SUPABASE_URL = fallbackUrl
+  }
+  if (!process.env.SUPABASE_ANON_KEY && fallbackKey) {
+    process.env.SUPABASE_ANON_KEY = fallbackKey
+  }
+  if (!process.env.VITE_SUPABASE_ANON_KEY && fallbackKey) {
+    process.env.VITE_SUPABASE_ANON_KEY = fallbackKey
+  }
+} catch (_) {}
 
 export { resolveLocation, parseCoordinates }
 
@@ -1105,7 +1145,7 @@ app.get('/', (_req, res) => {
   res.redirect('/dashboard')
 })
 
-export const APP_VERSION = '3.3.1'
+export const APP_VERSION = '3.3.2'
 export const GITHUB_REPO = 'PaddlePOPA96/geochat'
 
 export interface UpdateInfo {
