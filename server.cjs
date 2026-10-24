@@ -186500,7 +186500,7 @@ async function processNominatimQueue() {
       const url2 = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(item.query)}&format=json&limit=1`;
       const res = await axios_default.get(url2, {
         headers: {
-          "User-Agent": "MabarBang/3.3.0 (https://geoindo.my.id)",
+          "User-Agent": "MabarBang/3.3.2 (https://geoindo.my.id)",
           "Accept-Language": "id,en;q=0.9"
         },
         timeout: 4e3
@@ -188287,7 +188287,7 @@ var embeddedDashboardHtml = `<!DOCTYPE html>
 var embeddedUserscript = `// ==UserScript==
 // @name         MabarBang GeoGuessr Connector
 // @namespace    https://github.com/PaddlePOPA96/geochat
-// @version      3.3.1
+// @version      3.3.2
 // @description  Otomatis mengirim data ronde GeoGuessr ke Server MabarBang, menampilkan Scoreboard Overlay & PIN tebakan penonton di peta GeoGuessr
 // @author       kikobooo x arvana prod
 // @match        *://*.geoguessr.com/*
