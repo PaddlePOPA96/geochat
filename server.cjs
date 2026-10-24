@@ -187227,9 +187227,9 @@ var embeddedDashboardHtml = `<!DOCTYPE html>
       renderScoreboard();
     }
 
-    // Supabase Auth Integration (Reads directly from .env via /api/auth/config)
-    let SUPABASE_URL = 'https://REDACTED_PROJECT.supabase.co';
-    let SUPABASE_ANON_KEY = 'REDACTED_ANON_KEY';
+    // Supabase Auth Integration (Must be configured in .env)
+    let SUPABASE_URL = '';
+    let SUPABASE_ANON_KEY = '';
     
     let supabaseClient = null;
     let authUser = null;
@@ -187243,18 +187243,25 @@ var embeddedDashboardHtml = `<!DOCTYPE html>
         if (cfg && cfg.supabaseUrl && cfg.supabaseAnonKey) {
           SUPABASE_URL = cfg.supabaseUrl;
           SUPABASE_ANON_KEY = cfg.supabaseAnonKey;
-        }
-        if (typeof window.supabase !== 'undefined' && window.supabase.createClient) {
-          supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-          initSupabaseSession();
+          if (typeof window.supabase !== 'undefined' && window.supabase.createClient) {
+            supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+            initSupabaseSession();
+          }
+        } else {
+          showMissingEnvWarning();
         }
       })
       .catch(() => {
-        if (typeof window.supabase !== 'undefined' && window.supabase.createClient) {
-          supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-          initSupabaseSession();
-        }
+        showMissingEnvWarning();
       });
+
+    function showMissingEnvWarning() {
+      const gateAlert = document.getElementById('gateAlert');
+      if (gateAlert) {
+        gateAlert.style.display = 'block';
+        gateAlert.innerHTML = '\u26A0\uFE0F <strong>Supabase Belum Dikonfigurasi!</strong><br>Tambahkan <code>SUPABASE_URL</code> dan <code>SUPABASE_KEY</code> di file <code>.env</code> server lalu restart aplikasi.';
+      }
+    }
 
     async function initSupabaseSession() {
       if (!supabaseClient) return;
@@ -190387,9 +190394,11 @@ app.get("/api/state", (req, res) => {
   res.json(mgr.getState());
 });
 app.get("/api/auth/config", (_req, res) => {
+  const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || "";
+  const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || process.env.SUPABASE_KEY || "";
   res.json({
-    supabaseUrl: process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || "https://REDACTED_PROJECT.supabase.co",
-    supabaseAnonKey: process.env.VITE_SUPABASE_ANON_KEY || "REDACTED_ANON_KEY"
+    supabaseUrl,
+    supabaseAnonKey
   });
 });
 app.post("/api/auth/sync", async (req, res) => {

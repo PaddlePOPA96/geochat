@@ -1181,9 +1181,9 @@
       renderScoreboard();
     }
 
-    // Supabase Auth Integration (Reads directly from .env via /api/auth/config)
-    let SUPABASE_URL = 'https://REDACTED_PROJECT.supabase.co';
-    let SUPABASE_ANON_KEY = 'REDACTED_ANON_KEY';
+    // Supabase Auth Integration (Must be configured in .env)
+    let SUPABASE_URL = '';
+    let SUPABASE_ANON_KEY = '';
     
     let supabaseClient = null;
     let authUser = null;
@@ -1197,18 +1197,25 @@
         if (cfg && cfg.supabaseUrl && cfg.supabaseAnonKey) {
           SUPABASE_URL = cfg.supabaseUrl;
           SUPABASE_ANON_KEY = cfg.supabaseAnonKey;
-        }
-        if (typeof window.supabase !== 'undefined' && window.supabase.createClient) {
-          supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-          initSupabaseSession();
+          if (typeof window.supabase !== 'undefined' && window.supabase.createClient) {
+            supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+            initSupabaseSession();
+          }
+        } else {
+          showMissingEnvWarning();
         }
       })
       .catch(() => {
-        if (typeof window.supabase !== 'undefined' && window.supabase.createClient) {
-          supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-          initSupabaseSession();
-        }
+        showMissingEnvWarning();
       });
+
+    function showMissingEnvWarning() {
+      const gateAlert = document.getElementById('gateAlert');
+      if (gateAlert) {
+        gateAlert.style.display = 'block';
+        gateAlert.innerHTML = '⚠️ <strong>Supabase Belum Dikonfigurasi!</strong><br>Tambahkan <code>SUPABASE_URL</code> dan <code>SUPABASE_KEY</code> di file <code>.env</code> server lalu restart aplikasi.';
+      }
+    }
 
     async function initSupabaseSession() {
       if (!supabaseClient) return;

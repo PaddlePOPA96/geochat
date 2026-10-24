@@ -769,9 +769,11 @@ app.get('/api/state', (req, res) => {
 
 // Provide Supabase config from .env to frontend
 app.get('/api/auth/config', (_req, res) => {
+  const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || ''
+  const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || process.env.SUPABASE_KEY || ''
   res.json({
-    supabaseUrl: process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || 'https://REDACTED_PROJECT.supabase.co',
-    supabaseAnonKey: process.env.VITE_SUPABASE_ANON_KEY || 'REDACTED_ANON_KEY'
+    supabaseUrl,
+    supabaseAnonKey
   })
 })
 
