@@ -12,3 +12,10 @@ test-10000-pins.*
 # Environment variables
 .env
 .env.*
+
+# Agents
+.agents
+.agents/*
+
+GEMINI.md
+AGENTS.md
