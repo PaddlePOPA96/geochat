@@ -178,7 +178,20 @@ export default class YouTubeBackend extends EventEmitter {
       })
 
       this.#liveChat.on('error', (err: any) => {
-        console.error(`[YouTube Live Error]:`, err)
+        const errorMsg = err?.info || err?.message || String(err)
+        const isBadRequest =
+          String(err).includes('400') ||
+          String(err).includes('INVALID_ARGUMENT') ||
+          String(errorMsg).includes('INVALID_ARGUMENT')
+        
+        if (isBadRequest) {
+          console.warn(`[YouTube Live] Stream tidak aktif / live chat berakhir (${this.liveId}). Menghentikan koneksi.`)
+          this.close()
+          this.emit('error', new Error('Live stream tidak aktif atau video ID tidak valid.'))
+          return
+        }
+
+        console.error(`[YouTube Live Error]:`, err?.message || err)
         const errorObj = err instanceof Error ? err : new Error(String(err))
         this.emit('error', errorObj)
       })
@@ -193,10 +206,19 @@ export default class YouTubeBackend extends EventEmitter {
     } catch (err: any) {
       this.#connected = false
       const errorMsg = err?.message || String(err)
-      console.error(`[YouTube Connect Error]:`, errorMsg)
+      const isBadRequest =
+        String(err).includes('400') ||
+        String(err).includes('INVALID_ARGUMENT') ||
+        String(errorMsg).includes('INVALID_ARGUMENT')
+
+      console.warn(`[YouTube Connect Warn]:`, errorMsg)
       this.emit('error', new Error(errorMsg))
-      if (!this.#closing) {
+
+      // Jangan reconnect jika video ID salah / 400 Bad Request
+      if (!this.#closing && !isBadRequest && this.#reconnectAttempts < 3) {
         this.#scheduleReconnect(errorMsg)
+      } else if (isBadRequest) {
+        this.close()
       }
       throw new Error(errorMsg)
     }
@@ -204,13 +226,17 @@ export default class YouTubeBackend extends EventEmitter {
 
   #scheduleReconnect(reason?: string) {
     if (this.#closing || this.#reconnectTimer) return
+    if (this.#reconnectAttempts >= 3) {
+      console.warn(`[YouTube Auto-Reconnect] Telah mencapai batas maksimal (3x). Menghentikan percobaan.`)
+      return
+    }
 
-    // Exponential backoff: 5s, 10s, 20s, max 30s
+    // Exponential backoff: 5s, 10s, 20s
     this.#reconnectAttempts++
     const delay = Math.min(5000 * Math.pow(2, this.#reconnectAttempts - 1), 30000)
 
     console.log(
-      `[YouTube Auto-Reconnect] Attempt #${this.#reconnectAttempts} in ${delay / 1000}s. Reason: ${reason || 'Disconnected'}`
+      `[YouTube Auto-Reconnect] Attempt #${this.#reconnectAttempts}/3 in ${delay / 1000}s. Reason: ${reason || 'Disconnected'}`
     )
 
     this.#reconnectTimer = setTimeout(async () => {
@@ -218,8 +244,8 @@ export default class YouTubeBackend extends EventEmitter {
       if (this.#closing) return
       try {
         await this.connect()
-      } catch (err) {
-        console.warn(`[YouTube Auto-Reconnect] Attempt #${this.#reconnectAttempts} failed:`, err)
+      } catch (err: any) {
+        console.warn(`[YouTube Auto-Reconnect] Percobaan #${this.#reconnectAttempts} gagal: ${err?.message || err}`)
       }
     }, delay)
   }
